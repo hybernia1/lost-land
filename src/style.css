@@ -308,19 +308,10 @@ button:disabled {
   min-height: 0;
 }
 
-.pixi-scene {
-  overflow: hidden;
-}
-
 .pixi-canvas {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-.game-shell.is-village [data-role="world-scene"],
-.game-shell.is-world [data-role="village-scene"] {
-  display: none;
 }
 
 @media (max-width: 980px) {

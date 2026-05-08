@@ -1,10 +1,14 @@
 import type { BuildingId, GameState } from "../game/types";
+import { pushLocalizedLog } from "./log";
 
 const CLINIC_FOOD_PER_TREATMENT = 2;
 const INCIDENT_BASE_DELAY_SECONDS = 600;
 const INCIDENT_DELAY_RANGE_SECONDS = 420;
+const STARVATION_DEATH_SECONDS = 360;
+const DEHYDRATION_DEATH_SECONDS = 240;
 
 export function tickHealth(state: GameState, deltaSeconds: number): void {
+  tickDeprivationDeaths(state, deltaSeconds);
   tickClinicTreatment(state, deltaSeconds);
   tickIncidents(state);
 }
@@ -12,7 +16,7 @@ export function tickHealth(state: GameState, deltaSeconds: number): void {
 export function injureSurvivors(
   state: GameState,
   count: number,
-  message: string,
+  logKey: string,
 ): number {
   let injured = 0;
 
@@ -26,7 +30,7 @@ export function injureSurvivors(
   }
 
   if (injured > 0) {
-    pushLog(state, message);
+    pushLocalizedLog(state, logKey);
   }
 
   return injured;
@@ -44,11 +48,11 @@ export function maybeInjureFromConstruction(
     if (building.constructionWorkers > 0) {
       building.constructionWorkers -= 1;
       state.health.injured += 1;
-      pushLog(state, "A survivor was injured during construction.");
+      pushLocalizedLog(state, "logConstructionInjury");
       return;
     }
 
-    injureSurvivors(state, 1, "A survivor was injured during construction.");
+    injureSurvivors(state, 1, "logConstructionInjury");
   }
 }
 
@@ -79,11 +83,53 @@ function tickClinicTreatment(state: GameState, deltaSeconds: number): void {
     state.health.injured -= 1;
     state.survivors.workers += 1;
     state.health.treatmentProgress -= 1;
-    pushLog(state, "The clinic treated one survivor.");
+    pushLocalizedLog(state, "logClinicTreated");
   }
 
   if (state.resources.food < CLINIC_FOOD_PER_TREATMENT) {
     state.health.treatmentProgress = Math.min(state.health.treatmentProgress, 1);
+  }
+}
+
+function tickDeprivationDeaths(state: GameState, deltaSeconds: number): void {
+  tickDeprivation(
+    state,
+    "food",
+    "starvationProgress",
+    STARVATION_DEATH_SECONDS,
+    "logStarvationDeath",
+  );
+  tickDeprivation(
+    state,
+    "water",
+    "dehydrationProgress",
+    DEHYDRATION_DEATH_SECONDS,
+    "logDehydrationDeath",
+  );
+
+  function tickDeprivation(
+    currentState: GameState,
+    resourceId: "food" | "water",
+    progressKey: "starvationProgress" | "dehydrationProgress",
+    deathSeconds: number,
+    logKey: string,
+  ): void {
+    if (currentState.resources[resourceId] > 0 || getCampPopulation(currentState) <= 0) {
+      currentState.health[progressKey] = 0;
+      return;
+    }
+
+    currentState.health[progressKey] += deltaSeconds / deathSeconds;
+
+    while (currentState.health[progressKey] >= 1) {
+      if (!killCampSurvivor(currentState)) {
+        currentState.health[progressKey] = 0;
+        return;
+      }
+
+      currentState.health[progressKey] -= 1;
+      pushLocalizedLog(currentState, logKey);
+    }
   }
 }
 
@@ -93,10 +139,18 @@ function tickIncidents(state: GameState): void {
   }
 
   const roll = stableRoll(`illness:${Math.floor(state.health.nextIncidentAt)}`);
-  const chance = state.resources.morale < 45 ? 18 : 7;
+  const moraleChance = state.resources.morale < 45 ? 18 : 7;
+  const scarcityChance = getScarcityInjuryChance(state);
+  const chance = Math.min(72, moraleChance + scarcityChance);
 
   if (roll < chance) {
-    injureSurvivors(state, 1, "A survivor fell ill.");
+    injureSurvivors(
+      state,
+      1,
+      scarcityChance > 0 && roll >= moraleChance
+        ? "logScarcityInjury"
+        : "logIllness",
+    );
   }
 
   state.health.nextIncidentAt =
@@ -104,6 +158,21 @@ function tickIncidents(state: GameState): void {
     INCIDENT_BASE_DELAY_SECONDS +
     stableRoll(`next:${Math.floor(state.elapsedSeconds)}`) *
       (INCIDENT_DELAY_RANGE_SECONDS / 100);
+}
+
+function getScarcityInjuryChance(state: GameState): number {
+  const foodIndex = getResourceIndex(state, "food");
+  const waterIndex = getResourceIndex(state, "water");
+  const foodPressure = Math.max(0, 1 - foodIndex);
+  const waterPressure = Math.max(0, 1 - waterIndex);
+
+  return Math.round(foodPressure * 10 + waterPressure * 14);
+}
+
+function getResourceIndex(state: GameState, resourceId: "food" | "water"): number {
+  const capacity = Math.max(1, state.capacities[resourceId]);
+
+  return Math.max(0, Math.min(1, state.resources[resourceId] / capacity));
 }
 
 function injureWorker(state: GameState): boolean {
@@ -133,6 +202,53 @@ function injureWorker(state: GameState): boolean {
   return true;
 }
 
+function killCampSurvivor(state: GameState): boolean {
+  if (state.survivors.workers > 0) {
+    state.survivors.workers -= 1;
+    return true;
+  }
+
+  const staffedBuilding = Object.values(state.buildings).find(
+    (building) => building.workers > 0,
+  );
+
+  if (staffedBuilding) {
+    staffedBuilding.workers -= 1;
+    return true;
+  }
+
+  const activeConstruction = Object.values(state.buildings).find(
+    (building) => building.constructionWorkers > 0,
+  );
+
+  if (activeConstruction) {
+    activeConstruction.constructionWorkers -= 1;
+    return true;
+  }
+
+  if (state.survivors.troops > 0) {
+    state.survivors.troops -= 1;
+    return true;
+  }
+
+  if (state.health.injured <= 0) {
+    return false;
+  }
+
+  state.health.injured -= 1;
+  return true;
+}
+
+function getCampPopulation(state: GameState): number {
+  const buildingWorkers = Object.values(state.buildings)
+    .reduce((total, building) => total + building.workers + building.constructionWorkers, 0);
+
+  return state.survivors.workers +
+    state.survivors.troops +
+    buildingWorkers +
+    state.health.injured;
+}
+
 function stableRoll(seed: string): number {
   let value = 0;
 
@@ -141,9 +257,4 @@ function stableRoll(seed: string): number {
   }
 
   return value;
-}
-
-function pushLog(state: GameState, message: string): void {
-  state.log.unshift(message);
-  state.log = state.log.slice(0, 16);
 }

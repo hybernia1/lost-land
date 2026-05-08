@@ -1,6 +1,5 @@
 import { tileById } from "../data/mapTiles";
 import type { GameState, MapSector, ResourceBag, TileKind } from "../game/types";
-import { addResources } from "./resources";
 
 const MAP_WIDTH = 9;
 const MAP_HEIGHT = 9;
@@ -31,56 +30,8 @@ export function createInitialMap(): GameState["map"] {
   return {
     width: MAP_WIDTH,
     height: MAP_HEIGHT,
-    selectedSectorId: `${centerX}:${centerY}`,
     sectors,
   };
-}
-
-export function getSector(state: GameState, sectorId: string): MapSector | undefined {
-  return state.map.sectors.find((sector) => sector.id === sectorId);
-}
-
-export function revealAround(state: GameState, sector: MapSector): void {
-  for (const candidate of state.map.sectors) {
-    const distance = Math.abs(candidate.x - sector.x) + Math.abs(candidate.y - sector.y);
-
-    if (distance <= 1) {
-      candidate.revealed = true;
-    }
-  }
-}
-
-export function tickThreat(state: GameState, deltaSeconds: number): void {
-  const base = getSector(state, `${Math.floor(state.map.width / 2)}:${Math.floor(state.map.height / 2)}`);
-
-  if (!base) {
-    return;
-  }
-
-  const pressure = state.map.sectors.reduce((total, sector) => {
-    if (!sector.revealed || sector.kind === "base") {
-      return total;
-    }
-
-    const distance = Math.max(1, Math.abs(sector.x - base.x) + Math.abs(sector.y - base.y));
-    return total + sector.threat / distance;
-  }, 0);
-
-  if (pressure > 110) {
-    state.resources.morale = Math.max(
-      0,
-      state.resources.morale - 0.008 * deltaSeconds,
-    );
-  }
-}
-
-export function collectSectorLoot(state: GameState, sector: MapSector): void {
-  const loot = { ...sector.loot };
-  addResources(state.resources, loot, state.capacities);
-  sector.loot = {};
-  sector.scouted = true;
-  sector.threat = Math.max(0, sector.threat - 18);
-  revealAround(state, sector);
 }
 
 function pickTileKind(x: number, y: number, distance: number): TileKind {

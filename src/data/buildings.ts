@@ -15,6 +15,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     baseConstructionWorkers: 2,
     baseCost: { material: 45 },
     produces: { morale: 0.03 },
+    consumes: { energy: 0.01 },
   },
   {
     id: "storage",
@@ -28,6 +29,17 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
       water: 90,
       material: 130,
     },
+    consumes: { energy: 0.005 },
+  },
+  {
+    id: "dormitory",
+    name: "Dormitory",
+    description: "Houses civilian survivors, but needs power to stay livable.",
+    buildSeconds: 34,
+    baseConstructionWorkers: 2,
+    baseCost: { material: 85, energy: 6 },
+    alwaysConsumes: { energy: 0.02 },
+    housing: 10,
   },
   {
     id: "hydroponics",
@@ -57,6 +69,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     baseConstructionWorkers: 3,
     baseCost: { material: 80 },
     produces: { material: 0.14 },
+    consumes: { energy: 0.025 },
   },
   {
     id: "generator",
@@ -74,6 +87,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     baseConstructionWorkers: 2,
     baseCost: { material: 75 },
     defense: 12,
+    consumes: { energy: 0.01 },
   },
   {
     id: "barracks",
@@ -82,6 +96,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     buildSeconds: 40,
     baseConstructionWorkers: 2,
     baseCost: { material: 95, food: 18 },
+    consumes: { energy: 0.015 },
   },
   {
     id: "palisade",
@@ -92,14 +107,16 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     baseCost: { material: 95 },
     produces: { morale: 0.01 },
     defense: 9,
+    consumes: { energy: 0.005 },
   },
   {
     id: "clinic",
     name: "Clinic",
-    description: "Reduces expedition losses and keeps people fit.",
+    description: "Trains workers into troops for future outside missions and camp defense.",
     buildSeconds: 42,
     baseConstructionWorkers: 2,
     baseCost: { material: 85, food: 20 },
+    consumes: { energy: 0.025 },
   },
 ];
 

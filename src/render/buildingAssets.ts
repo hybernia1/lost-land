@@ -31,6 +31,12 @@ const palettes: Record<Exclude<BuildingId, "palisade">, Palette> = {
     detail: "#2b261f",
     light: "#d9b46c",
   },
+  dormitory: {
+    base: "#59615b",
+    roof: "#7b6f55",
+    detail: "#252820",
+    light: "#f0d07a",
+  },
   hydroponics: {
     base: "#456351",
     roof: "#6c8a68",
@@ -97,6 +103,8 @@ export function drawBuildingAsset(
     drawMainBuilding(context, options, palette);
   } else if (options.id === "storage") {
     drawStorage(context, options, palette);
+  } else if (options.id === "dormitory") {
+    drawDormitory(context, options, palette);
   } else if (options.id === "hydroponics") {
     drawHydroponics(context, options, palette);
   } else if (options.id === "waterStill") {
@@ -196,6 +204,36 @@ function drawStorage(
   drawRoof(context, width, height, palette.roof);
   drawPlanks(context, width, height, scale, 4);
   drawDoor(context, width, height, scale, palette.detail);
+}
+
+function drawDormitory(
+  context: CanvasRenderingContext2D,
+  { width, height, scale }: BuildingAssetOptions,
+  palette: Palette,
+): void {
+  drawBlock(context, width, height, scale, palette, 1.08);
+  drawRoof(context, width, height, palette.roof);
+  drawDoor(context, width, height, scale, palette.detail);
+
+  context.fillStyle = "rgba(240, 208, 122, 0.72)";
+  for (let index = 0; index < 3; index += 1) {
+    roundRect(
+      context,
+      -width * 0.32 + index * width * 0.23,
+      -height * 0.11,
+      width * 0.11,
+      height * 0.13,
+      2 * scale,
+    );
+    context.fill();
+  }
+
+  context.strokeStyle = "rgba(23, 26, 21, 0.34)";
+  context.lineWidth = 1.5 * scale;
+  context.beginPath();
+  context.moveTo(-width * 0.42, height * 0.28);
+  context.lineTo(width * 0.42, height * 0.28);
+  context.stroke();
 }
 
 function drawHydroponics(

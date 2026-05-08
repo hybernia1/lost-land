@@ -4,15 +4,14 @@
 
 Lost Land is a single-player browser strategy/survival game set around 2045.
 The core fantasy is managing a survivor community under resource pressure,
-expanding across a Travian-like sector map, and surviving zombie hordes.
+holding a fortified home village, and surviving zombie hordes.
 
 The first playable version should favor a clear strategy loop over visual
 complexity:
 
 - build and upgrade base buildings
 - produce, consume, and store resources
-- send expeditions to map sectors
-- reveal and exploit nearby locations
+- prepare for future random expeditions into the unknown outside world
 - react to events and incoming hordes
 - save and load the full game state locally
 
@@ -24,7 +23,7 @@ Recommended baseline:
 
 - TypeScript
 - Vite for local development and production bundling
-- PixiJS for in-game village/world rendering and game HUD
+- PixiJS for in-game village rendering and game HUD
 - DOM only for title menu, new-game flow, load/settings screens, and the shared floating tooltip host
 - SVG sprite icons in `src/assets/icons.svg`, rendered in Pixi via `src/render/pixiIcons.ts`
 - Local save system through versioned JSON in `localStorage` first
@@ -54,8 +53,11 @@ npm run build
 npm run preview
 ```
 
-Use `npm run dev` for the local development server. If the default Vite port is
-busy, use the next available port and mention the URL in the final response.
+Use `npm run dev` for the local development server. Keep only one Vite dev
+server running for this workspace. Before starting another one, check whether an
+existing server is already listening on the Vite port range and reuse or stop it
+instead of creating multiple servers on 5173, 5174, 5175, etc. Prefer the
+standard Vite URL `http://127.0.0.1:5173/` when available.
 
 Keep temporary implementation notes in this file only when they are useful for
 future Codex sessions. Do not put user-facing design docs, game lore, or task
@@ -93,7 +95,6 @@ src/
     events.ts
   render/
     PixiVillageRenderer.ts
-    PixiWorldRenderer.ts
     pixiIcons.ts
     buildingAssets.ts
   ui/
@@ -118,7 +119,7 @@ types. Avoid copy-pasted per-building or per-resource logic.
 ## UI and assets
 
 The game UI should be simple, readable, and operational rather than decorative.
-Use PixiJS for in-game map/village scenes and controls.
+Use PixiJS for the in-game village scene and controls.
 
 Icons live in `src/assets/icons.svg` as a symbol sprite. In-game Pixi UI should
 draw them through `drawPixiIcon` in `src/render/pixiIcons.ts`, so icon loading
@@ -146,10 +147,19 @@ Start with `localStorage`. Saves are multi-slot by community name: each
 an index of saved communities for the Continue menu. Move to IndexedDB only
 when save size makes it worthwhile.
 
+Use autosave only during gameplay. Do not add manual in-game save/load toolbar
+buttons; Continue from the title menu is the load flow.
+
+The game is in active development. Do not preserve legacy save compatibility or
+write migrations for old experimental state shapes unless explicitly requested.
+When state schemas change, bump the save version and reject/delete old shapes
+cleanly instead of carrying compatibility branches.
+
 ## Current design choices
 
-- Start with a square sector grid unless hexes become important to gameplay.
-- Keep the Travian-like grid only for the world map screen.
+- Do not render a world map screen for now. The outside world should be unknown
+  and future expeditions should use random/outcome-driven flows instead of
+  direct sector clicking, scouting, or attack actions.
 - Use a separate home village screen with a palisade perimeter and building
   plots inside the camp.
 - The village is a circular camp. The center plot starts with the Main Building
@@ -167,14 +177,14 @@ when save size makes it worthwhile.
 - Keep construction tied to direct village interaction. Clicking an empty plot
   should open a build-choice modal for that plot; clicking an existing building
   should open that building's detail/upgrade modal. The side panel should stay
-  focused on context, settlement status, expeditions, and log.
+  focused on context, settlement status, and log.
 - Resource and global status indicators should have hover tooltips explaining
   what the values mean.
 - The game screen should behave like a fixed game viewport, not a scrolling web
   page. Keep `game-shell` locked to the viewport; allow scrolling only inside
   panels/drawers that need it.
 - Start with real-time ticks, pause, and two speed controls: normal `1x` and
-  fast `8x`.
+  fast `24x`.
 - The visible game clock starts at 08:00 on a new game. One full in-game day
   lasts 45 real-time minutes at 1x speed.
 - Keep survivor management simple: only workers, injured survivors, and troops.
@@ -182,7 +192,7 @@ when save size makes it worthwhile.
   only be treated by the Clinic. Troops do not become injured; combat losses are
   deaths.
 - Troop training belongs to the Barracks building detail, not to the general
-  survivors or expedition side panel.
+  survivors panel.
 - Construction and upgrades reserve a logical number of workers for the whole
   build duration. Reserved construction workers are unavailable for other jobs
   until the job finishes or an injury removes them from the crew.
@@ -192,12 +202,12 @@ when save size makes it worthwhile.
 - Do not use a fuel resource. The Generator produces energy from assigned
   workers instead: level 1 supports 2 workers, level 2 supports 3 workers, and
   level 3+ supports 4 workers.
-- Do not use an ammo resource. Troops consume food and water when sent on
-  expeditions; combat outcomes kill troops rather than spending ammunition.
+- Do not use an ammo resource. Troops are currently a dummy/simple role until
+  future random outside expeditions are designed.
 - Use a minimal 2D/2.5D visual style before investing in detailed art.
 - Building visuals currently live as canvas vector assets in
   `src/render/buildingAssets.ts`. Keep individual building silhouettes readable
   at small slot sizes and avoid moving game rules into visual asset code.
-- Village and world map screens render through PixiJS. Keep menu, settings, and
-  save/load flows in DOM for now, but avoid adding DOM fallback for in-game HUD,
-  build modals, world map controls, or scene overlays.
+- The village screen renders through PixiJS. Keep menu, settings, and save/load
+  flows in DOM for now, but avoid adding DOM fallback for in-game HUD, build
+  modals, or scene overlays.

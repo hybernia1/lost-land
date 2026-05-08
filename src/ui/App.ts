@@ -4,21 +4,19 @@ import type { BuildingId, GameSpeed, GameState } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import { PixiWorldRenderer } from "../render/PixiWorldRenderer";
+import type { VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
 
-type ScreenId = "village" | "world";
 type AppMode = "menu" | "new-game" | "load-game" | "settings" | "game";
 
 export class App {
-  private worldRenderer: PixiWorldRenderer | null = null;
   private villageRenderer: PixiVillageRenderer | null = null;
   private state: GameState | null = null;
-  private activeScreen: ScreenId = "village";
   private mode: AppMode = "menu";
   private locale: Locale = loadLocale();
   private shellReady = false;
   private villageModalPlotId: string | null = null;
+  private villageInfoPanel: VillageInfoPanel | null = null;
   private renderQueued = false;
   private tooltipTarget: HTMLElement | null = null;
   private suppressVillageClickUntil = 0;
@@ -192,15 +190,16 @@ export class App {
       this.renderGameShell();
     }
 
-    if (!this.worldRenderer || !this.villageRenderer) {
+    if (!this.villageRenderer) {
       return;
     }
 
-    if (this.activeScreen === "village") {
-      this.villageRenderer.render(this.state, this.t(), this.villageModalPlotId);
-    } else {
-      this.worldRenderer.render(this.state, this.t());
-    }
+    this.villageRenderer.render(
+      this.state,
+      this.t(),
+      this.villageModalPlotId,
+      this.villageInfoPanel,
+    );
 
     this.updateShellMode();
   }
@@ -213,23 +212,19 @@ export class App {
         <main class="game-layout">
           <section class="scene-panel">
             <div class="pixi-scene" data-role="village-scene"></div>
-            <div class="pixi-scene" data-role="world-scene"></div>
           </section>
         </main>
         <div class="floating-tooltip" data-slot="tooltip" role="tooltip"></div>
       </div>
     `;
 
-    const worldScene = this.root.querySelector<HTMLElement>("[data-role='world-scene']");
     const villageScene = this.root.querySelector<HTMLElement>("[data-role='village-scene']");
 
-    if (!worldScene || !villageScene) {
+    if (!villageScene) {
       throw new Error("Missing scene hosts.");
     }
 
-    this.worldRenderer = new PixiWorldRenderer(worldScene, () => this.requestRender());
     this.villageRenderer = new PixiVillageRenderer(villageScene, () => this.requestRender());
-    worldScene.addEventListener("click", (event) => this.handleCanvasClick(event));
     villageScene.addEventListener("click", (event) => this.handleCanvasClick(event));
     const handlePixiAction = (event: Event) => {
       this.handlePixiAction(event as CustomEvent<{
@@ -237,13 +232,11 @@ export class App {
         building?: BuildingId;
         plot?: string;
         delta?: number;
-        sector?: string;
         speed?: GameSpeed;
-        view?: ScreenId;
+        continuousShifts?: boolean;
       }>);
     };
     villageScene.addEventListener("pixi-action", handlePixiAction);
-    worldScene.addEventListener("pixi-action", handlePixiAction);
     this.shellReady = true;
   }
 
@@ -254,8 +247,7 @@ export class App {
       return;
     }
 
-    shell.classList.toggle("is-village", this.activeScreen === "village");
-    shell.classList.toggle("is-world", this.activeScreen === "world");
+    shell.classList.add("is-village");
   }
 
   private handleCanvasClick(event: MouseEvent): void {
@@ -267,26 +259,17 @@ export class App {
       return;
     }
 
-    if (this.activeScreen === "village" && this.villageRenderer) {
+    if (this.villageRenderer) {
       const plotId = this.villageRenderer.hitTest(event.clientX, event.clientY);
 
       if (plotId) {
         this.game.selectVillagePlot(plotId);
         this.villageModalPlotId = plotId;
+        this.villageInfoPanel = null;
         this.requestRender();
       }
 
       return;
-    }
-
-    if (!this.worldRenderer || this.activeScreen !== "world") {
-      return;
-    }
-
-    const sector = this.worldRenderer.hitTest(event.clientX, event.clientY, this.state);
-
-    if (sector) {
-      this.game.selectSector(sector.id);
     }
   }
 
@@ -295,19 +278,11 @@ export class App {
     building?: BuildingId;
     plot?: string;
     delta?: number;
-    sector?: string;
     speed?: GameSpeed;
-    view?: ScreenId;
+    continuousShifts?: boolean;
   }>): void {
     this.suppressVillageClickUntil = Date.now() + 120;
-    const { action, building, delta, plot, sector, speed, view } = event.detail;
-
-    if (view) {
-      this.activeScreen = view;
-      this.villageModalPlotId = null;
-      this.requestRender();
-      return;
-    }
+    const { action, building, continuousShifts, delta, plot, speed } = event.detail;
 
     if (speed) {
       this.game.setSpeed(speed);
@@ -319,23 +294,26 @@ export class App {
       return;
     }
 
-    if (action === "save") {
-      this.game.save();
+    if (action === "home") {
+      this.returnHome();
       return;
     }
 
-    if (action === "load") {
-      this.game.load();
+    if (action === "open-morale-breakdown") {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = "morale";
+      this.requestRender();
       return;
     }
 
-    if (action === "reset") {
-      this.game.reset();
+    if (action === "set-continuous-shifts") {
+      this.game.setContinuousShifts(continuousShifts ?? false);
       return;
     }
 
     if (action === "close-village-modal") {
       this.villageModalPlotId = null;
+      this.villageInfoPanel = null;
       this.requestRender();
       return;
     }
@@ -369,11 +347,6 @@ export class App {
 
     if (action === "barracks-troop-to-worker") {
       this.game.convertTroopToWorker();
-      return;
-    }
-
-    if (action === "expedition" && sector) {
-      this.game.sendExpedition(sector);
     }
   }
 
@@ -397,19 +370,13 @@ export class App {
 
     if (action === "close-village-modal") {
       this.villageModalPlotId = null;
+      this.villageInfoPanel = null;
       this.requestRender();
       return;
     }
 
     if (action === "open-selected-plot" && this.state) {
       this.villageModalPlotId = this.state.village.selectedPlotId;
-      this.requestRender();
-      return;
-    }
-
-    if (button.dataset.view) {
-      this.activeScreen = button.dataset.view as ScreenId;
-      this.villageModalPlotId = null;
       this.requestRender();
       return;
     }
@@ -459,16 +426,8 @@ export class App {
       this.game.setPaused(!this.state.paused);
     }
 
-    if (action === "save") {
-      this.game.save();
-    }
-
-    if (action === "load") {
-      this.game.load();
-    }
-
-    if (action === "reset") {
-      this.game.reset();
+    if (action === "home") {
+      this.returnHome();
     }
 
     if (action === "upgrade" && button.dataset.building) {
@@ -495,10 +454,6 @@ export class App {
         button.dataset.plot,
         button.dataset.building as BuildingId,
       );
-    }
-
-    if (action === "expedition" && button.dataset.sector) {
-      this.game.sendExpedition(button.dataset.sector);
     }
   }
 
@@ -566,9 +521,23 @@ export class App {
 
   private startGameSession(): void {
     this.mode = "game";
-    this.activeScreen = "village";
     this.game.start();
     this.requestRender();
+  }
+
+  private returnHome(): void {
+    this.mode = "menu";
+    this.villageModalPlotId = null;
+    this.villageInfoPanel = null;
+    this.game.stop();
+    this.destroyVillageRenderer();
+    this.shellReady = false;
+    this.requestRender();
+  }
+
+  private destroyVillageRenderer(): void {
+    this.villageRenderer?.destroy();
+    this.villageRenderer = null;
   }
 
   private escapeHtml(value: string): string {
