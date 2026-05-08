@@ -3,6 +3,7 @@ import {
   Assets,
   Container,
   Graphics,
+  Rectangle,
   Text,
   Sprite,
   Texture,
@@ -10,6 +11,7 @@ import {
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
+import { buildingVisualDefinitions, getBuildingVisualFrame } from "../data/buildingVisuals";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
 import { formatGameClock, getGameDay } from "../game/time";
 import type { BuildingId, GameSpeed, GameState, ResourceBag, ResourceId } from "../game/types";
@@ -17,6 +19,7 @@ import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
   getActiveBuildingQueue,
+  getBuildingBuildSeconds,
   getBuildingWorkerLimit,
   getConstructionWorkerRequirement,
   getGeneratorEnergyRate,
@@ -55,13 +58,6 @@ type PixiActionDetail = {
   view?: "village" | "world";
 };
 
-type PixiTooltipDetail = {
-  visible: boolean;
-  text?: string;
-  x?: number;
-  y?: number;
-};
-
 type EffectLine = {
   iconId: string;
   value: string;
@@ -76,6 +72,21 @@ type CostLinePart = {
   tooltip: string;
 };
 
+type MainBuildingEffect = {
+  phase: number;
+  bounds: Bounds;
+  base: Graphics;
+  lights: Graphics;
+  smoke: Graphics;
+};
+
+type PalisadeGeometry = {
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+};
+
 const resourceColors: Record<ResourceId, number> = {
   food: 0xd8b66a,
   water: 0x66bde8,
@@ -86,12 +97,27 @@ const resourceColors: Record<ResourceId, number> = {
 
 const buildingTextureCache = new Map<string, Texture>();
 
+function upgradingTooltip(
+  name: string,
+  level: number,
+  upgradingRemaining: number,
+  levelLabel: string,
+): string {
+  const status = upgradingRemaining > 0
+    ? `${Math.ceil(upgradingRemaining)}s`
+    : `${levelLabel} ${level}`;
+  return `${name} / ${status}`;
+}
+
 export class PixiVillageRenderer {
   private app: Application | null = null;
   private readonly rootLayer = new Container();
   private readonly worldLayer = new Container();
   private readonly hudLayer = new Container();
+  private readonly tooltipLayer = new Container();
+  private readonly buildingSpritesheets = new Map<BuildingId, Texture>();
   private backgroundTexture: Texture | null = null;
+  private mainBuildingEffects: MainBuildingEffect[] = [];
   private layout: SceneLayout = {
     originX: 0,
     originY: 0,
@@ -106,7 +132,8 @@ export class PixiVillageRenderer {
     private readonly host: HTMLElement,
     private readonly requestRender: () => void = () => {},
   ) {
-    this.rootLayer.addChild(this.worldLayer, this.hudLayer);
+    this.tooltipLayer.eventMode = "none";
+    this.rootLayer.addChild(this.worldLayer, this.hudLayer, this.tooltipLayer);
     void this.initialize();
   }
 
@@ -126,18 +153,25 @@ export class PixiVillageRenderer {
     }
 
     this.layout = this.getLayout(width, height);
+    const hudScale = this.getHudScale(width, height);
+    const hudWidth = width / hudScale;
+    const hudHeight = height / hudScale;
+    const visualTime = performance.now() / 1000;
+    this.mainBuildingEffects = [];
     this.worldLayer.removeChildren();
     this.hudLayer.removeChildren();
+    this.hideCanvasTooltip();
+    this.hudLayer.scale.set(hudScale);
     this.drawBackground(width, height);
     this.drawPalisade(state, translations?.buildings);
 
     for (const plot of villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter")) {
-      this.drawPlot(plot, state, translations);
+      this.drawPlot(plot, state, translations, visualTime);
     }
 
     this.drawGate(state);
-    this.drawHud(state, translations, width, height);
-    this.drawVillageModal(state, translations, width, height, modalPlotId ?? null);
+    this.drawHud(state, translations, hudWidth, hudHeight);
+    this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
   }
 
   hitTest(clientX: number, clientY: number): string | null {
@@ -176,10 +210,28 @@ export class PixiVillageRenderer {
     app.canvas.classList.add("pixi-canvas");
     this.host.append(app.canvas);
     app.stage.addChild(this.rootLayer);
+    app.ticker.add(() => this.updateMainBuildingEffects());
     this.app = app;
 
-    this.backgroundTexture = await Assets.load<Texture>(villageBackgroundUrl);
+    const [backgroundTexture] = await Promise.all([
+      Assets.load<Texture>(villageBackgroundUrl),
+      this.loadBuildingSpritesheets(),
+    ]);
+    this.backgroundTexture = backgroundTexture;
     this.requestRender();
+  }
+
+  private async loadBuildingSpritesheets(): Promise<void> {
+    await Promise.all(
+      Object.entries(buildingVisualDefinitions).map(async ([buildingId, visual]) => {
+        if (!visual) {
+          return;
+        }
+
+        const texture = await Assets.load<Texture>(visual.spritesheetUrl);
+        this.buildingSpritesheets.set(buildingId as BuildingId, texture);
+      }),
+    );
   }
 
   private drawBackground(width: number, height: number): void {
@@ -202,16 +254,13 @@ export class PixiVillageRenderer {
     state: GameState,
     buildingLabels?: TranslationPack["buildings"],
   ): void {
-    const { originX, originY, width, height, scale } = this.layout;
+    const { scale } = this.layout;
     const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
     const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
     const hasStarted = plot?.buildingId === "palisade";
     const built = (building?.level ?? 0) > 0;
     const selected = state.village.selectedPlotId === "plot-palisade";
-    const centerX = originX + width / 2;
-    const centerY = originY + height * 0.52;
-    const radiusX = width * 0.47;
-    const radiusY = height * 0.41;
+    const { centerX, centerY, radiusX, radiusY } = this.getPalisadeGeometry();
     const alpha = built ? 1 : hasStarted ? 0.58 : 0.25;
 
     const palisade = new Graphics();
@@ -238,7 +287,7 @@ export class PixiVillageRenderer {
     }
     this.worldLayer.addChild(posts);
 
-    this.drawPalisadePlotLabel(
+    this.addPalisadeTooltip(
       selected,
       building?.level ?? 0,
       building?.upgradingRemaining ?? 0,
@@ -250,6 +299,7 @@ export class PixiVillageRenderer {
     plot: VillagePlotDefinition,
     state: GameState,
     translations?: TranslationPack,
+    visualTime = 0,
   ): void {
     const plotState = state.village.plots.find((candidate) => candidate.id === plot.id);
     const buildingId = plotState?.buildingId ?? null;
@@ -265,64 +315,71 @@ export class PixiVillageRenderer {
     const plotLayer = new Container();
     plotLayer.x = bounds.x + bounds.width / 2;
     plotLayer.y = bounds.y + bounds.height / 2;
+    plotLayer.hitArea = {
+      contains: (x: number, y: number) =>
+        x >= -bounds.width / 2 &&
+        x <= bounds.width / 2 &&
+        y >= -bounds.height / 2 &&
+        y <= bounds.height / 2,
+    };
     this.worldLayer.addChild(plotLayer);
 
-    const shadow = new Graphics();
-    shadow
-      .ellipse(0, bounds.height * 0.36, bounds.width * 0.58, bounds.height * 0.33)
-      .fill({ color: 0x000000, alpha: buildingId ? 0.36 : 0.18 });
-    plotLayer.addChild(shadow);
-
     if (buildingId && building) {
-      const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
-      asset.anchor.set(0.5);
-      asset.width = bounds.width;
-      asset.height = bounds.height;
-      asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
-      plotLayer.addChild(asset);
-
-      this.drawBuildingNameplate(
-        plotLayer,
+      const tooltip = upgradingTooltip(
         name,
         building.level,
-        selected,
-        isMainPlot ? bounds.height + 10 * this.layout.scale : bounds.height,
         building.upgradingRemaining,
+        translations?.ui.level ?? "Lvl",
       );
+      this.bindTooltip(plotLayer, tooltip);
+
+      const shadow = new Graphics();
+      shadow
+        .ellipse(0, bounds.height * 0.36, bounds.width * 0.58, bounds.height * 0.33)
+        .fill({ color: 0x000000, alpha: 0.36 });
+      plotLayer.addChild(shadow);
+
+      const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
+      asset.anchor.set(0.5);
+      this.fitSprite(asset, bounds.width, bounds.height);
+      asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
+      plotLayer.addChild(asset);
+      this.drawBuildingVisualEffects(plotLayer, buildingId, Math.max(1, building.level), bounds, visualTime);
       return;
     }
 
+    this.bindTooltip(plotLayer, translations?.ui.emptyPlot ?? "Empty plot");
     const empty = new Graphics();
+    const markerSize = Math.min(bounds.width, bounds.height) * 0.42;
+    const alpha = selected ? 0.95 : 0.44;
     empty
-      .roundRect(-bounds.width / 2, -bounds.height / 2, bounds.width, bounds.height, 6 * this.layout.scale)
-      .fill({ color: 0x292b1f, alpha: 0.46 })
+      .circle(0, 0, markerSize * 0.52)
+      .fill({ color: 0x10120e, alpha: selected ? 0.24 : 0.12 })
       .stroke({
         color: selected ? 0xf3c85f : 0xe0c46f,
-        alpha: selected ? 1 : 0.5,
+        alpha,
         width: selected ? 3 : 2,
       });
+    empty
+      .moveTo(-markerSize * 0.22, 0)
+      .lineTo(markerSize * 0.22, 0)
+      .moveTo(0, -markerSize * 0.22)
+      .lineTo(0, markerSize * 0.22)
+      .stroke({
+        color: selected ? 0xf3c85f : 0xeadca0,
+        alpha: selected ? 0.95 : 0.58,
+        width: Math.max(3, 5 * this.layout.scale),
+      });
     plotLayer.addChild(empty);
-    this.drawCenteredText(plotLayer, "+", 0, -bounds.height * 0.08, {
-      fill: 0xeadca0,
-      fontSize: Math.max(30, 38 * this.layout.scale),
-      fontWeight: "700",
-      alpha: 0.72,
-    });
-    this.drawCenteredText(plotLayer, (translations?.ui.emptyPlot ?? "Empty plot").toUpperCase(), 0, bounds.height * 0.26, {
-      fill: 0xefe5c5,
-      fontSize: Math.max(10, 12 * this.layout.scale),
-      fontWeight: "700",
-      alpha: 0.72,
-    });
   }
 
   private drawGate(state: GameState): void {
-    const { originX, originY, width, height } = this.layout;
     const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
     const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
     const alpha = (building?.level ?? 0) > 0 ? 1 : plot?.buildingId ? 0.58 : 0.3;
-    const gateX = originX + width * 0.5;
-    const gateY = originY + height * 0.9;
+    const { centerX, centerY, radiusY } = this.getPalisadeGeometry();
+    const gateX = centerX;
+    const gateY = centerY + radiusY;
     const gate = new Graphics();
 
     gate.rect(gateX - 42, gateY - 56, 84, 70).fill({ color: 0x4d3629, alpha });
@@ -355,8 +412,7 @@ export class PixiVillageRenderer {
     this.drawResourcePills(state, translations, width);
     this.drawViewTabs(translations);
     this.drawProduction(state, translations);
-    this.drawWorkforce(state, translations);
-    this.drawActionRail(translations, width, height);
+    this.drawWorkforce(state, translations, width);
     this.drawQueue(state, translations, height);
     this.drawToolbar(state, translations, width, height);
   }
@@ -437,8 +493,8 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(layer);
 
     const width = 308;
-    const rowHeight = 18;
-    const height = 44 + resourceDefinitions.length * rowHeight;
+    const rowHeight = 20;
+    const height = 46 + resourceDefinitions.length * rowHeight;
     this.drawPanel(layer, 0, 0, width, height);
     this.drawIcon(layer, "build", 18, 22, 14);
     this.drawText(layer, translations?.ui.production ?? "Production", 34, 14, {
@@ -447,14 +503,21 @@ export class PixiVillageRenderer {
       fontWeight: "800",
     });
     if (translations?.ui.productionTooltip) {
-      this.bindTooltip(layer, translations.ui.productionTooltip);
+      const headerHit = new Container();
+      headerHit.x = 14;
+      headerHit.y = 8;
+      headerHit.hitArea = {
+        contains: (x: number, y: number) => x >= 0 && x <= 126 && y >= 0 && y <= 26,
+      };
+      layer.addChild(headerHit);
+      this.bindTooltip(headerHit, translations.ui.productionTooltip);
     }
 
-    this.drawText(layer, translations?.ui.stock ?? "Stock", 226, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
+    this.drawText(layer, translations?.ui.stock ?? "Stock", 214, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
     this.drawText(layer, translations?.ui.perMinute ?? "+/min", 290, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
 
     resourceDefinitions.forEach((resource, index) => {
-      const y = 38 + index * rowHeight;
+      const y = 40 + index * rowHeight;
       const perMinute = rates[resource.id] * 60;
       const stock = resource.id === "morale"
         ? `${Math.floor(state.resources[resource.id])}%`
@@ -462,23 +525,37 @@ export class PixiVillageRenderer {
       const rateLabel = `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`;
       const rateColor = perMinute > 0.004 ? 0x8fe0b8 : perMinute < -0.004 ? 0xff9aa2 : 0xaeb4b8;
 
-      const resourceCell = new Container();
-      resourceCell.x = 142;
-      resourceCell.y = y + 7;
-      layer.addChild(resourceCell);
+      const row = new Container();
+      row.x = 14;
+      row.y = y - 2;
+      row.hitArea = {
+        contains: (x: number, y: number) => x >= 0 && x <= width - 28 && y >= 0 && y <= 18,
+      };
+      layer.addChild(row);
       if (translations) {
-        this.bindTooltip(resourceCell, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
+        this.bindTooltip(row, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
       }
-      this.drawIcon(resourceCell, resource.id, 0, 0, 15);
-      this.drawText(layer, stock, 226, y, { fill: 0xd7ddd8, fontSize: 11 }).anchor.set(1, 0);
-      this.drawText(layer, rateLabel, 290, y, { fill: rateColor, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+      if (index % 2 === 1) {
+        const stripe = new Graphics();
+        stripe.roundRect(0, 0, width - 28, 18, 4).fill({ color: 0xffffff, alpha: 0.025 });
+        row.addChild(stripe);
+      }
+      this.drawIcon(row, resource.id, 8, 9, 14);
+      this.drawText(row, translations?.resources[resource.id] ?? resource.id, 28, 1, {
+        fill: 0xd7ddd8,
+        fontSize: 11,
+        fontWeight: "800",
+      });
+      this.drawText(row, stock, 200, 1, { fill: 0xd7ddd8, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+      this.drawText(row, rateLabel, 276, 1, { fill: rateColor, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
     });
   }
 
-  private drawWorkforce(state: GameState, translations: TranslationPack | undefined): void {
+  private drawWorkforce(state: GameState, translations: TranslationPack | undefined, width: number): void {
+    const panelWidth = 308;
     const layer = new Container();
-    layer.x = 28;
-    layer.y = 304;
+    layer.x = Math.max(28, width - panelWidth - 28);
+    layer.y = 152;
     this.hudLayer.addChild(layer);
 
     const buildingWorkers = Object.values(state.buildings)
@@ -496,89 +573,107 @@ export class PixiVillageRenderer {
       state.health.injured;
     const t = translations;
 
-    this.drawPanel(layer, 0, 0, 308, 126);
+    this.drawPanel(layer, 0, 0, panelWidth, 190);
     this.drawIcon(layer, "people", 18, 22, 15);
     this.drawText(layer, t?.ui.survivors ?? "Survivors", 34, 14, {
       fill: 0xf3edda,
       fontSize: 12,
       fontWeight: "800",
     });
-    this.drawInfoToken(layer, {
-      iconId: "people",
-      text: `${totalPopulation}`,
-      tooltip: t?.ui.totalPopulation ?? "Total population",
-      x: 246,
-      y: 14,
+    const total = this.drawText(layer, `${totalPopulation}`, panelWidth - 28, 14, {
+      fill: 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
     });
+    total.anchor.set(1, 0);
+    const totalHit = new Container();
+    totalHit.x = panelWidth - 92;
+    totalHit.y = 10;
+    totalHit.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= 66 && y >= 0 && y <= 22,
+    };
+    layer.addChild(totalHit);
+    this.bindTooltip(totalHit, t?.ui.totalPopulation ?? "Total population");
 
-    const rows: Array<[string, string, string, number]> = [
-      ["people", `${state.survivors.workers}`, t?.ui.availableWorkers ?? "Available workers", 0],
-      ["build", `${buildingWorkers}`, t?.ui.buildingWorkers ?? "Working in buildings", 1],
-      ["material", `${constructionWorkers}`, t?.ui.constructionCrew ?? "Construction crew", 2],
-      ["scout", `${state.survivors.troops}`, t?.ui.availableTroops ?? "Available troops", 3],
-      ["day", `${expeditionTroops}`, t?.ui.expeditionTroops ?? "On expedition", 4],
-      ["morale", `${state.health.injured}`, t?.roles.injured ?? "Injured", 5],
+    const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
+      { iconId: "people", value: `${state.survivors.workers}`, label: t?.ui.availableWorkers ?? "Available workers", tooltip: t?.ui.availableWorkers ?? "Available workers" },
+      { iconId: "build", value: `${buildingWorkers}`, label: t?.ui.buildingWorkers ?? "Working in buildings", tooltip: t?.ui.buildingWorkers ?? "Working in buildings" },
+      { iconId: "material", value: `${constructionWorkers}`, label: t?.ui.constructionCrew ?? "Construction crew", tooltip: t?.ui.constructionCrew ?? "Construction crew" },
+      { iconId: "scout", value: `${state.survivors.troops}`, label: t?.ui.availableTroops ?? "Available troops", tooltip: t?.ui.availableTroops ?? "Available troops" },
+      { iconId: "expedition", value: `${expeditionTroops}`, label: t?.ui.expeditionTroops ?? "On expedition", tooltip: t?.ui.expeditionTroops ?? "On expedition" },
+      { iconId: "morale", value: `${state.health.injured}`, label: t?.roles.injured ?? "Injured", tooltip: t?.roles.injured ?? "Injured", missing: state.health.injured > 0 },
     ];
 
-    rows.forEach(([iconId, value, tooltip, index]) => {
-      const column = index % 2;
-      const row = Math.floor(index / 2);
-      this.drawInfoToken(layer, {
-        iconId,
-        text: value,
-        tooltip,
-        missing: iconId === "morale" && state.health.injured > 0,
-        x: 16 + column * 144,
-        y: 44 + row * 26,
+    rows.forEach((row, index) => {
+      this.drawWorkforceRow(layer, {
+        ...row,
+        x: 14,
+        y: 42 + index * 23,
+        width: panelWidth - 28,
       });
     });
   }
 
-  private drawActionRail(translations: TranslationPack | undefined, width: number, height: number): void {
-    const actions: Array<[string, string, string]> = [
-      [translations?.ui.buildAction ?? "Build", "▥", "open-selected-plot"],
-      [translations?.ui.upgradeAction ?? "Upgrade", "◆", "open-selected-plot"],
-      [translations?.ui.settlersAction ?? "Settlers", "●●", "open-survivors"],
-      [translations?.ui.logAction ?? "Log", "▤", "open-log"],
-    ];
-    const rail = new Container();
-    rail.x = width - 120;
-    rail.y = Math.max(150, height / 2 - 202);
-    this.hudLayer.addChild(rail);
+  private drawWorkforceRow(
+    parent: Container,
+    options: {
+      iconId: string;
+      label: string;
+      value: string;
+      tooltip: string;
+      missing?: boolean;
+      x: number;
+      y: number;
+      width: number;
+    },
+  ): void {
+    const row = new Container();
+    row.x = options.x;
+    row.y = options.y;
+    parent.addChild(row);
 
-    const visibleActions: Array<[string, string, string]> = [
-      [translations?.ui.buildAction ?? "Build", "build", "open-selected-plot"],
-      [translations?.ui.upgradeAction ?? "Upgrade", "material", "open-selected-plot"],
-    ];
-    visibleActions.forEach(([label, symbol, action], index) => {
-      const button = this.createActionButton(label, symbol, action);
-      button.y = index * 106;
-      rail.addChild(button);
+    this.drawIcon(row, options.iconId, 8, 9, 14);
+    this.drawText(row, options.label, 28, 1, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "800",
     });
-    void actions;
+    const value = this.drawText(row, options.value, options.width, 1, {
+      fill: options.missing ? 0xff6f7d : 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+    value.anchor.set(1, 0);
+
+    row.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= options.width && y >= -2 && y <= 21,
+    };
+    this.bindTooltip(row, options.tooltip);
   }
 
   private drawQueue(state: GameState, translations: TranslationPack | undefined, height: number): void {
     const queue = getActiveBuildingQueue(state);
     const layer = new Container();
-    layer.x = 300;
-    layer.y = height - 86;
+    layer.x = 28;
+    layer.y = height - 104;
     this.hudLayer.addChild(layer);
-    this.drawPanel(layer, 0, 0, 310, 62);
-    this.drawText(layer, translations?.ui.buildingQueue ?? "Building queue", 12, 13, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
-    this.drawText(layer, `${queue.length}/${MAX_ACTIVE_BUILDINGS}`, 276, 13, { fill: 0xf1df9a, fontSize: 13, fontWeight: "800" });
+    this.drawPanel(layer, 0, 0, 308, 78);
+    this.drawIcon(layer, "build", 18, 22, 14);
+    this.drawText(layer, translations?.ui.buildingQueue ?? "Building queue", 34, 14, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
+    this.drawText(layer, `${queue.length}/${MAX_ACTIVE_BUILDINGS}`, 280, 14, { fill: 0xf1df9a, fontSize: 13, fontWeight: "800" }).anchor.set(1, 0);
 
     if (queue.length === 0) {
-      this.drawText(layer, translations?.ui.queueEmpty ?? "No active construction.", 12, 38, { fill: 0xaeb4b8, fontSize: 12 });
+      this.drawText(layer, translations?.ui.queueEmpty ?? "No active construction.", 14, 44, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "700" });
       return;
     }
 
     queue.slice(0, 2).forEach((buildingId, index) => {
       const building = state.buildings[buildingId];
       const label = translations?.buildings[buildingId].name ?? buildingById[buildingId].name;
-      this.drawText(layer, `${label} / ${Math.ceil(building.upgradingRemaining)}s`, 12, 38 + index * 16, {
+      this.drawText(layer, `${label} / ${Math.ceil(building.upgradingRemaining)}s`, 14, 42 + index * 17, {
         fill: 0xd7ddd8,
         fontSize: 11,
+        fontWeight: "700",
       });
     });
   }
@@ -656,7 +751,7 @@ export class PixiVillageRenderer {
     const buildingId = selectedPlot.buildingId;
     const building = state.buildings[buildingId];
     const definition = buildingById[buildingId];
-    this.drawBuildingDetail(panel, buildingId, building.level, building.upgradingRemaining, definition.maxLevel, definition.buildSeconds, state, translations, modalWidth);
+    this.drawBuildingDetail(panel, buildingId, building.level, building.upgradingRemaining, definition.maxLevel, state, translations, modalWidth);
   }
 
   private drawBuildChoices(
@@ -751,8 +846,7 @@ export class PixiVillageRenderer {
     asset.anchor.set(0.5);
     asset.x = 72;
     asset.y = options.height / 2;
-    asset.width = Math.min(104, options.height * 1.42);
-    asset.height = Math.min(78, options.height * 0.96);
+    this.fitSprite(asset, Math.min(104, options.height * 1.42), Math.min(78, options.height * 0.96));
     row.addChild(asset);
 
     const textX = 150;
@@ -808,7 +902,6 @@ export class PixiVillageRenderer {
     level: number,
     upgradingRemaining: number,
     maxLevel: number,
-    buildSeconds: number,
     state: GameState,
     translations: TranslationPack,
     modalWidth: number,
@@ -832,8 +925,7 @@ export class PixiVillageRenderer {
     asset.anchor.set(0.5);
     asset.x = 90;
     asset.y = 76;
-    asset.width = 150;
-    asset.height = 112;
+    this.fitSprite(asset, 150, 112);
     content.addChild(asset);
 
     this.drawText(content, translated.name, 196, 6, { fill: 0xf5efdf, fontSize: 24, fontWeight: "900" });
@@ -884,7 +976,7 @@ export class PixiVillageRenderer {
         ? translations.ui.upgrade
         : translations.ui.queueFull;
     this.createModalButton(content, buttonLabel, modalWidth - 210, y + 24, 162, 36, { action: "upgrade", building: buildingId }, disabled);
-    this.drawText(content, `${Math.ceil(buildSeconds * (1 + level * 0.35))}s`, modalWidth - 210, y + 68, {
+    this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 210, y + 68, {
       fill: 0xaeb4b8,
       fontSize: 11,
       fontWeight: "700",
@@ -1172,18 +1264,6 @@ export class PixiVillageRenderer {
     return group;
   }
 
-  private createActionButton(label: string, iconId: string, action: string): Container {
-    const button = new Container();
-    const box = new Graphics();
-    box.roundRect(0, 0, 92, 96, 8).fill({ color: 0x10120e, alpha: 0.72 }).stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
-    button.addChild(box);
-    this.drawIcon(button, iconId, 46, 31, 30);
-    this.drawCenteredText(button, label.toUpperCase(), 46, 68, { fill: 0xf3c85f, fontSize: 11, fontWeight: "900" });
-    this.bindAction(button, { action });
-    this.bindTooltip(button, label);
-    return button;
-  }
-
   private createHudButton(
     parent: Container,
     label: string,
@@ -1265,23 +1345,74 @@ export class PixiVillageRenderer {
   private bindTooltip(target: Container, text: string): void {
     target.eventMode = "static";
     target.on("pointerover", (event) => {
-      this.emitTooltip(true, text, event.global.x, event.global.y);
+      this.showCanvasTooltip(text, event.global.x, event.global.y);
     });
     target.on("pointermove", (event) => {
-      this.emitTooltip(true, text, event.global.x, event.global.y);
+      this.showCanvasTooltip(text, event.global.x, event.global.y);
     });
     target.on("pointerout", () => {
-      this.emitTooltip(false);
+      this.hideCanvasTooltip();
     });
   }
 
-  private emitTooltip(visible: boolean, text?: string, x?: number, y?: number): void {
-    this.host.dispatchEvent(new CustomEvent<PixiTooltipDetail>("pixi-tooltip", {
-      detail: { visible, text, x, y },
-    }));
+  private showCanvasTooltip(text: string, x: number, y: number): void {
+    if (!text) {
+      this.hideCanvasTooltip();
+      return;
+    }
+
+    this.tooltipLayer.removeChildren();
+
+    const label = new Text({
+      text,
+      style: {
+        fill: 0xf4eedf,
+        fontFamily: "Inter, Arial, sans-serif",
+        fontSize: 13,
+        fontWeight: "700",
+        lineHeight: 18,
+        wordWrap: true,
+        wordWrapWidth: 280,
+      },
+    });
+    label.x = 12;
+    label.y = 9;
+
+    const panelWidth = Math.min(320, Math.max(92, label.width + 24));
+    const panelHeight = Math.max(36, label.height + 18);
+    const panel = new Graphics();
+    panel.roundRect(0, 0, panelWidth, panelHeight, 7)
+      .fill({ color: 0x111519, alpha: 0.96 })
+      .stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
+    this.tooltipLayer.addChild(panel, label);
+    this.positionCanvasTooltip(x, y, panelWidth, panelHeight);
   }
 
-  private drawPalisadePlotLabel(
+  private positionCanvasTooltip(x: number, y: number, width: number, height: number): void {
+    const margin = 10;
+    const offset = 14;
+    const stageWidth = this.host.clientWidth;
+    const stageHeight = this.host.clientHeight;
+    let nextX = x + offset;
+    let nextY = y + offset;
+
+    if (nextX + width > stageWidth - margin) {
+      nextX = x - width - offset;
+    }
+
+    if (nextY + height > stageHeight - margin) {
+      nextY = y - height - offset;
+    }
+
+    this.tooltipLayer.x = Math.max(margin, Math.min(stageWidth - width - margin, nextX));
+    this.tooltipLayer.y = Math.max(margin, Math.min(stageHeight - height - margin, nextY));
+  }
+
+  private hideCanvasTooltip(): void {
+    this.tooltipLayer.removeChildren();
+  }
+
+  private addPalisadeTooltip(
     selected: boolean,
     level: number,
     upgradingRemaining: number,
@@ -1294,77 +1425,178 @@ export class PixiVillageRenderer {
     }
 
     const bounds = this.getPlotBounds(plot);
-    const labelLayer = new Container();
-    labelLayer.x = bounds.x;
-    labelLayer.y = bounds.y;
-    this.worldLayer.addChild(labelLayer);
+    const hitLayer = new Container();
+    hitLayer.x = bounds.x;
+    hitLayer.y = bounds.y;
+    hitLayer.hitArea = {
+      contains: (x: number, y: number) =>
+        x >= 0 && x <= bounds.width && y >= 0 && y <= bounds.height,
+    };
+    this.bindTooltip(
+      hitLayer,
+      upgradingTooltip(name, level, upgradingRemaining, "Lvl"),
+    );
+    this.worldLayer.addChild(hitLayer);
 
-    const plate = new Graphics();
-    plate
-      .roundRect(0, 0, bounds.width, bounds.height, 7 * this.layout.scale)
-      .fill({ color: selected ? 0x1c1810 : 0x0a0c0c, alpha: selected ? 0.28 : 0.2 })
+    if (!selected) {
+      return;
+    }
+
+    const marker = new Graphics();
+    marker
+      .roundRect(bounds.x, bounds.y, bounds.width, bounds.height, 7 * this.layout.scale)
       .stroke({
-        color: selected ? 0xf6e58d : 0xffffff,
-        alpha: selected ? 1 : 0.22,
-        width: selected ? 3 : 1,
-      });
-    labelLayer.addChild(plate);
-    this.drawCenteredText(labelLayer, name, bounds.width / 2, bounds.height * 0.48, {
-      fill: 0xf3edda,
-      fontSize: Math.max(10, 12 * this.layout.scale),
-    });
-    this.drawCenteredText(
-      labelLayer,
-      upgradingRemaining > 0 ? `${Math.ceil(upgradingRemaining)}s` : `Lvl ${level}`,
-      bounds.width / 2,
-      bounds.height * 0.78,
-      {
-        fill: upgradingRemaining > 0 ? 0xf1bf55 : level > 0 ? 0xf3dc8f : 0xaab1aa,
-        fontSize: Math.max(10, 12 * this.layout.scale),
+        color: 0xf6e58d,
+        alpha: 0.8,
+        width: 2,
       },
     );
+    this.worldLayer.addChild(marker);
   }
 
-  private drawBuildingNameplate(
+  private drawBuildingVisualEffects(
     parent: Container,
-    name: string,
+    buildingId: BuildingId,
     level: number,
-    selected: boolean,
-    plotHeight: number,
-    upgradingRemaining = 0,
+    bounds: Bounds,
+    visualTime: number,
   ): void {
-    const plateWidth = 128 * this.layout.scale;
-    const plateHeight = 44 * this.layout.scale;
-    const y = plotHeight * 0.42;
-    const plate = new Graphics();
-    plate
-      .roundRect(-plateWidth / 2, y, plateWidth, plateHeight, 5 * this.layout.scale)
-      .fill({ color: selected ? 0x1c1810 : 0x12130f, alpha: selected ? 0.86 : 0.82 })
-      .stroke({
-        color: selected ? 0xf3c85f : 0xe0c46f,
-        alpha: selected ? 1 : 0.32,
-        width: selected ? 2 : 1,
-      });
-    parent.addChild(plate);
-    this.drawCenteredText(parent, name.toUpperCase(), 0, y + plateHeight * 0.38, {
-      fill: 0xf5efdf,
-      fontSize: Math.max(11, 14 * this.layout.scale),
-      fontWeight: "800",
-    });
-    this.drawCenteredText(
-      parent,
-      upgradingRemaining > 0 ? `${Math.ceil(upgradingRemaining)}s` : `Lvl ${level}`,
-      0,
-      y + plateHeight * 0.72,
-      {
-        fill: 0xf1bf55,
-        fontSize: Math.max(10, 13 * this.layout.scale),
-        fontWeight: "700",
-      },
-    );
+    if (buildingId !== "mainBuilding") {
+      return;
+    }
+
+    const phase = getBuildingVisualFrame(buildingId, level);
+    const effects = new Container();
+    effects.eventMode = "none";
+    const base = new Graphics();
+    const lights = new Graphics();
+    const smoke = new Graphics();
+    base.eventMode = "none";
+    lights.eventMode = "none";
+    smoke.eventMode = "none";
+    effects.addChild(base);
+    effects.addChild(lights);
+    effects.addChild(smoke);
+    this.drawMainBuildingBaseGlow(base, phase, bounds, visualTime);
+    this.drawMainBuildingLights(lights, phase, bounds, visualTime);
+    this.drawMainBuildingSmoke(smoke, phase, bounds, visualTime);
+    this.mainBuildingEffects.push({ phase, bounds, base, lights, smoke });
+
+    parent.addChild(effects);
+  }
+
+  private drawMainBuildingBaseGlow(
+    graphics: Graphics,
+    phase: number,
+    bounds: Bounds,
+    visualTime: number,
+  ): void {
+    const baseGlowAlpha = 0.08 + phase * 0.025;
+    const lightPulse = 0.75 + Math.sin(visualTime * 4.4 + phase) * 0.18;
+
+    graphics.clear()
+      .ellipse(0, bounds.height * 0.3, bounds.width * (0.18 + phase * 0.035), bounds.height * 0.07)
+      .fill({ color: 0xf0c766, alpha: baseGlowAlpha * lightPulse });
+  }
+
+  private drawMainBuildingLights(
+    graphics: Graphics,
+    phase: number,
+    bounds: Bounds,
+    visualTime: number,
+  ): void {
+    graphics.clear();
+    const positions = [
+      { x: -0.2, y: 0.03, delay: 0 },
+      { x: -0.04, y: -0.1, delay: 1.1 },
+      { x: 0.17, y: 0.0, delay: 2.2 },
+      { x: 0.28, y: -0.14, delay: 3.1 },
+    ];
+
+    for (let index = 0; index <= Math.min(phase, positions.length - 1); index += 1) {
+      const position = positions[index];
+      const flicker = 0.58 + Math.sin(visualTime * 7.2 + position.delay) * 0.22 +
+        Math.sin(visualTime * 13.4 + position.delay) * 0.08;
+      const x = bounds.width * position.x;
+      const y = bounds.height * position.y;
+      const radius = Math.max(2, (3.3 + phase * 0.25) * this.layout.scale);
+
+      graphics
+        .circle(x, y, radius * 3.4)
+        .fill({ color: 0xffc85b, alpha: 0.045 * flicker });
+      graphics
+        .circle(x, y, radius * 1.45)
+        .fill({ color: 0xffd36a, alpha: 0.14 * flicker });
+      graphics
+        .circle(x, y, radius)
+        .fill({ color: 0xfff2b0, alpha: 0.42 * flicker });
+    }
+  }
+
+  private drawMainBuildingSmoke(
+    graphics: Graphics,
+    phase: number,
+    bounds: Bounds,
+    visualTime: number,
+  ): void {
+    graphics.clear();
+    const sourceCount = Math.min(3, 1 + Math.floor(phase / 2));
+
+    for (let source = 0; source < sourceCount; source += 1) {
+      const sourceX = bounds.width * (-0.06 + source * 0.11);
+      const sourceY = -bounds.height * (0.32 + source * 0.03);
+
+      for (let puff = 0; puff < 4; puff += 1) {
+        const progress = (visualTime * (0.13 + source * 0.02) + puff * 0.25 + source * 0.17) % 1;
+        const drift = Math.sin(visualTime * 1.8 + puff * 1.7 + source) * bounds.width * 0.016;
+        const rise = bounds.height * (0.05 + progress * (0.22 + phase * 0.015));
+        const radius = Math.max(3.5, bounds.width * (0.018 + progress * 0.025));
+        const alpha = (1 - progress) * (0.13 + phase * 0.012);
+
+        graphics
+          .circle(sourceX + drift + progress * bounds.width * 0.035, sourceY - rise, radius)
+          .fill({ color: 0xb8b2a0, alpha });
+        graphics
+          .circle(sourceX + drift - radius * 0.45, sourceY - rise + radius * 0.18, radius * 0.62)
+          .fill({ color: 0xd6d0bd, alpha: alpha * 0.52 });
+      }
+    }
+
+    for (let index = 0; index < phase; index += 1) {
+      const blink = 0.45 + Math.sin(visualTime * 5 + index) * 0.2;
+      graphics
+        .circle(bounds.width * 0.08, -bounds.height * (0.34 + index * 0.055), Math.max(1.5, 2.3 * this.layout.scale))
+        .fill({ color: 0x9bd8ff, alpha: 0.12 * blink });
+    }
+  }
+
+  private fitSprite(sprite: Sprite, maxWidth: number, maxHeight: number): void {
+    const widthScale = maxWidth / sprite.texture.width;
+    const heightScale = maxHeight / sprite.texture.height;
+    const scale = Math.min(widthScale, heightScale);
+    sprite.scale.set(scale);
+  }
+
+  private updateMainBuildingEffects(): void {
+    if (this.mainBuildingEffects.length === 0) {
+      return;
+    }
+
+    const visualTime = performance.now() / 1000;
+    for (const effect of this.mainBuildingEffects) {
+      this.drawMainBuildingBaseGlow(effect.base, effect.phase, effect.bounds, visualTime);
+      this.drawMainBuildingLights(effect.lights, effect.phase, effect.bounds, visualTime);
+      this.drawMainBuildingSmoke(effect.smoke, effect.phase, effect.bounds, visualTime);
+    }
   }
 
   private getBuildingTexture(buildingId: BuildingId, level: number, built: boolean): Texture {
+    const spritesheetTexture = this.getSpritesheetBuildingTexture(buildingId, level, built);
+
+    if (spritesheetTexture) {
+      return spritesheetTexture;
+    }
+
     const key = `${buildingId}:${level}:${built ? "built" : "ghost"}`;
     const cached = buildingTextureCache.get(key);
 
@@ -1392,6 +1624,40 @@ export class PixiVillageRenderer {
     });
 
     const texture = Texture.from(canvas);
+    buildingTextureCache.set(key, texture);
+    return texture;
+  }
+
+  private getSpritesheetBuildingTexture(
+    buildingId: BuildingId,
+    level: number,
+    built: boolean,
+  ): Texture | null {
+    if (!built) {
+      return null;
+    }
+
+    const visual = buildingVisualDefinitions[buildingId];
+    const spritesheet = this.buildingSpritesheets.get(buildingId);
+
+    if (!visual || !spritesheet) {
+      return null;
+    }
+
+    const frame = getBuildingVisualFrame(buildingId, level);
+    const key = `${buildingId}:spritesheet:${frame}`;
+    const cached = buildingTextureCache.get(key);
+
+    if (cached) {
+      return cached;
+    }
+
+    const frameWidth = spritesheet.width / visual.frames;
+    const texture = new Texture({
+      source: spritesheet.source,
+      frame: new Rectangle(frame * frameWidth, 0, frameWidth, spritesheet.height),
+    });
+
     buildingTextureCache.set(key, texture);
     return texture;
   }
@@ -1464,13 +1730,45 @@ export class PixiVillageRenderer {
     };
   }
 
+  private getHudScale(width: number, height: number): number {
+    return Math.min(1.2, Math.max(1, Math.min(width / 1120, height / 640)));
+  }
+
+  private getPalisadeGeometry(): PalisadeGeometry {
+    const { originX, originY, width, height } = this.layout;
+
+    return {
+      centerX: originX + width * 0.5,
+      centerY: originY + height * 0.525,
+      radiusX: width * 0.535,
+      radiusY: height * 0.425,
+    };
+  }
+
   private getPlotBounds(plot: VillagePlotDefinition): Bounds {
+    if (plot.id === "plot-palisade") {
+      return this.getPalisadePlotBounds(plot);
+    }
+
     const width = plot.width * this.layout.scale;
     const height = plot.height * this.layout.scale;
 
     return {
       x: this.layout.originX + plot.x * this.layout.width - width / 2,
       y: this.layout.originY + plot.y * this.layout.height - height / 2,
+      width,
+      height,
+    };
+  }
+
+  private getPalisadePlotBounds(plot: VillagePlotDefinition): Bounds {
+    const width = plot.width * this.layout.scale;
+    const height = plot.height * this.layout.scale;
+    const { centerX, centerY, radiusY } = this.getPalisadeGeometry();
+
+    return {
+      x: centerX - width / 2,
+      y: centerY + radiusY - height * 0.62,
       width,
       height,
     };

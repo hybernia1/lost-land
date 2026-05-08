@@ -242,18 +242,8 @@ export class App {
         view?: ScreenId;
       }>);
     };
-    const handlePixiTooltip = (event: Event) => {
-      this.handlePixiTooltip(event as CustomEvent<{
-        visible: boolean;
-        text?: string;
-        x?: number;
-        y?: number;
-      }>);
-    };
     villageScene.addEventListener("pixi-action", handlePixiAction);
     worldScene.addEventListener("pixi-action", handlePixiAction);
-    villageScene.addEventListener("pixi-tooltip", handlePixiTooltip);
-    worldScene.addEventListener("pixi-tooltip", handlePixiTooltip);
     this.shellReady = true;
   }
 
@@ -385,21 +375,6 @@ export class App {
     if (action === "expedition" && sector) {
       this.game.sendExpedition(sector);
     }
-  }
-
-  private handlePixiTooltip(event: CustomEvent<{
-    visible: boolean;
-    text?: string;
-    x?: number;
-    y?: number;
-  }>): void {
-    if (!event.detail.visible || !event.detail.text) {
-      this.hideTooltip();
-      return;
-    }
-
-    this.tooltipTarget = null;
-    this.showTooltip(event.detail.text, event.detail.x ?? 0, event.detail.y ?? 0);
   }
 
   private handleActionClick(event: MouseEvent): void {

@@ -8,7 +8,7 @@ import type {
   ResourceId,
 } from "../game/types";
 import { maybeInjureFromConstruction } from "./health";
-import { addResources, canAfford, scaleResourceBag, spendResources } from "./resources";
+import { addResources, canAfford, spendResources } from "./resources";
 
 const BASE_CAPACITY: Record<ResourceId, number> = {
   food: 180,
@@ -20,22 +20,13 @@ const BASE_CAPACITY: Record<ResourceId, number> = {
 
 export const MAX_ACTIVE_BUILDINGS = 2;
 const GENERATOR_BASE_ENERGY_RATE = 0.28;
-const BASE_CONSTRUCTION_WORKERS: Record<BuildingId, number> = {
-  mainBuilding: 2,
-  storage: 2,
-  hydroponics: 2,
-  waterStill: 2,
-  workshop: 3,
-  generator: 3,
-  watchtower: 2,
-  barracks: 2,
-  clinic: 2,
-  palisade: 3,
-};
 
 export function getUpgradeCost(buildingId: BuildingId, level: number): ResourceBag {
-  const definition = buildingById[buildingId];
-  return scaleResourceBag(definition.baseCost, 1 + level * 0.72);
+  return getNextBuildingLevelRequirement(buildingId, level).cost;
+}
+
+export function getBuildingBuildSeconds(buildingId: BuildingId, currentLevel: number): number {
+  return getNextBuildingLevelRequirement(buildingId, currentLevel).buildSeconds;
 }
 
 export function getActiveBuildingQueue(state: GameState): BuildingId[] {
@@ -52,8 +43,7 @@ export function getConstructionWorkerRequirement(
   buildingId: BuildingId,
   currentLevel: number,
 ): number {
-  const baseWorkers = BASE_CONSTRUCTION_WORKERS[buildingId];
-  return Math.min(6, baseWorkers + Math.floor(currentLevel / 3));
+  return getNextBuildingLevelRequirement(buildingId, currentLevel).constructionWorkers;
 }
 
 export function getBuildingWorkerLimit(state: GameState, buildingId: BuildingId): number {
@@ -187,7 +177,7 @@ export function startBuildingConstruction(
   spendResources(state.resources, cost);
   state.survivors.workers -= constructionWorkers;
   building.constructionWorkers = constructionWorkers;
-  building.upgradingRemaining = definition.buildSeconds;
+  building.upgradingRemaining = getBuildingBuildSeconds(buildingId, 0);
   pushLog(state, `${definition.name} upgrade started.`);
   return true;
 }
@@ -216,7 +206,7 @@ export function startBuildingUpgrade(state: GameState, buildingId: BuildingId): 
   spendResources(state.resources, cost);
   state.survivors.workers -= constructionWorkers;
   building.constructionWorkers = constructionWorkers;
-  building.upgradingRemaining = definition.buildSeconds * (1 + building.level * 0.35);
+  building.upgradingRemaining = getBuildingBuildSeconds(buildingId, building.level);
   pushLog(state, `${definition.name} upgrade started.`);
   return true;
 }
@@ -395,6 +385,15 @@ function releaseConstructionWorkers(
 ): void {
   state.survivors.workers += building.constructionWorkers;
   building.constructionWorkers = 0;
+}
+
+function getNextBuildingLevelRequirement(
+  buildingId: BuildingId,
+  currentLevel: number,
+) {
+  const definition = buildingById[buildingId];
+  const targetLevel = Math.min(definition.maxLevel, Math.max(1, currentLevel + 1));
+  return definition.levelRequirements[targetLevel - 1];
 }
 
 function pushLog(state: GameState, message: string): void {
