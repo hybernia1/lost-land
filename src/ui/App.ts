@@ -311,16 +311,16 @@ export class App {
       return;
     }
 
-    if (action === "open-morale-breakdown") {
+    if (action === "open-resource-breakdown" && resourceId) {
       this.villageModalPlotId = null;
-      this.villageInfoPanel = "morale";
+      this.villageInfoPanel = resourceId;
       this.requestRender();
       return;
     }
 
-    if (action === "open-resource-breakdown" && resourceId) {
+    if (action === "open-survivor-overview") {
       this.villageModalPlotId = null;
-      this.villageInfoPanel = resourceId;
+      this.villageInfoPanel = "survivors";
       this.requestRender();
       return;
     }
