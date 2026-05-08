@@ -232,6 +232,7 @@ export class App {
         building?: BuildingId;
         plot?: string;
         delta?: number;
+        troopCount?: number;
         scoutMode?: ScoutingMode;
         scoutTroops?: number;
         resourceId?: ResourceId;
@@ -281,14 +282,19 @@ export class App {
     building?: BuildingId;
     plot?: string;
     delta?: number;
+    troopCount?: number;
     scoutMode?: ScoutingMode;
     scoutTroops?: number;
     resourceId?: ResourceId;
     speed?: GameSpeed;
     continuousShifts?: boolean;
   }>): void {
-    this.suppressVillageClickUntil = Date.now() + 120;
-    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed } = event.detail;
+    this.suppressVillageClickUntil = Date.now() + 400;
+    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed, troopCount } = event.detail;
+
+    if (action === "consume-pointer") {
+      return;
+    }
 
     if (speed) {
       this.game.setSpeed(speed);
@@ -354,12 +360,12 @@ export class App {
     }
 
     if (action === "barracks-worker-to-troop") {
-      this.game.convertWorkerToTroop();
+      this.repeatAction(troopCount, () => this.game.convertWorkerToTroop());
       return;
     }
 
     if (action === "barracks-troop-to-worker") {
-      this.game.convertTroopToWorker();
+      this.repeatAction(troopCount, () => this.game.convertTroopToWorker());
       return;
     }
 
@@ -548,6 +554,14 @@ export class App {
     this.mode = "game";
     this.game.start();
     this.requestRender();
+  }
+
+  private repeatAction(count: number | undefined, action: () => void): void {
+    const repetitions = Math.max(1, Math.floor(count ?? 1));
+
+    for (let index = 0; index < repetitions; index += 1) {
+      action();
+    }
   }
 
   private returnHome(): void {

@@ -60,6 +60,7 @@ type PixiActionDetail = {
   building?: BuildingId;
   plot?: string;
   delta?: number;
+  troopCount?: number;
   scoutMode?: ScoutingMode;
   scoutTroops?: number;
   resourceId?: ResourceId;
@@ -82,6 +83,16 @@ type CostLinePart = {
   missing: boolean;
   tooltip: string;
 };
+
+type BuildingMetric = {
+  iconId: string;
+  label: string;
+  value: string;
+  fill?: number;
+  tooltip?: string;
+};
+
+type BarracksTab = "training" | "scouting";
 
 type MainBuildingEffect = {
   phase: number;
@@ -146,6 +157,8 @@ export class PixiVillageRenderer {
   private buildChoicesScrollY = 0;
   private buildChoicesScrollPlotId: string | null = null;
   private activeBuildCategory: BuildingCategory = "resource";
+  private activeBarracksTab: BarracksTab = "training";
+  private barracksTroopCount = 1;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
 
@@ -1058,8 +1071,12 @@ export class PixiVillageRenderer {
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
-    const modalWidth = Math.min(1100, width - 48);
-    const modalHeight = Math.min(840, height - 48);
+    const isBuildChoice = selectedPlot.buildingId === null;
+    const detailBuildingId = selectedPlot.buildingId;
+    const modalWidth = isBuildChoice ? Math.min(1100, width - 48) : Math.min(860, width - 40);
+    const modalHeight = isBuildChoice
+      ? Math.min(840, height - 48)
+      : Math.min(detailBuildingId === "barracks" ? 590 : 510, height - 40);
     const panel = new Container();
     panel.x = (width - modalWidth) / 2;
     panel.y = (height - modalHeight) / 2;
@@ -1067,15 +1084,10 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
     this.drawPanel(panel, 0, 0, modalWidth, modalHeight);
 
-    const title = selectedPlot.buildingId === null
-      ? translations.ui.availableBuilds
-      : translations.ui.selectedPlot;
-    const subtitle = `${selectedPlot.id} / ${selectedPlot.buildingId === null ? translations.ui.emptyPlot : translations.ui.alreadyBuilt}`;
-    this.drawText(panel, title, 24, 20, { fill: 0xf5efdf, fontSize: 22, fontWeight: "900" });
-    this.drawText(panel, subtitle, 24, 50, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "700" });
-    this.createIconButton(panel, "close", modalWidth - 58, 18, 36, 36, { action: "close-village-modal" }, translations.ui.close);
-
     if (selectedPlot.buildingId === null) {
+      const title = translations.ui.availableBuilds;
+      const subtitle = `${selectedPlot.id} / ${translations.ui.emptyPlot}`;
+      this.drawModalHeader(panel, title, subtitle, modalWidth, translations);
       this.drawBuildChoices(
         panel,
         selectedPlot.id,
@@ -1088,10 +1100,39 @@ export class PixiVillageRenderer {
       return;
     }
 
+    this.drawModalClose(panel, modalWidth, translations);
     const buildingId = selectedPlot.buildingId;
     const building = state.buildings[buildingId];
     const definition = buildingById[buildingId];
-    this.drawBuildingDetail(panel, buildingId, building.level, building.upgradingRemaining, definition.maxLevel, state, translations, modalWidth);
+    this.drawBuildingDetail(panel, buildingId, building.level, building.upgradingRemaining, definition.maxLevel, state, translations, modalWidth, modalHeight);
+  }
+
+  private drawModalHeader(
+    parent: Container,
+    title: string,
+    subtitle: string,
+    modalWidth: number,
+    translations: TranslationPack,
+  ): void {
+    const badge = new Container();
+    badge.x = 22;
+    badge.y = 18;
+    parent.addChild(badge);
+
+    const badgeBox = new Graphics();
+    badgeBox.roundRect(0, 0, 42, 42, 8)
+      .fill({ color: 0x11140f, alpha: 0.9 })
+      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+    badge.addChild(badgeBox);
+    this.drawIcon(badge, "build", 21, 21, 22);
+
+    this.drawText(parent, title, 72, 20, { fill: 0xf5efdf, fontSize: 21, fontWeight: "900" });
+    this.drawText(parent, subtitle, 72, 48, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "800" });
+    this.drawModalClose(parent, modalWidth, translations);
+  }
+
+  private drawModalClose(parent: Container, modalWidth: number, translations: TranslationPack): void {
+    this.createIconButton(parent, "close", modalWidth - 58, 18, 38, 38, { action: "close-village-modal" }, translations.ui.close);
   }
 
   private drawBuildChoices(
@@ -1281,7 +1322,9 @@ export class PixiVillageRenderer {
   private bindBuildCategoryAction(target: Container, category: BuildingCategory): void {
     target.eventMode = "static";
     target.cursor = "pointer";
-    target.on("pointertap", () => {
+    target.on("pointerdown", (event) => {
+      event.stopPropagation();
+      this.consumeHostClick();
       this.activeBuildCategory = category;
       this.buildChoicesScrollY = 0;
       this.requestRender();
@@ -1404,8 +1447,11 @@ export class PixiVillageRenderer {
     state: GameState,
     translations: TranslationPack,
     modalWidth: number,
+    modalHeight: number,
   ): void {
     const translated = translations.buildings[buildingId];
+    const building = state.buildings[buildingId];
+    const definition = buildingById[buildingId];
     const cost = getUpgradeCost(buildingId, level);
     const locked = level >= maxLevel;
     const upgrading = upgradingRemaining > 0;
@@ -1416,46 +1462,69 @@ export class PixiVillageRenderer {
     const disabled = locked || upgrading || !affordable || !queueAvailable || !workersAvailable;
 
     const content = new Container();
-    content.x = 24;
-    content.y = 88;
     parent.addChild(content);
+
+    const sideMargin = 28;
+    const contentTop = 34;
+    const previewWidth = 150;
+    const previewHeight = 128;
+    const titleX = sideMargin + previewWidth + 24;
+    const titleWidth = modalWidth - titleX - sideMargin;
+    const bodyWidth = modalWidth - sideMargin * 2;
+
+    this.drawBuildingPreview(content, translated.name, Math.max(1, level), level > 0, sideMargin, contentTop, previewWidth, previewHeight);
 
     const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, level), level > 0));
     asset.anchor.set(0.5);
-    asset.x = 90;
-    asset.y = 76;
-    this.fitSprite(asset, 150, 112);
+    asset.x = sideMargin + previewWidth / 2;
+    asset.y = contentTop + previewHeight / 2 + 4;
+    this.fitSprite(asset, 118, 88);
     content.addChild(asset);
 
-    this.drawText(content, translated.name, 196, 6, { fill: 0xf5efdf, fontSize: 24, fontWeight: "900" });
-    this.drawText(content, translated.description, 196, 40, {
+    this.drawText(content, translated.name, titleX, contentTop + 6, { fill: 0xf5efdf, fontSize: 30, fontWeight: "900" });
+    this.drawText(content, translated.description, titleX, contentTop + 48, {
       fill: 0xc8cabb,
       fontSize: 13,
-      fontWeight: "600",
+      fontWeight: "700",
       wordWrap: true,
-      wordWrapWidth: modalWidth - 260,
+      wordWrapWidth: titleWidth,
     });
 
-    this.drawStatPill(content, "build", `${translations.ui.level} ${level}/${maxLevel}`, 196, 88);
-    this.drawStatPill(content, "shield", `${translations.ui.defense} ${Math.round(this.getDefenseScore(state))}`, 330, 88);
-    this.drawEffects(content, this.getNextLevelEffects(buildingId, level, translations), 196, 132, modalWidth - 270);
+    const metricGap = 10;
+    const metricWidth = (titleWidth - metricGap * 3) / 4;
+    const metricY = contentTop + 86;
+    this.getBuildingDetailMetrics(buildingId, building, level, maxLevel, requiredWorkers, state, translations)
+      .forEach((metric, index) => {
+        this.drawMetricCard(
+          content,
+          metric,
+          titleX + index * (metricWidth + metricGap),
+          metricY,
+          metricWidth,
+          58,
+        );
+      });
 
-    let y = 184;
+    const operationsY = contentTop + 166;
     if (buildingId === "generator") {
-      y = this.drawGeneratorControls(content, buildingId, state, translations, y);
+      this.drawGeneratorControls(content, buildingId, state, translations, sideMargin, operationsY, bodyWidth);
+    } else if (buildingId === "barracks") {
+      this.drawBarracksControls(content, state, translations, sideMargin, operationsY, bodyWidth);
+    } else {
+      this.drawBuildingOperations(content, buildingId, level, translations, sideMargin, operationsY, bodyWidth);
     }
 
-    if (buildingId === "barracks") {
-      y = this.drawBarracksControls(content, state, translations, y);
-    }
-
-    this.drawText(content, locked ? translations.ui.maxLevelReached : translations.ui.nextLevel, 0, y, {
+    const footerY = modalHeight - 134;
+    this.drawPanel(content, sideMargin, footerY, modalWidth - sideMargin * 2, 110);
+    this.drawText(content, locked ? translations.ui.maxLevelReached : translations.ui.nextLevel, sideMargin + 28, footerY + 26, {
       fill: 0xf1df9a,
       fontSize: 13,
       fontWeight: "900",
     });
-    this.drawCostLine(content, cost, state.resources, translations, 0, y + 28);
-    this.drawWorkerRequirement(content, requiredWorkers, state.survivors.workers, translations, 190, y + 28);
+
+    this.drawCostLine(content, cost, state.resources, translations, sideMargin + 28, footerY + 62);
+    this.drawWorkerRequirement(content, requiredWorkers, state.survivors.workers, translations, sideMargin + 208, footerY + 62);
+    this.drawEffects(content, this.getNextLevelEffects(buildingId, level, translations), sideMargin + 290, footerY + 62, Math.max(120, modalWidth - 580));
 
     const warnings: string[] = [];
     if (!queueAvailable && !upgrading) {
@@ -1466,23 +1535,287 @@ export class PixiVillageRenderer {
     }
 
     warnings.forEach((warning, index) => {
-      this.drawText(content, warning, 0, y + 66 + index * 18, { fill: 0xff9aa2, fontSize: 12, fontWeight: "800" });
+      this.drawText(content, warning, sideMargin + 28, footerY + 86 + index * 16, { fill: 0xff9aa2, fontSize: 11, fontWeight: "800" });
     });
 
     const buttonLabel = upgrading
       ? `${Math.ceil(upgradingRemaining)}s`
-      : queueAvailable
-        ? translations.ui.upgrade
-        : translations.ui.queueFull;
-    this.createModalButton(content, buttonLabel, modalWidth - 210, y + 24, 162, 36, { action: "upgrade", building: buildingId }, disabled);
-    this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 210, y + 68, {
+      : locked
+        ? `${level}/${maxLevel}`
+        : queueAvailable
+          ? translations.ui.upgrade
+          : translations.ui.queueFull;
+    this.createModalButton(content, buttonLabel, modalWidth - 258, footerY + 24, 210, 44, { action: "upgrade", building: buildingId }, disabled);
+    this.drawIcon(content, "day", modalWidth - 172, footerY + 88, 14);
+    this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 154, footerY + 80, {
       fill: 0xaeb4b8,
       fontSize: 11,
       fontWeight: "700",
     });
   }
 
-  private drawGeneratorControls(parent: Container, buildingId: BuildingId, state: GameState, translations: TranslationPack, y: number): number {
+  private drawBuildingPreview(
+    parent: Container,
+    buildingName: string,
+    level: number,
+    built: boolean,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    const frame = new Graphics();
+    frame.roundRect(x, y, width, height, 8)
+      .fill({ color: 0x11140f, alpha: 0.72 })
+      .stroke({ color: 0xe0c46f, alpha: 0.22, width: 1 });
+    frame.circle(x + width * 0.52, y + height * 0.48, width * 0.42)
+      .stroke({ color: 0xe0c46f, alpha: 0.05, width: 1 });
+    frame.moveTo(x + 16, y + height * 0.7)
+      .lineTo(x + width - 16, y + height * 0.7)
+      .stroke({ color: 0xe0c46f, alpha: 0.08, width: 1 });
+    frame.ellipse(x + width / 2, y + height * 0.78, width * 0.34, height * 0.08)
+      .fill({ color: 0x030405, alpha: 0.4 });
+    parent.addChild(frame);
+
+    if (!built) {
+      this.drawText(parent, `${buildingName} / ${level}`, x + 16, y + height - 32, {
+        fill: 0xaeb4b8,
+        fontSize: 11,
+        fontWeight: "800",
+      });
+    }
+  }
+
+  private getBuildingDetailMetrics(
+    buildingId: BuildingId,
+    building: GameState["buildings"][BuildingId],
+    level: number,
+    maxLevel: number,
+    requiredWorkers: number,
+    state: GameState,
+    translations: TranslationPack,
+  ): BuildingMetric[] {
+    const definition = buildingById[buildingId];
+    const defense = (definition.defense ?? 0) * level;
+
+    return [
+      {
+        iconId: "build",
+        label: translations.ui.level,
+        value: `${level}/${maxLevel}`,
+        fill: 0xf1df9a,
+        tooltip: `${translations.ui.level} ${level}/${maxLevel}`,
+      },
+      {
+        iconId: "shield",
+        label: translations.ui.defense,
+        value: `${Math.round(defense)}`,
+        fill: defense > 0 ? 0xf5efdf : 0xd7ddd8,
+        tooltip: `${translations.ui.defense}: ${Math.round(defense)}`,
+      },
+      this.getBuildingProductionMetric(buildingId, building, level, translations),
+      this.getBuildingEnergyMetric(buildingId, building, level, translations),
+    ];
+  }
+
+  private getBuildingProductionMetric(
+    buildingId: BuildingId,
+    building: GameState["buildings"][BuildingId],
+    level: number,
+    translations: TranslationPack,
+  ): BuildingMetric {
+    const definition = buildingById[buildingId];
+
+    if (buildingId === "generator") {
+      const rate = getGeneratorEnergyRate(level, building.workers);
+      return {
+        iconId: "energy",
+        label: translations.ui.production,
+        value: this.getHourlyRateLabel(rate),
+        fill: this.getRateColor(rate),
+        tooltip: `${translations.resources.energy}: ${this.getHourlyRateLabel(rate)}`,
+      };
+    }
+
+    const produced = Object.entries(definition.produces ?? {})
+      .find(([, amount]) => (amount ?? 0) > 0);
+
+    if (produced) {
+      const [resourceId, amount] = produced;
+      const typedResourceId = resourceId as ResourceId;
+      const rate = (amount ?? 0) * level;
+      return {
+        iconId: typedResourceId,
+        label: translations.ui.production,
+        value: this.getHourlyRateLabel(rate),
+        fill: this.getRateColor(rate),
+        tooltip: `${translations.resources[typedResourceId]}: ${this.getHourlyRateLabel(rate)}`,
+      };
+    }
+
+    if (definition.housing) {
+      const capacity = definition.housing * level;
+      return {
+        iconId: "home",
+        label: translations.ui.housingCapacity,
+        value: `+${capacity}`,
+        fill: capacity > 0 ? 0xf1df9a : 0xd7ddd8,
+        tooltip: `${translations.ui.housingCapacity}: ${capacity}`,
+      };
+    }
+
+    const storage = Object.entries(definition.storageBonus ?? {})
+      .find(([, amount]) => (amount ?? 0) > 0);
+
+    if (storage) {
+      const [resourceId, amount] = storage;
+      const typedResourceId = resourceId as ResourceId;
+      const capacity = Math.round((amount ?? 0) * level);
+      return {
+        iconId: typedResourceId,
+        label: translations.ui.stock,
+        value: `+${capacity}`,
+        fill: capacity > 0 ? 0xf1df9a : 0xd7ddd8,
+        tooltip: `${translations.resources[typedResourceId]} ${translations.ui.stock}: +${capacity}`,
+      };
+    }
+
+    return {
+      iconId: "build",
+      label: translations.ui.production,
+      value: "0",
+      fill: 0xd7ddd8,
+      tooltip: translations.ui.production,
+    };
+  }
+
+  private getBuildingEnergyMetric(
+    buildingId: BuildingId,
+    building: GameState["buildings"][BuildingId],
+    level: number,
+    translations: TranslationPack,
+  ): BuildingMetric {
+    const definition = buildingById[buildingId];
+    const consumption =
+      ((definition.consumes?.energy ?? 0) + (definition.alwaysConsumes?.energy ?? 0)) * level;
+    const production = buildingId === "generator"
+      ? getGeneratorEnergyRate(level, building.workers)
+      : 0;
+    const netRate = production - consumption;
+
+    return {
+      iconId: "energy",
+      label: translations.resources.energy,
+      value: this.getHourlyRateLabel(netRate),
+      fill: this.getRateColor(netRate),
+      tooltip: `${translations.resources.energy}: ${this.getHourlyRateLabel(netRate)}`,
+    };
+  }
+
+  private getBuildingWorkerMetricValue(
+    buildingId: BuildingId,
+    building: GameState["buildings"][BuildingId],
+    requiredWorkers: number,
+    state: GameState,
+  ): string {
+    const workerLimit = getBuildingWorkerLimit(state, buildingId);
+
+    if (workerLimit > 0) {
+      return `${building.workers}/${workerLimit}`;
+    }
+
+    if (building.constructionWorkers > 0) {
+      return `${building.constructionWorkers}`;
+    }
+
+    return `${requiredWorkers}`;
+  }
+
+  private drawMetricCard(
+    parent: Container,
+    metric: BuildingMetric,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    const card = new Container();
+    card.x = x;
+    card.y = y;
+    parent.addChild(card);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, height, 7)
+      .fill({ color: 0x10120e, alpha: 0.78 })
+      .stroke({ color: 0xe0c46f, alpha: 0.18, width: 1 });
+    card.addChild(box);
+
+    this.drawIcon(card, metric.iconId, 22, height / 2, 22);
+    this.drawText(card, metric.label, 48, 12, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: width - 58,
+    });
+    this.drawText(card, metric.value, 48, 32, {
+      fill: metric.fill ?? 0xf5efdf,
+      fontSize: 17,
+      fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: width - 58,
+    });
+
+    if (metric.tooltip) {
+      this.bindTooltip(card, metric.tooltip);
+    }
+  }
+
+  private drawSectionTitle(parent: Container, label: string, x: number, y: number): void {
+    this.drawText(parent, label, x, y, {
+      fill: 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+  }
+
+  private drawBuildingOperations(
+    parent: Container,
+    buildingId: BuildingId,
+    level: number,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+  ): number {
+    const effects = this.getCurrentBuildingEffects(buildingId, level, translations);
+    const height = 112;
+
+    this.drawPanel(parent, x, y, width, height);
+    this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
+
+    if (effects.length === 0) {
+      this.drawText(parent, translations.ui.resourceNoActiveEffects ?? "-", x + 20, y + 54, {
+        fill: 0xaeb4b8,
+        fontSize: 12,
+        fontWeight: "800",
+      });
+      return y + height + 14;
+    }
+
+    this.drawEffects(parent, effects, x + 20, y + 56, width - 40);
+    return y + height + 14;
+  }
+
+  private drawGeneratorControls(
+    parent: Container,
+    buildingId: BuildingId,
+    state: GameState,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+  ): number {
     const building = state.buildings[buildingId];
     const workerLimit = getBuildingWorkerLimit(state, buildingId);
 
@@ -1491,47 +1824,219 @@ export class PixiVillageRenderer {
     }
 
     const energyPerHour = getGeneratorEnergyRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS;
-    this.drawPanel(parent, 0, y, 360, 58);
-    this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, 14, y + 11, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
+    this.drawPanel(parent, x, y, width, 104);
+    this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
+    this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, x + 20, y + 50, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
     this.drawInfoToken(parent, {
       iconId: "energy",
       text: `+${this.formatRate(energyPerHour)}/h`,
       tooltip: `${translations.resources.energy}: +${this.formatRate(energyPerHour)}/h`,
-      x: 14,
-      y: y + 32,
+      x: x + 20,
+      y: y + 74,
     });
-    this.createModalButton(parent, "-", 254, y + 14, 36, 30, { action: "building-workers", building: buildingId, delta: -1 }, building.workers <= 0);
-    this.createModalButton(parent, "+", 302, y + 14, 36, 30, { action: "building-workers", building: buildingId, delta: 1 }, building.workers >= workerLimit || state.survivors.workers <= 0);
-    return y + 78;
+    this.createModalButton(parent, "-", x + width - 96, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: -1 }, building.workers <= 0);
+    this.createModalButton(parent, "+", x + width - 48, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: 1 }, building.workers >= workerLimit || state.survivors.workers <= 0);
+    return y + 118;
   }
 
-  private drawBarracksControls(parent: Container, state: GameState, translations: TranslationPack, y: number): number {
+  private drawBarracksControls(parent: Container, state: GameState, translations: TranslationPack, x: number, y: number, width: number): number {
     if (state.buildings.barracks.level <= 0) {
       return y;
     }
 
-    const panelHeight = 158;
+    const panelHeight = 174;
+    const contentY = y + 62;
+    const selectedTroops = Math.max(1, Math.floor(this.barracksTroopCount));
+    const maxSelectableTroops = Math.max(1, Math.max(state.survivors.workers, state.survivors.troops));
+    this.barracksTroopCount = Math.min(selectedTroops, maxSelectableTroops);
 
-    this.drawPanel(parent, 0, y, 560, panelHeight);
-    this.drawText(parent, `${translations.ui.availableWorkers}: ${state.survivors.workers}`, 14, y + 12, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
-    this.drawText(parent, `${translations.ui.availableTroops}: ${state.survivors.troops}`, 14, y + 38, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
-    this.createModalButton(parent, translations.ui.workerToTroop, 188, y + 12, 112, 30, { action: "barracks-worker-to-troop" }, state.survivors.workers <= 0);
-    this.createModalButton(parent, translations.ui.troopToWorker, 308, y + 12, 108, 30, { action: "barracks-troop-to-worker" }, state.survivors.troops <= 0);
+    this.drawPanel(parent, x, y, width, panelHeight);
+    this.drawBarracksTabs(parent, translations, x + 20, y + 18);
 
-    const scoutingY = y + 76;
-    this.drawText(parent, translations.ui.scouting, 14, scoutingY, { fill: 0xf1df9a, fontSize: 13, fontWeight: "900" });
+    if (this.activeBarracksTab === "scouting") {
+      this.drawBarracksScouting(parent, state, translations, x, contentY, width);
+      return y + panelHeight + 14;
+    }
+
+    this.drawBarracksTraining(parent, state, translations, x, contentY, width, maxSelectableTroops);
+    return y + panelHeight + 14;
+  }
+
+  private drawBarracksTraining(
+    parent: Container,
+    state: GameState,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+    maxSelectableTroops: number,
+  ): void {
+    this.drawBarracksAvailabilityCard(parent, "people", translations.ui.availableWorkers, state.survivors.workers, x + 20, y, 156, 42);
+    this.drawBarracksAvailabilityCard(parent, "scout", translations.ui.availableTroops, state.survivors.troops, x + 188, y, 156, 42);
+    this.drawTroopCountStepper(
+      parent,
+      translations.ui.squadSize ?? translations.roles.troops,
+      this.barracksTroopCount,
+      maxSelectableTroops,
+      x + width - 208,
+      y,
+      188,
+    );
+
+    this.createModalButton(
+      parent,
+      translations.ui.workerToTroop,
+      x + 20,
+      y + 58,
+      156,
+      32,
+      { action: "barracks-worker-to-troop", troopCount: this.barracksTroopCount },
+      state.survivors.workers < this.barracksTroopCount,
+    );
+    this.createModalButton(
+      parent,
+      translations.ui.troopToWorker,
+      x + 188,
+      y + 58,
+      156,
+      32,
+      { action: "barracks-troop-to-worker", troopCount: this.barracksTroopCount },
+      state.survivors.troops < this.barracksTroopCount,
+    );
+  }
+
+  private drawBarracksScouting(
+    parent: Container,
+    state: GameState,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+  ): void {
+    const maxScoutingTroops = Math.max(1, state.survivors.troops);
+    this.barracksTroopCount = Math.min(this.barracksTroopCount, maxScoutingTroops);
+
     this.drawText(
       parent,
       `${translations.ui.scoutingDuration}: ${this.formatScoutingRemaining(SCOUTING_DURATION_SECONDS)} / ${translations.ui.scoutingCapacity}: ${SCOUTING_CARRY_PER_TROOP}`,
-      120,
-      scoutingY,
+      x + 20,
+      y,
       { fill: 0xaeb4b8, fontSize: 12, fontWeight: "800" },
     );
 
-    this.drawScoutingLaunchRow(parent, translations, "safe", y + 102, state.survivors.troops);
-    this.drawScoutingLaunchRow(parent, translations, "risky", y + 132, state.survivors.troops);
+    this.drawTroopCountStepper(
+      parent,
+      translations.ui.squadSize ?? translations.roles.troops,
+      this.barracksTroopCount,
+      maxScoutingTroops,
+      x + width - 208,
+      y - 14,
+      188,
+    );
+    this.drawScoutingLaunchRow(parent, translations, "safe", y + 46, state.survivors.troops, this.barracksTroopCount, x, width);
+    this.drawScoutingLaunchRow(parent, translations, "risky", y + 78, state.survivors.troops, this.barracksTroopCount, x, width);
+  }
 
-    return y + panelHeight + 20;
+  private drawBarracksTabs(parent: Container, translations: TranslationPack, x: number, y: number): void {
+    const tabs: Array<{ id: BarracksTab; label: string }> = [
+      { id: "training", label: translations.ui.training ?? "Training" },
+      { id: "scouting", label: translations.ui.scouting },
+    ];
+    let offsetX = 0;
+
+    tabs.forEach((tab) => {
+      const active = this.activeBarracksTab === tab.id;
+      const tabWidth = Math.max(112, tab.label.length * 8 + 34);
+      const tabLayer = new Container();
+      tabLayer.x = x + offsetX;
+      tabLayer.y = y;
+      parent.addChild(tabLayer);
+
+      const box = new Graphics();
+      box.roundRect(0, 0, tabWidth, 32, 7)
+        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 })
+        .stroke({ color: 0xe0c46f, alpha: active ? 0.62 : 0.22, width: 1 });
+      tabLayer.addChild(box);
+      this.drawCenteredText(tabLayer, tab.label, tabWidth / 2, 16, {
+        fill: active ? 0x11140f : 0xd8d2bd,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+
+      if (!active) {
+        tabLayer.eventMode = "static";
+        tabLayer.cursor = "pointer";
+        tabLayer.on("pointerdown", (event) => {
+          event.stopPropagation();
+          this.consumeHostClick();
+          this.activeBarracksTab = tab.id;
+          this.requestRender();
+        });
+      }
+
+      offsetX += tabWidth + 8;
+    });
+  }
+
+  private drawBarracksAvailabilityCard(
+    parent: Container,
+    iconId: string,
+    label: string,
+    value: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    const card = new Container();
+    card.x = x;
+    card.y = y;
+    parent.addChild(card);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, height, 7)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 })
+      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    card.addChild(box);
+    this.drawIcon(card, iconId, 22, height / 2, 20);
+    this.drawText(card, label, 48, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
+    this.drawText(card, `${value}`, 48, 26, { fill: 0xf5efdf, fontSize: 17, fontWeight: "900" });
+  }
+
+  private drawTroopCountStepper(
+    parent: Container,
+    label: string,
+    value: number,
+    maxValue: number,
+    x: number,
+    y: number,
+    width: number,
+  ): void {
+    const stepper = new Container();
+    stepper.x = x;
+    stepper.y = y;
+    parent.addChild(stepper);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, 50, 7)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 })
+      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    stepper.addChild(box);
+
+    this.drawText(stepper, label, 12, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
+    this.createLocalModalButton(stepper, "-", width - 108, 12, 30, 28, () => {
+      this.barracksTroopCount = Math.max(1, this.barracksTroopCount - 1);
+      this.requestRender();
+    }, value <= 1);
+    this.drawCenteredText(stepper, `${value}`, width - 58, 26, {
+      fill: 0xf1df9a,
+      fontSize: 17,
+      fontWeight: "900",
+    });
+    this.createLocalModalButton(stepper, "+", width - 38, 12, 30, 28, () => {
+      this.barracksTroopCount = Math.min(maxValue, this.barracksTroopCount + 1);
+      this.requestRender();
+    }, value >= maxValue);
   }
 
   private drawScoutingLaunchRow(
@@ -1540,14 +2045,38 @@ export class PixiVillageRenderer {
     mode: ScoutingMode,
     y: number,
     availableTroops: number,
+    selectedTroops: number,
+    x: number,
+    width: number,
   ): void {
     const modeLabel = translations.ui[mode === "safe" ? "safeScouting" : "riskyScouting"];
     const riskLabel = mode === "safe" ? translations.ui.safeScoutingRisk : translations.ui.riskyScoutingRisk;
 
-    this.drawText(parent, modeLabel, 14, y + 6, { fill: 0xf5efdf, fontSize: 12, fontWeight: "900" });
-    this.drawText(parent, riskLabel, 120, y + 6, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.createModalButton(parent, "1", 356, y, 36, 26, { action: "start-scouting", scoutMode: mode, scoutTroops: 1 }, availableTroops < 1);
-    this.createModalButton(parent, "5", 402, y, 36, 26, { action: "start-scouting", scoutMode: mode, scoutTroops: 5 }, availableTroops < 5);
+    const rowContainer = new Container();
+    parent.addChild(rowContainer);
+
+    const row = new Graphics();
+    row.roundRect(x + 18, y - 2, width - 36, 28, 7)
+      .fill({ color: 0x080a09, alpha: 0.44 })
+      .stroke({ color: 0xe0c46f, alpha: 0.12, width: 1 });
+    rowContainer.addChild(row);
+    this.drawIcon(rowContainer, mode === "safe" ? "scout" : "shield", x + 34, y + 12, 17);
+    this.drawText(rowContainer, modeLabel, x + 50, y + 3, { fill: 0xf5efdf, fontSize: 12, fontWeight: "900" });
+    rowContainer.hitArea = {
+      contains: (hitX: number, hitY: number) =>
+        hitX >= x + 18 && hitX <= x + width - 34 && hitY >= y - 2 && hitY <= y + 26,
+    };
+    this.bindTooltip(rowContainer, riskLabel);
+    this.createModalButton(
+      parent,
+      `${translations.ui.sendScouting ?? "Send"} ${selectedTroops}`,
+      x + width - 118,
+      y - 1,
+      84,
+      26,
+      { action: "start-scouting", scoutMode: mode, scoutTroops: selectedTroops },
+      availableTroops < selectedTroops,
+    );
   }
 
   private drawEffects(parent: Container, effects: EffectLine[], x: number, y: number, maxWidth: number): number {
@@ -1670,6 +2199,45 @@ export class PixiVillageRenderer {
     return button;
   }
 
+  private createLocalModalButton(
+    parent: Container,
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    onTap: () => void,
+    disabled = false,
+  ): Container {
+    const button = new Container();
+    button.x = x;
+    button.y = y;
+    parent.addChild(button);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, height, 6)
+      .fill({ color: disabled ? 0x34362e : 0x262719, alpha: disabled ? 0.52 : 0.92 })
+      .stroke({ color: 0xe0c46f, alpha: disabled ? 0.16 : 0.36, width: 1 });
+    button.addChild(box);
+    this.drawCenteredText(button, label, width / 2, height / 2, {
+      fill: disabled ? 0xaeb4b8 : 0xf1df9a,
+      fontSize: 14,
+      fontWeight: "900",
+    });
+
+    if (!disabled) {
+      button.eventMode = "static";
+      button.cursor = "pointer";
+      button.on("pointerdown", (event) => {
+        event.stopPropagation();
+        this.consumeHostClick();
+        onTap();
+      });
+    }
+
+    return button;
+  }
+
   private getCostLineParts(bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack): CostLinePart[] {
     return Object.entries(bag)
       .filter(([, amount]) => (amount ?? 0) > 0)
@@ -1783,6 +2351,82 @@ export class PixiVillageRenderer {
         iconId: typedResourceId,
         value: `+${Math.round(amount ?? 0)}`,
         tooltip: `${translations.resources[typedResourceId]} cap +${Math.round(amount ?? 0)}`,
+      });
+    }
+
+    return effects;
+  }
+
+  private getCurrentBuildingEffects(buildingId: BuildingId, level: number, translations: TranslationPack): EffectLine[] {
+    const definition = buildingById[buildingId];
+
+    if (!definition || level <= 0) {
+      return [];
+    }
+
+    const effects: EffectLine[] = [];
+
+    if (buildingId === "clinic") {
+      const treatmentPerHour = level * GAME_HOUR_REAL_SECONDS / 60;
+      const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
+      effects.push({
+        iconId: "people",
+        value: `+${this.formatRate(treatmentPerHour)}/h`,
+        tooltip: `${translations.ui.treatment} +${this.formatRate(treatmentPerHour)}/h (${translations.resources.food} -${this.formatRate(foodPerHour)}/h)`,
+      });
+    }
+
+    if (buildingId === "dormitory" && definition.housing) {
+      effects.push({
+        iconId: "home",
+        value: `+${definition.housing * level}`,
+        tooltip: `${translations.ui.housingCapacity} +${definition.housing * level}`,
+      });
+    }
+
+    if (definition.defense) {
+      effects.push({
+        iconId: "shield",
+        value: `+${definition.defense * level}`,
+        tooltip: `${translations.ui.defense} +${definition.defense * level}`,
+      });
+    }
+
+    for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      effects.push({
+        iconId: typedResourceId,
+        value: `+${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+      });
+    }
+
+    for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      effects.push({
+        iconId: typedResourceId,
+        value: `-${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+        negative: true,
+      });
+    }
+
+    for (const [resourceId, amount] of Object.entries(definition.alwaysConsumes ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      effects.push({
+        iconId: typedResourceId,
+        value: `-${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
+        negative: true,
+      });
+    }
+
+    for (const [resourceId, amount] of Object.entries(definition.storageBonus ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      effects.push({
+        iconId: typedResourceId,
+        value: `+${Math.round((amount ?? 0) * level)}`,
+        tooltip: `${translations.resources[typedResourceId]} cap +${Math.round((amount ?? 0) * level)}`,
       });
     }
 
@@ -1912,9 +2556,16 @@ export class PixiVillageRenderer {
   private bindAction(target: Container, detail: PixiActionDetail): void {
     target.eventMode = "static";
     target.cursor = "pointer";
-    target.on("pointertap", () => {
+    target.on("pointerdown", (event) => {
+      event.stopPropagation();
       this.host.dispatchEvent(new CustomEvent<PixiActionDetail>("pixi-action", { detail }));
     });
+  }
+
+  private consumeHostClick(): void {
+    this.host.dispatchEvent(new CustomEvent<PixiActionDetail>("pixi-action", {
+      detail: { action: "consume-pointer" },
+    }));
   }
 
   private bindTooltip(target: Container, text: string): void {
