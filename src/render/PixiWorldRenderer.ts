@@ -189,6 +189,7 @@ export class PixiWorldRenderer {
     this.drawResourcePills(state, translations, width);
     this.drawViewTabs(translations);
     this.drawProduction(state, translations);
+    this.drawWorkforce(state, translations);
     this.drawToolbar(state, translations, width, height);
   }
 
@@ -252,30 +253,82 @@ export class PixiWorldRenderer {
     layer.x = 28;
     layer.y = 152;
     this.hudLayer.addChild(layer);
-    this.drawPanel(layer, 0, 0, 308, 152);
-    drawPixiIcon(layer, "build", 18, 80, 14);
-    this.drawText(layer, translations.ui.production, 34, 72, { fill: 0xf3edda, fontSize: 12, fontWeight: "800" });
+    this.drawPanel(layer, 0, 0, 308, 134);
+    drawPixiIcon(layer, "build", 18, 22, 14);
+    this.drawText(layer, translations.ui.production, 34, 14, { fill: 0xf3edda, fontSize: 12, fontWeight: "800" });
     this.bindTooltip(layer, translations.ui.productionTooltip);
-    this.drawText(layer, translations.ui.resource, 114, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.drawText(layer, translations.ui.stock, 216, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.drawText(layer, translations.ui.perMinute, 258, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
+    this.drawText(layer, translations.ui.stock, 226, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
+    this.drawText(layer, translations.ui.perMinute, 290, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
 
     resourceDefinitions.forEach((resource, index) => {
-      const y = 42 + index * 20;
+      const y = 38 + index * 18;
       const perMinute = rates[resource.id] * 60;
       const stock = resource.id === "morale"
         ? `${Math.floor(state.resources[resource.id])}%`
         : `${Math.floor(state.resources[resource.id])}/${Math.floor(state.capacities[resource.id])}`;
       const rateColor = perMinute > 0.004 ? 0x8fe0b8 : perMinute < -0.004 ? 0xff9aa2 : 0xaeb4b8;
       const resourceCell = new Container();
-      resourceCell.x = 114;
-      resourceCell.y = y - 1;
+      resourceCell.x = 142;
+      resourceCell.y = y + 7;
       layer.addChild(resourceCell);
-      drawPixiIcon(resourceCell, resource.id, 6, 8, 13);
       this.bindTooltip(resourceCell, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
-      this.drawText(layer, translations.resources[resource.id], 130, y, { fill: 0xd7ddd8, fontSize: 11 });
-      this.drawText(layer, stock, 216, y, { fill: 0xd7ddd8, fontSize: 11 });
-      this.drawText(layer, `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`, 268, y, { fill: rateColor, fontSize: 11, fontWeight: "700" });
+      drawPixiIcon(resourceCell, resource.id, 0, 0, 15);
+      this.drawText(layer, stock, 226, y, { fill: 0xd7ddd8, fontSize: 11 }).anchor.set(1, 0);
+      this.drawText(layer, `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`, 290, y, { fill: rateColor, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+    });
+  }
+
+  private drawWorkforce(state: GameState, translations: TranslationPack): void {
+    const layer = new Container();
+    layer.x = 28;
+    layer.y = 304;
+    this.hudLayer.addChild(layer);
+
+    const buildingWorkers = Object.values(state.buildings)
+      .reduce((total, building) => total + building.workers, 0);
+    const constructionWorkers = Object.values(state.buildings)
+      .reduce((total, building) => total + building.constructionWorkers, 0);
+    const expeditionTroops = state.expeditions
+      .reduce((total, expedition) => total + expedition.survivors, 0);
+    const totalPopulation =
+      state.survivors.workers +
+      state.survivors.troops +
+      buildingWorkers +
+      constructionWorkers +
+      expeditionTroops +
+      state.health.injured;
+
+    this.drawPanel(layer, 0, 0, 308, 126);
+    drawPixiIcon(layer, "people", 18, 22, 15);
+    this.drawText(layer, translations.ui.survivors, 34, 14, { fill: 0xf3edda, fontSize: 12, fontWeight: "800" });
+    this.drawInfoToken(layer, {
+      iconId: "people",
+      text: `${totalPopulation}`,
+      tooltip: translations.ui.totalPopulation,
+      x: 246,
+      y: 14,
+    });
+
+    const rows: Array<[string, string, string, number]> = [
+      ["people", `${state.survivors.workers}`, translations.ui.availableWorkers, 0],
+      ["build", `${buildingWorkers}`, translations.ui.buildingWorkers, 1],
+      ["material", `${constructionWorkers}`, translations.ui.constructionCrew, 2],
+      ["scout", `${state.survivors.troops}`, translations.ui.availableTroops, 3],
+      ["day", `${expeditionTroops}`, translations.ui.expeditionTroops, 4],
+      ["morale", `${state.health.injured}`, translations.roles.injured, 5],
+    ];
+
+    rows.forEach(([iconId, value, tooltip, index]) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      this.drawInfoToken(layer, {
+        iconId,
+        text: value,
+        tooltip,
+        missing: iconId === "morale" && state.health.injured > 0,
+        x: 16 + column * 144,
+        y: 44 + row * 26,
+      });
     });
   }
 
@@ -320,16 +373,25 @@ export class PixiWorldRenderer {
 
     this.drawText(panel, translations.tiles[sector.kind], 16, 18, { fill: 0xf5efdf, fontSize: 18, fontWeight: "900" });
     this.drawText(panel, `${sector.id} / ${translations.ui.threat} ${Math.round(sector.threat)}%`, 16, 48, { fill: 0xaeb4b8, fontSize: 12 });
-    this.drawText(panel, hasLoot ? this.formatResourceBag(sector.loot, translations) : translations.ui.noLoot, 16, 82, { fill: 0xf1df9a, fontSize: 13, wordWrap: true, wordWrapWidth: 286 });
+    if (hasLoot) {
+      this.drawResourceBagTokens(panel, sector.loot, translations, 16, 86);
+    } else {
+      this.drawText(panel, translations.ui.noLoot, 16, 82, {
+        fill: 0xf1df9a,
+        fontSize: 12,
+        fontWeight: "800",
+      });
+    }
 
     if (sector.kind !== "base") {
-      this.drawText(panel, `${translations.ui.expeditionSupplies}: ${this.formatResourceBag(supplyCost, translations)}`, 16, 124, { fill: 0xd7ddd8, fontSize: 12, wordWrap: true, wordWrapWidth: 286 });
+      this.drawText(panel, translations.ui.expeditionSupplies, 16, 142, { fill: 0xd7ddd8, fontSize: 12, fontWeight: "800" });
+      this.drawResourceBagTokens(panel, supplyCost, translations, 16, 164);
       if (!hasExpeditionTroops) {
-        this.drawText(panel, translations.ui.needTroops, 16, 154, { fill: 0xff9aa2, fontSize: 12, wordWrap: true, wordWrapWidth: 286 });
+        this.drawText(panel, translations.ui.needTroops, 16, 190, { fill: 0xff9aa2, fontSize: 12, wordWrap: true, wordWrapWidth: 286 });
       } else if (!hasSupplies) {
-        this.drawText(panel, translations.ui.needExpeditionSupplies, 16, 154, { fill: 0xff9aa2, fontSize: 12, wordWrap: true, wordWrapWidth: 286 });
+        this.drawText(panel, translations.ui.needExpeditionSupplies, 16, 190, { fill: 0xff9aa2, fontSize: 12, wordWrap: true, wordWrapWidth: 286 });
       }
-      this.createHudButton(panel, translations.ui.sendExpedition, 16, 196, 180, 36, { action: "expedition", sector: sector.id }, false, !canSend);
+      this.createHudButton(panel, translations.ui.sendExpedition, 16, 206, 180, 36, { action: "expedition", sector: sector.id }, false, !canSend);
     }
   }
 
@@ -352,6 +414,61 @@ export class PixiWorldRenderer {
     group.addChild(text);
     this.bindTooltip(group, tooltip);
     return group;
+  }
+
+  private drawResourceBagTokens(
+    parent: Container,
+    bag: Partial<Record<ResourceId, number>>,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+  ): void {
+    let offset = 0;
+
+    Object.entries(bag)
+      .filter(([, amount]) => (amount ?? 0) > 0)
+      .forEach(([resourceId, amount]) => {
+        const typedResourceId = resourceId as ResourceId;
+        const value = Math.ceil(amount ?? 0);
+        const token = this.drawInfoToken(parent, {
+          iconId: typedResourceId,
+          text: `${value}`,
+          tooltip: `${translations.resources[typedResourceId]} ${value}`,
+          x: x + offset,
+          y,
+        });
+        offset += token.width + 8;
+      });
+  }
+
+  private drawInfoToken(
+    parent: Container,
+    options: {
+      iconId: string;
+      text: string;
+      tooltip: string;
+      x: number;
+      y: number;
+      missing?: boolean;
+    },
+  ): Container {
+    const token = new Container();
+    token.x = options.x;
+    token.y = options.y;
+    parent.addChild(token);
+
+    drawPixiIcon(token, options.iconId, 8, 8, 14);
+    const label = this.drawText(token, options.text, 20, 0, {
+      fill: options.missing ? 0xff6f7d : 0xf1df9a,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    this.bindTooltip(token, options.tooltip);
+    token.hitArea = {
+      contains: (localX: number, localY: number) =>
+        localX >= 0 && localX <= label.width + 26 && localY >= -2 && localY <= 18,
+    };
+    return token;
   }
 
   private createHudButton(
@@ -476,13 +593,6 @@ export class PixiWorldRenderer {
     label.y = y;
     parent.addChild(label);
     return label;
-  }
-
-  private formatResourceBag(bag: Partial<Record<ResourceId, number>>, translations: TranslationPack): string {
-    return Object.entries(bag)
-      .filter(([, amount]) => (amount ?? 0) > 0)
-      .map(([resourceId, amount]) => `${translations.resources[resourceId as ResourceId]} ${Math.ceil(amount ?? 0)}`)
-      .join(" / ");
   }
 
   private formatRate(value: number): string {
