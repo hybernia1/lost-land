@@ -55,6 +55,12 @@ const palettes: Record<Exclude<BuildingId, "palisade">, Palette> = {
     detail: "#29231d",
     light: "#d7a75f",
   },
+  scrapyard: {
+    base: "#5e6158",
+    roof: "#83765d",
+    detail: "#272b28",
+    light: "#d6b36b",
+  },
   generator: {
     base: "#675f45",
     roof: "#8e7a45",
@@ -111,6 +117,8 @@ export function drawBuildingAsset(
     drawWaterStill(context, options, palette);
   } else if (options.id === "workshop") {
     drawWorkshop(context, options, palette);
+  } else if (options.id === "scrapyard") {
+    drawScrapyard(context, options, palette);
   } else if (options.id === "generator") {
     drawGenerator(context, options, palette);
   } else if (options.id === "watchtower") {
@@ -288,6 +296,46 @@ function drawWorkshop(
   context.moveTo(width * 0.32, height * 0.13);
   context.lineTo(width * 0.16, -height * 0.09);
   context.stroke();
+}
+
+function drawScrapyard(
+  context: CanvasRenderingContext2D,
+  { width, height, scale }: BuildingAssetOptions,
+  palette: Palette,
+): void {
+  drawBlock(context, width, height, scale, palette, 0.9);
+  context.fillStyle = palette.roof;
+  roundRect(context, -width * 0.4, -height * 0.28, width * 0.8, height * 0.16, 4 * scale);
+  context.fill();
+
+  context.fillStyle = "rgba(39, 43, 40, 0.82)";
+  roundRect(context, -width * 0.38, height * 0.06, width * 0.76, height * 0.22, 3 * scale);
+  context.fill();
+
+  context.fillStyle = "rgba(199, 201, 189, 0.82)";
+  for (let index = 0; index < 4; index += 1) {
+    const scrapWidth = width * (0.11 + index * 0.01);
+    const scrapHeight = height * (0.1 + (index % 2) * 0.04);
+    roundRect(
+      context,
+      -width * 0.32 + index * width * 0.18,
+      height * (0.12 - index * 0.035),
+      scrapWidth,
+      scrapHeight,
+      2 * scale,
+    );
+    context.fill();
+  }
+
+  context.strokeStyle = "rgba(214, 179, 107, 0.52)";
+  context.lineWidth = 2 * scale;
+  context.beginPath();
+  context.moveTo(-width * 0.28, -height * 0.04);
+  context.lineTo(width * 0.28, -height * 0.04);
+  context.moveTo(-width * 0.18, -height * 0.18);
+  context.lineTo(width * 0.12, height * 0.2);
+  context.stroke();
+  drawSmallLight(context, width * 0.25, height * 0.02, palette.light, scale);
 }
 
 function drawGenerator(

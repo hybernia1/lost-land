@@ -9,6 +9,7 @@ type BuildingDefinitionInput = Omit<
 const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   {
     id: "mainBuilding",
+    category: "support",
     name: "Main Building",
     description: "Coordinates construction, housing, and camp decisions.",
     buildSeconds: 24,
@@ -19,6 +20,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "storage",
+    category: "support",
     name: "Storage Depot",
     description: "Raises the stockpile limits for practical supplies.",
     buildSeconds: 28,
@@ -33,6 +35,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "dormitory",
+    category: "housing",
     name: "Dormitory",
     description: "Houses civilian survivors, but needs power to stay livable.",
     buildSeconds: 34,
@@ -43,6 +46,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "hydroponics",
+    category: "resource",
     name: "Hydroponics",
     description: "Grows food indoors, but needs water and power.",
     buildSeconds: 32,
@@ -53,6 +57,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "waterStill",
+    category: "resource",
     name: "Water Still",
     description: "Filters contaminated water into drinkable reserves.",
     buildSeconds: 30,
@@ -63,6 +68,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "workshop",
+    category: "resource",
     name: "Workshop",
     description: "Turns scrap into useful construction material.",
     buildSeconds: 34,
@@ -72,7 +78,19 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     consumes: { energy: 0.025 },
   },
   {
+    id: "scrapyard",
+    category: "resource",
+    name: "Scrapyard",
+    description: "Sorts salvage into usable construction material.",
+    buildSeconds: 36,
+    baseConstructionWorkers: 3,
+    baseCost: { material: 100, energy: 8 },
+    produces: { material: 0.22 },
+    consumes: { energy: 0.04 },
+  },
+  {
     id: "generator",
+    category: "resource",
     name: "Generator",
     description: "Turns assigned workers into power for the camp.",
     buildSeconds: 36,
@@ -81,6 +99,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "watchtower",
+    category: "defense",
     name: "Watchtower",
     description: "Improves perimeter control against roaming hordes.",
     buildSeconds: 38,
@@ -91,6 +110,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "barracks",
+    category: "defense",
     name: "Barracks",
     description: "Trains workers into troops and keeps the militia organized.",
     buildSeconds: 40,
@@ -100,6 +120,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "palisade",
+    category: "defense",
     name: "Palisade",
     description: "A reinforced wooden perimeter that makes the camp safer.",
     buildSeconds: 40,
@@ -111,6 +132,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   },
   {
     id: "clinic",
+    category: "support",
     name: "Clinic",
     description: "Trains workers into troops for future outside missions and camp defense.",
     buildSeconds: 42,

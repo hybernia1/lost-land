@@ -24,7 +24,7 @@ export function createInitialState(
   ) as Record<BuildingId, BuildingState>;
 
   const state: GameState = {
-    saveVersion: 15,
+    saveVersion: 17,
     saveId,
     communityName,
     startedAt: new Date().toISOString(),
@@ -44,6 +44,9 @@ export function createInitialState(
     survivors: {
       workers: 3,
       troops: 0,
+    },
+    scouting: {
+      missions: [],
     },
     health: {
       injured: 0,

@@ -12,11 +12,18 @@ export type BuildingId =
   | "hydroponics"
   | "waterStill"
   | "workshop"
+  | "scrapyard"
   | "generator"
   | "watchtower"
   | "barracks"
   | "clinic"
   | "palisade";
+
+export type BuildingCategory =
+  | "resource"
+  | "housing"
+  | "defense"
+  | "support";
 
 export type TileKind =
   | "base"
@@ -38,6 +45,7 @@ export type BuildingLevelRequirement = {
 
 export type BuildingDefinition = {
   id: BuildingId;
+  category: BuildingCategory;
   name: string;
   description: string;
   maxLevel: number;
@@ -77,6 +85,19 @@ export type SurvivorRoles = {
   troops: number;
 };
 
+export type ScoutingMode = "safe" | "risky";
+
+export type ScoutingMission = {
+  id: string;
+  mode: ScoutingMode;
+  troops: number;
+  remainingSeconds: number;
+};
+
+export type ScoutingState = {
+  missions: ScoutingMission[];
+};
+
 export type HealthState = {
   injured: number;
   treatmentProgress: number;
@@ -112,6 +133,7 @@ export type GameState = {
   resources: Record<ResourceId, number>;
   capacities: Record<ResourceId, number>;
   survivors: SurvivorRoles;
+  scouting: ScoutingState;
   health: HealthState;
   buildings: Record<BuildingId, BuildingState>;
   village: {
