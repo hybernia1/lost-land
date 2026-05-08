@@ -1,6 +1,6 @@
 import type { Game } from "../game/Game";
 import { formatGameClock, getGameDay } from "../game/time";
-import type { BuildingId, GameSpeed, GameState } from "../game/types";
+import type { BuildingId, GameSpeed, GameState, ResourceId, ScoutingMode } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
@@ -232,6 +232,9 @@ export class App {
         building?: BuildingId;
         plot?: string;
         delta?: number;
+        scoutMode?: ScoutingMode;
+        scoutTroops?: number;
+        resourceId?: ResourceId;
         speed?: GameSpeed;
         continuousShifts?: boolean;
       }>);
@@ -278,11 +281,14 @@ export class App {
     building?: BuildingId;
     plot?: string;
     delta?: number;
+    scoutMode?: ScoutingMode;
+    scoutTroops?: number;
+    resourceId?: ResourceId;
     speed?: GameSpeed;
     continuousShifts?: boolean;
   }>): void {
     this.suppressVillageClickUntil = Date.now() + 120;
-    const { action, building, continuousShifts, delta, plot, speed } = event.detail;
+    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed } = event.detail;
 
     if (speed) {
       this.game.setSpeed(speed);
@@ -302,6 +308,13 @@ export class App {
     if (action === "open-morale-breakdown") {
       this.villageModalPlotId = null;
       this.villageInfoPanel = "morale";
+      this.requestRender();
+      return;
+    }
+
+    if (action === "open-resource-breakdown" && resourceId) {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = resourceId;
       this.requestRender();
       return;
     }
@@ -347,6 +360,11 @@ export class App {
 
     if (action === "barracks-troop-to-worker") {
       this.game.convertTroopToWorker();
+      return;
+    }
+
+    if (action === "start-scouting" && scoutMode && scoutTroops) {
+      this.game.startScouting(scoutMode, scoutTroops);
     }
   }
 
@@ -447,6 +465,13 @@ export class App {
 
     if (action === "barracks-troop-to-worker") {
       this.game.convertTroopToWorker();
+    }
+
+    if (action === "start-scouting" && button.dataset.scoutMode && button.dataset.scoutTroops) {
+      this.game.startScouting(
+        button.dataset.scoutMode as ScoutingMode,
+        Number(button.dataset.scoutTroops),
+      );
     }
 
     if (action === "build" && button.dataset.building && button.dataset.plot) {

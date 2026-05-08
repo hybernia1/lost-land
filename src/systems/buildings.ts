@@ -25,13 +25,16 @@ const GENERATOR_BASE_ENERGY_RATE = 0.28;
 const HOMELESS_MORALE_PENALTY_PER_HOUR = 1;
 const CONTINUOUS_SHIFT_MORALE_PENALTY_PER_HOUR = 2;
 
-export type MoraleBreakdownLine = {
+export type ResourceBreakdownLine = {
   source:
     | "building"
+    | "generator"
+    | "survivorConsumption"
     | "homeless"
     | "foodShortage"
     | "waterShortage"
     | "continuousShifts";
+  resourceId: ResourceId;
   ratePerSecond: number;
   buildingId?: BuildingId;
   count?: number;
@@ -164,8 +167,11 @@ export function getHousingStatus(state: GameState): {
   };
 }
 
-export function getMoraleBreakdown(state: GameState): MoraleBreakdownLine[] {
-  const lines: MoraleBreakdownLine[] = [];
+export function getResourceBreakdown(
+  state: GameState,
+  resourceId: ResourceId,
+): ResourceBreakdownLine[] {
+  const lines: ResourceBreakdownLine[] = [];
   const productionActive = isProductionShiftActive(state);
 
   for (const definition of buildingDefinitions) {
@@ -173,20 +179,54 @@ export function getMoraleBreakdown(state: GameState): MoraleBreakdownLine[] {
 
     if (
       building.level <= 0 ||
-      building.upgradingRemaining > 0 ||
-      !productionActive ||
-      isBuildingInactiveDueToEnergy(state, definition.id)
+      building.upgradingRemaining > 0
     ) {
       continue;
     }
 
+    const alwaysRate = -(definition.alwaysConsumes?.[resourceId] ?? 0) * building.level;
+
+    if (alwaysRate !== 0) {
+      lines.push({
+        source: "building",
+        resourceId,
+        buildingId: definition.id,
+        ratePerSecond: alwaysRate,
+      });
+    }
+
+    if (!productionActive) {
+      continue;
+    }
+
+    if (definition.id === "generator") {
+      const ratePerSecond = resourceId === "energy"
+        ? getGeneratorEnergyRate(building.level, building.workers)
+        : 0;
+
+      if (ratePerSecond !== 0) {
+        lines.push({
+          source: "generator",
+          resourceId,
+          buildingId: definition.id,
+          ratePerSecond,
+        });
+      }
+      continue;
+    }
+
+    if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+      continue;
+    }
+
     const ratePerSecond =
-      ((definition.produces?.morale ?? 0) - (definition.consumes?.morale ?? 0)) *
+      ((definition.produces?.[resourceId] ?? 0) - (definition.consumes?.[resourceId] ?? 0)) *
       building.level;
 
     if (ratePerSecond !== 0) {
       lines.push({
         source: "building",
+        resourceId,
         buildingId: definition.id,
         ratePerSecond,
       });
@@ -194,28 +234,49 @@ export function getMoraleBreakdown(state: GameState): MoraleBreakdownLine[] {
   }
 
   const homeless = getHousingStatus(state).homeless;
-  if (homeless > 0) {
+  if (resourceId === "morale" && homeless > 0) {
     lines.push({
       source: "homeless",
+      resourceId,
       count: homeless,
       ratePerSecond: -homeless * HOMELESS_MORALE_PENALTY_PER_HOUR / GAME_HOUR_REAL_SECONDS,
     });
   }
 
-  if (isContinuousNightShiftActive(state)) {
+  if (resourceId === "morale" && isContinuousNightShiftActive(state)) {
     lines.push({
       source: "continuousShifts",
+      resourceId,
       ratePerSecond: -CONTINUOUS_SHIFT_MORALE_PENALTY_PER_HOUR / GAME_HOUR_REAL_SECONDS,
     });
   }
 
-  const currentRates = getProductionDelta(state, 1);
-  if ((currentRates.food ?? 0) < 0 && state.resources.food <= 0) {
-    lines.push({ source: "foodShortage", ratePerSecond: -0.08 });
+  const population = getPopulation(state);
+  if (resourceId === "food") {
+    lines.push({
+      source: "survivorConsumption",
+      resourceId,
+      count: population,
+      ratePerSecond: -population * 0.012,
+    });
   }
 
-  if ((currentRates.water ?? 0) < 0 && state.resources.water <= 0) {
-    lines.push({ source: "waterShortage", ratePerSecond: -0.11 });
+  if (resourceId === "water") {
+    lines.push({
+      source: "survivorConsumption",
+      resourceId,
+      count: population,
+      ratePerSecond: -population * 0.014,
+    });
+  }
+
+  const currentRates = getProductionDelta(state, 1);
+  if (resourceId === "morale" && (currentRates.food ?? 0) < 0 && state.resources.food <= 0) {
+    lines.push({ source: "foodShortage", resourceId, ratePerSecond: -0.08 });
+  }
+
+  if (resourceId === "morale" && (currentRates.water ?? 0) < 0 && state.resources.water <= 0) {
+    lines.push({ source: "waterShortage", resourceId, ratePerSecond: -0.11 });
   }
 
   return lines;

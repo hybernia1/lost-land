@@ -9,9 +9,10 @@ import {
 import { tickHealth } from "../systems/health";
 import { localizeStaticLogEntries } from "../systems/log";
 import { loadGame, saveGame } from "../systems/save";
+import { startScoutingMission, tickScouting } from "../systems/scouting";
 import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
 import { createInitialState } from "./createInitialState";
-import type { BuildingId, GameListener, GameSpeed, GameState } from "./types";
+import type { BuildingId, GameListener, GameSpeed, GameState, ScoutingMode } from "./types";
 
 const TICK_SECONDS = 1;
 const AUTOSAVE_REAL_SECONDS = 10;
@@ -97,6 +98,12 @@ export class Game {
     }
   }
 
+  startScouting(mode: ScoutingMode, troopCount: number): void {
+    if (startScoutingMission(this.state, mode, troopCount)) {
+      this.commit();
+    }
+  }
+
   setPaused(paused: boolean): void {
     this.state.paused = paused;
     this.commit();
@@ -142,6 +149,7 @@ export class Game {
     const scaledDelta = deltaSeconds * this.state.speed;
     this.state.elapsedSeconds += scaledDelta;
     tickBuildings(this.state, scaledDelta);
+    tickScouting(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
     tickHealth(this.state, scaledDelta);
     this.autosaveIfDue();
@@ -178,9 +186,25 @@ export class Game {
 function normalizeGameState(state: GameState): void {
   state.communityName = state.communityName?.trim() || "Lost Land";
   state.saveId = state.saveId?.trim() || `community-${Date.now().toString(36)}`;
-  state.saveVersion = 15;
+  state.saveVersion = 17;
   state.workMode = state.workMode === "continuous" ? "continuous" : "day";
   state.log = localizeStaticLogEntries(state.log ?? []);
+  state.scouting = {
+    missions: Array.isArray(state.scouting?.missions)
+      ? state.scouting.missions
+          .filter((mission) =>
+            (mission.mode === "safe" || mission.mode === "risky") &&
+            mission.troops > 0 &&
+            mission.remainingSeconds > 0
+          )
+          .map((mission) => ({
+            id: mission.id?.trim() || `scout-${Date.now().toString(36)}`,
+            mode: mission.mode,
+            troops: Math.floor(mission.troops),
+            remainingSeconds: Math.max(0, mission.remainingSeconds),
+          }))
+      : [],
+  };
 
   if (state.speed !== 24) {
     state.speed = 1;
