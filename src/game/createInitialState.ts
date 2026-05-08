@@ -2,6 +2,7 @@ import { buildingDefinitions } from "../data/buildings";
 import { emptyResourceRecord } from "../data/resources";
 import { villagePlotDefinitions } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
+import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialMap } from "../systems/map";
 import type { BuildingId, BuildingState, GameState } from "./types";
 
@@ -23,13 +24,14 @@ export function createInitialState(
   ) as Record<BuildingId, BuildingState>;
 
   const state: GameState = {
-    saveVersion: 12,
+    saveVersion: 15,
     saveId,
     communityName,
     startedAt: new Date().toISOString(),
     elapsedSeconds: 0,
     paused: false,
     speed: 1,
+    workMode: "day",
     resources: {
       ...emptyResourceRecord(),
       food: 105,
@@ -47,6 +49,8 @@ export function createInitialState(
       injured: 0,
       treatmentProgress: 0,
       nextIncidentAt: 600,
+      starvationProgress: 0,
+      dehydrationProgress: 0,
     },
     buildings,
     village: {
@@ -57,11 +61,7 @@ export function createInitialState(
       })),
     },
     map: createInitialMap(),
-    expeditions: [],
-    log: [
-      "Day 1: the camp radio catches only static.",
-      "A safe perimeter is marked around the old transit depot.",
-    ],
+    log: getLocalizedInitialLogEntries(),
   };
 
   recalculateCapacities(state);

@@ -13,7 +13,7 @@ import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
 import { buildingVisualDefinitions, getBuildingVisualFrame } from "../data/buildingVisuals";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
-import { formatGameClock, getGameDay } from "../game/time";
+import { formatGameClock, GAME_HOUR_REAL_SECONDS, getGameDay } from "../game/time";
 import type { BuildingId, GameSpeed, GameState, ResourceBag, ResourceId } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
@@ -23,10 +23,15 @@ import {
   getBuildingWorkerLimit,
   getConstructionWorkerRequirement,
   getGeneratorEnergyRate,
+  getHousingStatus,
+  getMoraleBreakdown,
   getResourceProductionRates,
   getUpgradeCost,
   hasAvailableBuildingSlot,
+  isDayShiftHour,
+  isBuildingInactiveDueToEnergy,
   MAX_ACTIVE_BUILDINGS,
+  type MoraleBreakdownLine,
 } from "../systems/buildings";
 import { getClinicFoodPerTreatment } from "../systems/health";
 import { canAfford } from "../systems/resources";
@@ -55,8 +60,10 @@ type PixiActionDetail = {
   plot?: string;
   delta?: number;
   speed?: GameSpeed;
-  view?: "village" | "world";
+  continuousShifts?: boolean;
 };
+
+export type VillageInfoPanel = "morale";
 
 type EffectLine = {
   iconId: string;
@@ -95,6 +102,8 @@ const resourceColors: Record<ResourceId, number> = {
   morale: 0xe9a0a0,
 };
 
+const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
+
 const buildingTextureCache = new Map<string, Texture>();
 
 function upgradingTooltip(
@@ -127,6 +136,12 @@ export class PixiVillageRenderer {
   };
   private lastState: GameState | null = null;
   private lastTranslations: TranslationPack | undefined;
+  private buildChoicesScrollArea: Bounds | null = null;
+  private buildChoicesScrollMax = 0;
+  private buildChoicesScrollY = 0;
+  private buildChoicesScrollPlotId: string | null = null;
+  private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
+  private readonly handleMouseLeave = () => this.hideCanvasTooltip();
 
   constructor(
     private readonly host: HTMLElement,
@@ -134,10 +149,17 @@ export class PixiVillageRenderer {
   ) {
     this.tooltipLayer.eventMode = "none";
     this.rootLayer.addChild(this.worldLayer, this.hudLayer, this.tooltipLayer);
+    this.host.addEventListener("wheel", this.handleWheel, { passive: false });
+    this.host.addEventListener("mouseleave", this.handleMouseLeave);
     void this.initialize();
   }
 
-  render(state: GameState, translations?: TranslationPack, modalPlotId?: string | null): void {
+  render(
+    state: GameState,
+    translations?: TranslationPack,
+    modalPlotId?: string | null,
+    infoPanel?: VillageInfoPanel | null,
+  ): void {
     this.lastState = state;
     this.lastTranslations = translations;
 
@@ -160,7 +182,8 @@ export class PixiVillageRenderer {
     this.mainBuildingEffects = [];
     this.worldLayer.removeChildren();
     this.hudLayer.removeChildren();
-    this.hideCanvasTooltip();
+    this.buildChoicesScrollArea = null;
+    this.buildChoicesScrollMax = 0;
     this.hudLayer.scale.set(hudScale);
     this.drawBackground(width, height);
     this.drawPalisade(state, translations?.buildings);
@@ -172,6 +195,7 @@ export class PixiVillageRenderer {
     this.drawGate(state);
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
+    this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
   }
 
   hitTest(clientX: number, clientY: number): string | null {
@@ -192,7 +216,43 @@ export class PixiVillageRenderer {
     );
   }
 
+  private handleHostWheel(event: WheelEvent): void {
+    if (!this.buildChoicesScrollArea || this.buildChoicesScrollMax <= 0) {
+      return;
+    }
+
+    const rect = this.host.getBoundingClientRect();
+    const hudScale = this.hudLayer.scale.x || 1;
+    const x = (event.clientX - rect.left) / hudScale;
+    const y = (event.clientY - rect.top) / hudScale;
+    const area = this.buildChoicesScrollArea;
+
+    if (
+      x < area.x ||
+      x > area.x + area.width ||
+      y < area.y ||
+      y > area.y + area.height
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextScroll = Math.max(
+      0,
+      Math.min(this.buildChoicesScrollMax, this.buildChoicesScrollY + event.deltaY),
+    );
+
+    if (nextScroll === this.buildChoicesScrollY) {
+      return;
+    }
+
+    this.buildChoicesScrollY = nextScroll;
+    this.requestRender();
+  }
+
   destroy(): void {
+    this.host.removeEventListener("wheel", this.handleWheel);
+    this.host.removeEventListener("mouseleave", this.handleMouseLeave);
     this.app?.destroy(true);
     this.app = null;
   }
@@ -341,10 +401,17 @@ export class PixiVillageRenderer {
 
       const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
       asset.anchor.set(0.5);
-      this.fitSprite(asset, bounds.width, bounds.height);
+      this.fitSprite(
+        asset,
+        bounds.width * VILLAGE_BUILDING_RENDER_SCALE,
+        bounds.height * VILLAGE_BUILDING_RENDER_SCALE,
+      );
       asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
       plotLayer.addChild(asset);
       this.drawBuildingVisualEffects(plotLayer, buildingId, Math.max(1, building.level), bounds, visualTime);
+      if (isBuildingInactiveDueToEnergy(state, buildingId)) {
+        this.drawPowerWarning(plotLayer, bounds);
+      }
       return;
     }
 
@@ -398,21 +465,37 @@ export class PixiVillageRenderer {
     const day = getGameDay(state.elapsedSeconds);
     const clock = formatGameClock(state.elapsedSeconds);
     const population = this.getPopulation(state);
+    const housing = getHousingStatus(state);
+    const rates = getResourceProductionRates(state);
+    const moraleRate = this.getHourlyRateLabel(rates.morale);
+    const moraleRateColor = this.getRateColor(rates.morale);
 
     this.drawBrand(state.communityName, `${t?.ui.day ?? "Day"} ${day} / ${clock}`);
     this.drawTopPills(
       [
-        ["day", `${t?.ui.day ?? "Day"} ${day} / ${clock}`, t?.ui.dayTooltip],
-        ["people", `${population}`, t?.ui.populationTooltip],
-        ["shield", `${Math.round(this.getDefenseScore(state))}`, t?.ui.defenseTooltip],
-        ["morale", `${Math.floor(state.resources.morale)}%`, t ? `${t.resources.morale}: ${t.resourceDescriptions.morale}` : undefined],
+        { iconId: "day", label: `${t?.ui.day ?? "Day"} ${day} / ${clock}`, tooltip: t?.ui.dayTooltip },
+        {
+          iconId: "people",
+          label: `${population}`,
+          tooltip: t
+            ? `${t.ui.populationTooltip}\n${t.ui.housed}: ${housing.housed}\n${t.ui.homeless}: ${housing.homeless}`
+            : undefined,
+        },
+        { iconId: "shield", label: `${Math.round(this.getDefenseScore(state))}`, tooltip: t?.ui.defenseTooltip },
+        {
+          iconId: "morale",
+          label: `${Math.floor(state.resources.morale)}%`,
+          sublabel: moraleRate,
+          sublabelFill: moraleRateColor,
+          tooltip: t ? `${t.resources.morale}: ${t.resourceDescriptions.morale}` : undefined,
+          action: { action: "open-morale-breakdown" },
+        },
       ],
       width,
     );
-    this.drawResourcePills(state, translations, width);
-    this.drawViewTabs(translations);
-    this.drawProduction(state, translations);
-    this.drawWorkforce(state, translations, width);
+    this.drawResourcePills(state, translations, width, rates);
+    this.drawWorkforce(state, translations, width, housing);
+    this.drawEventLog(state, translations, height);
     this.drawQueue(state, translations, height);
     this.drawToolbar(state, translations, width, height);
   }
@@ -439,14 +522,31 @@ export class PixiVillageRenderer {
     });
   }
 
-  private drawTopPills(items: Array<[string, string, string | undefined]>, width: number): void {
+  private drawTopPills(
+    items: Array<{
+      iconId: string;
+      label: string;
+      tooltip?: string;
+      sublabel?: string;
+      sublabelFill?: number;
+      action?: PixiActionDetail;
+    }>,
+    width: number,
+  ): void {
     const group = new Container();
     group.y = 30;
     this.hudLayer.addChild(group);
 
     let x = 0;
-    for (const [iconId, label, tooltip] of items) {
-      const pill = this.createPill(label, iconId, tooltip);
+    for (const item of items) {
+      const pill = this.createPill(
+        item.label,
+        item.iconId,
+        item.tooltip,
+        item.sublabel,
+        item.sublabelFill,
+        item.action,
+      );
       pill.x = x;
       group.addChild(pill);
       x += pill.width + 8;
@@ -455,18 +555,25 @@ export class PixiVillageRenderer {
     group.x = Math.max(390, (width - x) / 2);
   }
 
-  private drawResourcePills(state: GameState, translations: TranslationPack | undefined, width: number): void {
+  private drawResourcePills(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    rates: Record<ResourceId, number>,
+  ): void {
     const group = new Container();
-    group.y = 30;
+    group.y = 18;
     this.hudLayer.addChild(group);
 
     let x = 0;
     for (const resource of resourceDefinitions.filter((definition) => definition.id !== "morale")) {
       const label = `${Math.floor(state.resources[resource.id])}/${Math.floor(state.capacities[resource.id])}`;
+      const rate = rates[resource.id];
+      const rateLabel = this.getHourlyRateLabel(rate);
       const tooltip = translations
         ? `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`
         : resource.id;
-      const pill = this.createPill(label, resource.id, tooltip);
+      const pill = this.createPill(label, resource.id, tooltip, rateLabel, this.getRateColor(rate));
       pill.x = x;
       group.addChild(pill);
       x += pill.width + 8;
@@ -475,83 +582,12 @@ export class PixiVillageRenderer {
     group.x = Math.max(28, width - x - 28);
   }
 
-  private drawViewTabs(translations: TranslationPack | undefined): void {
-    const group = new Container();
-    group.x = 28;
-    group.y = 94;
-    this.hudLayer.addChild(group);
-
-    this.createHudButton(group, translations?.ui.village ?? "Village", 0, 0, 90, 42, { view: "village" }, true);
-    this.createHudButton(group, translations?.ui.worldMap ?? "World map", 98, 0, 116, 42, { view: "world" });
-  }
-
-  private drawProduction(state: GameState, translations: TranslationPack | undefined): void {
-    const rates = getResourceProductionRates(state);
-    const layer = new Container();
-    layer.x = 28;
-    layer.y = 152;
-    this.hudLayer.addChild(layer);
-
-    const width = 308;
-    const rowHeight = 20;
-    const height = 46 + resourceDefinitions.length * rowHeight;
-    this.drawPanel(layer, 0, 0, width, height);
-    this.drawIcon(layer, "build", 18, 22, 14);
-    this.drawText(layer, translations?.ui.production ?? "Production", 34, 14, {
-      fill: 0xf3edda,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-    if (translations?.ui.productionTooltip) {
-      const headerHit = new Container();
-      headerHit.x = 14;
-      headerHit.y = 8;
-      headerHit.hitArea = {
-        contains: (x: number, y: number) => x >= 0 && x <= 126 && y >= 0 && y <= 26,
-      };
-      layer.addChild(headerHit);
-      this.bindTooltip(headerHit, translations.ui.productionTooltip);
-    }
-
-    this.drawText(layer, translations?.ui.stock ?? "Stock", 214, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
-    this.drawText(layer, translations?.ui.perMinute ?? "+/min", 290, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
-
-    resourceDefinitions.forEach((resource, index) => {
-      const y = 40 + index * rowHeight;
-      const perMinute = rates[resource.id] * 60;
-      const stock = resource.id === "morale"
-        ? `${Math.floor(state.resources[resource.id])}%`
-        : `${Math.floor(state.resources[resource.id])}/${Math.floor(state.capacities[resource.id])}`;
-      const rateLabel = `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`;
-      const rateColor = perMinute > 0.004 ? 0x8fe0b8 : perMinute < -0.004 ? 0xff9aa2 : 0xaeb4b8;
-
-      const row = new Container();
-      row.x = 14;
-      row.y = y - 2;
-      row.hitArea = {
-        contains: (x: number, y: number) => x >= 0 && x <= width - 28 && y >= 0 && y <= 18,
-      };
-      layer.addChild(row);
-      if (translations) {
-        this.bindTooltip(row, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
-      }
-      if (index % 2 === 1) {
-        const stripe = new Graphics();
-        stripe.roundRect(0, 0, width - 28, 18, 4).fill({ color: 0xffffff, alpha: 0.025 });
-        row.addChild(stripe);
-      }
-      this.drawIcon(row, resource.id, 8, 9, 14);
-      this.drawText(row, translations?.resources[resource.id] ?? resource.id, 28, 1, {
-        fill: 0xd7ddd8,
-        fontSize: 11,
-        fontWeight: "800",
-      });
-      this.drawText(row, stock, 200, 1, { fill: 0xd7ddd8, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
-      this.drawText(row, rateLabel, 276, 1, { fill: rateColor, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
-    });
-  }
-
-  private drawWorkforce(state: GameState, translations: TranslationPack | undefined, width: number): void {
+  private drawWorkforce(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    housing = getHousingStatus(state),
+  ): void {
     const panelWidth = 308;
     const layer = new Container();
     layer.x = Math.max(28, width - panelWidth - 28);
@@ -562,18 +598,15 @@ export class PixiVillageRenderer {
       .reduce((total, building) => total + building.workers, 0);
     const constructionWorkers = Object.values(state.buildings)
       .reduce((total, building) => total + building.constructionWorkers, 0);
-    const expeditionTroops = state.expeditions
-      .reduce((total, expedition) => total + expedition.survivors, 0);
     const totalPopulation =
       state.survivors.workers +
       state.survivors.troops +
       buildingWorkers +
       constructionWorkers +
-      expeditionTroops +
       state.health.injured;
     const t = translations;
 
-    this.drawPanel(layer, 0, 0, panelWidth, 190);
+    this.drawPanel(layer, 0, 0, panelWidth, 278);
     this.drawIcon(layer, "people", 18, 22, 15);
     this.drawText(layer, t?.ui.survivors ?? "Survivors", 34, 14, {
       fill: 0xf3edda,
@@ -600,8 +633,20 @@ export class PixiVillageRenderer {
       { iconId: "build", value: `${buildingWorkers}`, label: t?.ui.buildingWorkers ?? "Working in buildings", tooltip: t?.ui.buildingWorkers ?? "Working in buildings" },
       { iconId: "material", value: `${constructionWorkers}`, label: t?.ui.constructionCrew ?? "Construction crew", tooltip: t?.ui.constructionCrew ?? "Construction crew" },
       { iconId: "scout", value: `${state.survivors.troops}`, label: t?.ui.availableTroops ?? "Available troops", tooltip: t?.ui.availableTroops ?? "Available troops" },
-      { iconId: "expedition", value: `${expeditionTroops}`, label: t?.ui.expeditionTroops ?? "On expedition", tooltip: t?.ui.expeditionTroops ?? "On expedition" },
       { iconId: "morale", value: `${state.health.injured}`, label: t?.roles.injured ?? "Injured", tooltip: t?.roles.injured ?? "Injured", missing: state.health.injured > 0 },
+      {
+        iconId: "home",
+        value: `${housing.housed}/${housing.civilianCapacity + this.getTroopHousingCapacity(state)}`,
+        label: t?.ui.housed ?? "Housed",
+        tooltip: t?.ui.housingTooltip ?? "Housing",
+      },
+      {
+        iconId: "home",
+        value: `${housing.homeless}`,
+        label: t?.ui.homeless ?? "Homeless",
+        tooltip: t?.ui.housingTooltip ?? "Housing",
+        missing: housing.homeless > 0,
+      },
     ];
 
     rows.forEach((row, index) => {
@@ -612,6 +657,45 @@ export class PixiVillageRenderer {
         width: panelWidth - 28,
       });
     });
+
+    const continuousShifts = state.workMode === "continuous";
+    this.drawText(
+      layer,
+      `${t?.ui.workSchedule ?? "Schedule"}: ${continuousShifts ? t?.ui.continuousShifts ?? "24h shifts" : t?.ui.dayShift ?? "Day shift"}`,
+      14,
+      210,
+      {
+        fill: 0xf5efdf,
+        fontSize: 12,
+        fontWeight: "800",
+      },
+    );
+    this.createModalButton(
+      layer,
+      continuousShifts
+        ? t?.ui.dayShift ?? "Day shift"
+        : t?.ui.continuousShifts ?? "24h shifts",
+      176,
+      202,
+      118,
+      30,
+      { action: "set-continuous-shifts", continuousShifts: !continuousShifts },
+    );
+    this.drawText(
+      layer,
+      continuousShifts
+        ? t?.ui.continuousShiftsMorale ?? "Night work lowers morale."
+        : isDayShiftHour(state)
+          ? t?.ui.dayShiftActive ?? "Production active."
+          : t?.ui.nightProductionPaused ?? "Production paused until morning.",
+      14,
+      246,
+      {
+        fill: continuousShifts ? 0xffc0a0 : 0xaeb4b8,
+        fontSize: 10,
+        fontWeight: "800",
+      },
+    );
   }
 
   private drawWorkforceRow(
@@ -678,19 +762,197 @@ export class PixiVillageRenderer {
     });
   }
 
+  private drawEventLog(state: GameState, translations: TranslationPack | undefined, height: number): void {
+    const layer = new Container();
+    layer.x = 28;
+    layer.y = Math.max(282, height - 242);
+    this.hudLayer.addChild(layer);
+
+    const width = 308;
+    const panelHeight = 128;
+    this.drawPanel(layer, 0, 0, width, panelHeight);
+    this.drawIcon(layer, "day", 18, 22, 14);
+    this.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
+      fill: 0xf5efdf,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+
+    const entries = state.log.slice(0, 4);
+
+    if (entries.length === 0) {
+      this.drawText(layer, "-", 14, 44, {
+        fill: 0xaeb4b8,
+        fontSize: 11,
+        fontWeight: "700",
+      });
+      return;
+    }
+
+    entries.forEach((entry, index) => {
+      this.drawText(layer, entry, 14, 42 + index * 20, {
+        fill: index === 0 ? 0xf1df9a : 0xc8cabb,
+        fontSize: 10,
+        fontWeight: index === 0 ? "800" : "700",
+        wordWrap: true,
+        wordWrapWidth: width - 28,
+      });
+    });
+  }
+
   private drawToolbar(state: GameState, translations: TranslationPack | undefined, width: number, height: number): void {
     const group = new Container();
-    group.x = width - 318;
+    group.x = width - 244;
     group.y = height - 72;
     this.hudLayer.addChild(group);
-    this.drawPanel(group, 0, 0, 290, 48);
+    this.drawPanel(group, 0, 0, 216, 48);
 
     this.createIconButton(group, state.paused ? "play" : "pause", 8, 8, 40, 32, { action: "pause" }, state.paused ? translations?.ui.resume : translations?.ui.pause);
     this.createHudButton(group, translations?.ui.speedNormal ?? "1x", 56, 8, 44, 32, { speed: 1 }, state.speed === 1);
-    this.createHudButton(group, translations?.ui.speedFast ?? "Fast", 108, 8, 52, 32, { speed: 8 }, state.speed === 8);
-    this.createIconButton(group, "save", 168, 8, 40, 32, { action: "save" }, translations?.ui.save);
-    this.createIconButton(group, "load", 216, 8, 32, 32, { action: "load" }, translations?.ui.load);
-    this.createIconButton(group, "reset", 256, 8, 26, 32, { action: "reset" }, translations?.ui.reset);
+    this.createHudButton(group, translations?.ui.speedFast ?? "24x", 108, 8, 52, 32, { speed: 24 }, state.speed === 24);
+    this.createIconButton(group, "home", 168, 8, 40, 32, { action: "home" }, translations?.ui.home);
+  }
+
+  private drawInfoPanel(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    height: number,
+    infoPanel: VillageInfoPanel | null,
+  ): void {
+    if (!infoPanel || !translations) {
+      return;
+    }
+
+    if (infoPanel === "morale") {
+      this.drawMoraleBreakdownPanel(state, translations, width, height);
+    }
+  }
+
+  private drawMoraleBreakdownPanel(
+    state: GameState,
+    translations: TranslationPack,
+    width: number,
+    height: number,
+  ): void {
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
+
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    overlay.addChild(backdrop);
+    this.bindAction(backdrop, { action: "close-village-modal" });
+
+    const panelWidth = Math.min(520, width - 48);
+    const panelHeight = 340;
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(36, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight);
+    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
+
+    const breakdown = getMoraleBreakdown(state);
+    const totalRate = breakdown.reduce((total, line) => total + line.ratePerSecond, 0);
+
+    this.drawIcon(panel, "morale", 28, 31, 20);
+    this.drawText(panel, translations.resources.morale, 52, 19, {
+      fill: 0xf5efdf,
+      fontSize: 22,
+      fontWeight: "900",
+    });
+    this.drawText(panel, `${Math.floor(state.resources.morale)}%`, panelWidth - 92, 21, {
+      fill: 0xf1df9a,
+      fontSize: 18,
+      fontWeight: "900",
+    }).anchor.set(1, 0);
+    this.drawText(panel, translations.ui.moraleBreakdown, 24, 68, {
+      fill: 0xaeb4b8,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+
+    this.drawMoraleBreakdownRow(
+      panel,
+      translations.ui.moraleNetChange,
+      this.getHourlyRateLabel(totalRate),
+      totalRate,
+      panelWidth,
+      100,
+      true,
+    );
+
+    if (breakdown.length === 0) {
+      this.drawText(panel, translations.ui.moraleNoActiveEffects, 24, 148, {
+        fill: 0xc8cabb,
+        fontSize: 13,
+        fontWeight: "700",
+      });
+      return;
+    }
+
+    breakdown.forEach((line, index) => {
+      this.drawMoraleBreakdownRow(
+        panel,
+        this.getMoraleBreakdownLabel(line, translations),
+        this.getHourlyRateLabel(line.ratePerSecond),
+        line.ratePerSecond,
+        panelWidth,
+        148 + index * 34,
+      );
+    });
+  }
+
+  private drawMoraleBreakdownRow(
+    parent: Container,
+    label: string,
+    value: string,
+    ratePerSecond: number,
+    width: number,
+    y: number,
+    highlighted = false,
+  ): void {
+    const row = new Graphics();
+    row.roundRect(18, y - 7, width - 36, 28, 6)
+      .fill({ color: highlighted ? 0x262719 : 0x0f120e, alpha: highlighted ? 0.72 : 0.38 })
+      .stroke({ color: 0xe0c46f, alpha: highlighted ? 0.22 : 0.1, width: 1 });
+    parent.addChild(row);
+
+    this.drawText(parent, label, 32, y, {
+      fill: highlighted ? 0xf5efdf : 0xd8d2bd,
+      fontSize: 12,
+      fontWeight: highlighted ? "900" : "800",
+    });
+    const valueText = this.drawText(parent, value, width - 32, y, {
+      fill: this.getRateColor(ratePerSecond),
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    valueText.anchor.set(1, 0);
+  }
+
+  private getMoraleBreakdownLabel(
+    line: MoraleBreakdownLine,
+    translations: TranslationPack,
+  ): string {
+    if (line.source === "building" && line.buildingId) {
+      return translations.buildings[line.buildingId].name;
+    }
+
+    if (line.source === "homeless") {
+      return `${translations.ui.homeless}${line.count ? ` (${line.count})` : ""}`;
+    }
+
+    if (line.source === "foodShortage") {
+      return translations.ui.moraleFoodShortage;
+    }
+
+    if (line.source === "continuousShifts") {
+      return translations.ui.moraleContinuousShifts;
+    }
+
+    return translations.ui.moraleWaterShortage;
   }
 
   private drawVillageModal(
@@ -768,15 +1030,42 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const gap = 4;
+    if (this.buildChoicesScrollPlotId !== plotId) {
+      this.buildChoicesScrollPlotId = plotId;
+      this.buildChoicesScrollY = 0;
+    }
+
+    const gap = 8;
     const listX = 24;
     const listY = 88;
-    const rowWidth = modalWidth - 48;
     const availableHeight = modalHeight - listY - 24;
-    const rowHeight = Math.max(
-      58,
-      Math.min(76, (availableHeight - gap * (buildableBuildings.length - 1)) / buildableBuildings.length),
-    );
+    const rowHeight = modalHeight < 620 ? 80 : 88;
+    const contentHeight = buildableBuildings.length * rowHeight + gap * (buildableBuildings.length - 1);
+    const maxScroll = Math.max(0, contentHeight - availableHeight);
+    const needsScroll = maxScroll > 1;
+    const scrollbarGutter = needsScroll ? 22 : 0;
+    const rowWidth = modalWidth - 48 - scrollbarGutter;
+    const scrollY = Math.max(0, Math.min(maxScroll, this.buildChoicesScrollY));
+
+    this.buildChoicesScrollY = scrollY;
+    this.buildChoicesScrollMax = maxScroll;
+    this.buildChoicesScrollArea = {
+      x: parent.x + listX,
+      y: parent.y + listY,
+      width: rowWidth + scrollbarGutter,
+      height: availableHeight,
+    };
+
+    const listContent = new Container();
+    listContent.x = listX;
+    listContent.y = listY - scrollY;
+    parent.addChild(listContent);
+
+    const listMask = new Graphics();
+    listMask.eventMode = "none";
+    listMask.rect(listX, listY, rowWidth, availableHeight).fill({ color: 0xffffff, alpha: 1 });
+    parent.addChild(listMask);
+    listContent.mask = listMask;
 
     buildableBuildings.forEach((buildingId, index) => {
       const translated = translations.buildings[buildingId];
@@ -792,9 +1081,9 @@ export class PixiVillageRenderer {
           ? translations.ui.notEnoughWorkers
           : translations.ui.buildHere;
 
-      this.drawBuildRow(parent, {
-        x: listX,
-        y: listY + index * (rowHeight + gap),
+      this.drawBuildRow(listContent, {
+        x: 0,
+        y: index * (rowHeight + gap),
         width: rowWidth,
         height: rowHeight,
         buildingId,
@@ -812,6 +1101,44 @@ export class PixiVillageRenderer {
         effects: this.getNextLevelEffects(buildingId, 0, translations),
       });
     });
+
+    if (needsScroll) {
+      this.drawBuildChoicesScrollbar(
+        parent,
+        listX + rowWidth + 9,
+        listY,
+        10,
+        availableHeight,
+        scrollY,
+        maxScroll,
+        contentHeight,
+      );
+    }
+  }
+
+  private drawBuildChoicesScrollbar(
+    parent: Container,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    scrollY: number,
+    maxScroll: number,
+    contentHeight: number,
+  ): void {
+    const track = new Graphics();
+    track.roundRect(x, y, width, height, width / 2)
+      .fill({ color: 0x070807, alpha: 0.52 })
+      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+    parent.addChild(track);
+
+    const thumbHeight = Math.max(46, (height / contentHeight) * height);
+    const thumbTravel = Math.max(0, height - thumbHeight - 4);
+    const thumbY = y + 2 + (maxScroll > 0 ? (scrollY / maxScroll) * thumbTravel : 0);
+    const thumb = new Graphics();
+    thumb.roundRect(x + 2, thumbY, width - 4, thumbHeight, (width - 4) / 2)
+      .fill({ color: 0xe0c46f, alpha: 0.86 });
+    parent.addChild(thumb);
   }
 
   private drawBuildRow(
@@ -991,13 +1318,13 @@ export class PixiVillageRenderer {
       return y;
     }
 
-    const energyPerMinute = getGeneratorEnergyRate(building.level, building.workers) * 60;
+    const energyPerHour = getGeneratorEnergyRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS;
     this.drawPanel(parent, 0, y, 360, 58);
     this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, 14, y + 11, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
     this.drawInfoToken(parent, {
       iconId: "energy",
-      text: `+${this.formatRate(energyPerMinute)}/min`,
-      tooltip: `${translations.resources.energy}: +${this.formatRate(energyPerMinute)}/min`,
+      text: `+${this.formatRate(energyPerHour)}/h`,
+      tooltip: `${translations.resources.energy}: +${this.formatRate(energyPerHour)}/h`,
       x: 14,
       y: y + 32,
     });
@@ -1172,10 +1499,20 @@ export class PixiVillageRenderer {
       });
     }
     if (buildingId === "clinic") {
+      const treatmentPerHour = (currentLevel + 1) * GAME_HOUR_REAL_SECONDS / 60;
+      const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
       effects.push({
         iconId: "people",
-        value: "+1/min",
-        tooltip: `${translations.ui.treatment} +1/min (${translations.resources.food} -${getClinicFoodPerTreatment()})`,
+        value: `+${this.formatRate(treatmentPerHour)}/h`,
+        tooltip: `${translations.ui.treatment} +${this.formatRate(treatmentPerHour)}/h (${translations.resources.food} -${this.formatRate(foodPerHour)}/h)`,
+      });
+    }
+    if (buildingId === "dormitory") {
+      const housing = definition.housing ?? 0;
+      effects.push({
+        iconId: "home",
+        value: `+${housing}`,
+        tooltip: `${translations.ui.housingCapacity} +${housing}`,
       });
     }
     if (buildingId === "barracks") {
@@ -1188,8 +1525,8 @@ export class PixiVillageRenderer {
     if (buildingId === "generator") {
       const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
       const nextLimit = Math.min(4, currentLevel + 2);
-      const currentMaxRate = getGeneratorEnergyRate(currentLevel, currentLimit) * 60;
-      const nextMaxRate = getGeneratorEnergyRate(currentLevel + 1, nextLimit) * 60;
+      const currentMaxRate = getGeneratorEnergyRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
+      const nextMaxRate = getGeneratorEnergyRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
       if (nextLimit > currentLimit) {
         effects.push({
           iconId: "people",
@@ -1199,8 +1536,8 @@ export class PixiVillageRenderer {
       }
       effects.push({
         iconId: "energy",
-        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/min`,
-        tooltip: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/min`,
+        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
+        tooltip: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
       });
     }
     if (definition.defense) {
@@ -1214,16 +1551,25 @@ export class PixiVillageRenderer {
       const typedResourceId = resourceId as ResourceId;
       effects.push({
         iconId: typedResourceId,
-        value: `+${this.formatRate((amount ?? 0) * 60)}/min`,
-        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * 60)}/min`,
+        value: `+${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
       });
     }
     for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
       const typedResourceId = resourceId as ResourceId;
       effects.push({
         iconId: typedResourceId,
-        value: `-${this.formatRate((amount ?? 0) * 60)}/min`,
-        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * 60)}/min`,
+        value: `-${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
+        negative: true,
+      });
+    }
+    for (const [resourceId, amount] of Object.entries(definition.alwaysConsumes ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      effects.push({
+        iconId: typedResourceId,
+        value: `-${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
+        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
         negative: true,
       });
     }
@@ -1239,9 +1585,14 @@ export class PixiVillageRenderer {
     return effects;
   }
 
-  private createPill(label: string, color: number | string, prefix?: string): Container {
-    const iconId = typeof color === "string" ? color : "day";
-    const tooltip = prefix;
+  private createPill(
+    label: string,
+    iconId: string,
+    tooltip?: string,
+    sublabel?: string,
+    sublabelFill = 0xaeb4b8,
+    action?: PixiActionDetail,
+  ): Container {
     const group = new Container();
     const text = new Text({
       text: label,
@@ -1252,14 +1603,34 @@ export class PixiVillageRenderer {
         fontWeight: "800",
       },
     });
-    const width = Math.max(62, text.width + 44);
-    this.drawPanel(group, 0, 0, width, 34);
-    this.drawIcon(group, iconId, 17, 17, 16);
+    const subtext = sublabel
+      ? new Text({
+        text: sublabel,
+        style: {
+          fill: sublabelFill,
+          fontFamily: "Inter, Arial, sans-serif",
+          fontSize: 10,
+          fontWeight: "800",
+        },
+      })
+      : null;
+    const width = Math.max(68, Math.max(text.width, subtext?.width ?? 0) + 44);
+    const height = subtext ? 46 : 34;
+    this.drawPanel(group, 0, 0, width, height);
+    this.drawIcon(group, iconId, 17, height / 2, 16);
     text.x = 32;
-    text.y = 7;
+    text.y = subtext ? 6 : 7;
     group.addChild(text);
+    if (subtext) {
+      subtext.x = 32;
+      subtext.y = 25;
+      group.addChild(subtext);
+    }
     if (tooltip) {
       this.bindTooltip(group, tooltip);
+    }
+    if (action) {
+      this.bindAction(group, action);
     }
     return group;
   }
@@ -1483,6 +1854,37 @@ export class PixiVillageRenderer {
     this.mainBuildingEffects.push({ phase, bounds, base, lights, smoke });
 
     parent.addChild(effects);
+  }
+
+  private drawPowerWarning(parent: Container, bounds: Bounds): void {
+    const badge = new Container();
+    badge.x = bounds.width * 0.28;
+    badge.y = -bounds.height * 0.44;
+    parent.addChild(badge);
+
+    const shadow = new Graphics();
+    shadow.circle(2, 3, 16).fill({ color: 0x000000, alpha: 0.42 });
+    badge.addChild(shadow);
+
+    const ring = new Graphics();
+    ring.circle(0, 0, 16)
+      .fill({ color: 0x2a090b, alpha: 0.94 })
+      .stroke({ color: 0xff5566, alpha: 0.86, width: 2 });
+    badge.addChild(ring);
+
+    const bolt = new Graphics();
+    bolt
+      .poly([
+        -2, -11,
+        8, -11,
+        3, -2,
+        10, -2,
+        -4, 13,
+        0, 3,
+        -7, 3,
+      ])
+      .fill({ color: 0xff4f62, alpha: 1 });
+    badge.addChild(bolt);
   }
 
   private drawMainBuildingBaseGlow(
@@ -1782,19 +2184,40 @@ export class PixiVillageRenderer {
     return value.toFixed(1);
   }
 
+  private getHourlyRateLabel(ratePerSecond: number): string {
+    const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
+
+    if (Math.abs(hourlyRate) < 0.05) {
+      return "0/h";
+    }
+
+    return `${hourlyRate > 0 ? "+" : ""}${this.formatRate(hourlyRate)}/h`;
+  }
+
+  private getRateColor(ratePerSecond: number): number {
+    const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
+
+    if (hourlyRate > 0.05) {
+      return 0x8fe0b8;
+    }
+
+    if (hourlyRate < -0.05) {
+      return 0xff9aa2;
+    }
+
+    return 0xaeb4b8;
+  }
+
   private getPopulation(state: GameState): number {
     const buildingWorkers = Object.values(state.buildings)
       .reduce((total, building) => total + building.workers, 0);
     const constructionWorkers = Object.values(state.buildings)
       .reduce((total, building) => total + building.constructionWorkers, 0);
-    const expeditionTroops = state.expeditions
-      .reduce((total, expedition) => total + expedition.survivors, 0);
 
     return state.survivors.workers +
       state.survivors.troops +
       buildingWorkers +
       constructionWorkers +
-      expeditionTroops +
       state.health.injured;
   }
 
@@ -1802,5 +2225,9 @@ export class PixiVillageRenderer {
     return state.survivors.troops * 4 +
       state.buildings.watchtower.level * 12 +
       state.buildings.palisade.level * 9;
+  }
+
+  private getTroopHousingCapacity(state: GameState): number {
+    return state.buildings.barracks.level > 0 ? state.survivors.troops : 0;
   }
 }

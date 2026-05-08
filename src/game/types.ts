@@ -8,6 +8,7 @@ export type ResourceId =
 export type BuildingId =
   | "mainBuilding"
   | "storage"
+  | "dormitory"
   | "hydroponics"
   | "waterStill"
   | "workshop"
@@ -46,7 +47,9 @@ export type BuildingDefinition = {
   levelRequirements: BuildingLevelRequirement[];
   produces?: ResourceBag;
   consumes?: ResourceBag;
+  alwaysConsumes?: ResourceBag;
   storageBonus?: ResourceBag;
+  housing?: number;
   defense?: number;
 };
 
@@ -78,6 +81,8 @@ export type HealthState = {
   injured: number;
   treatmentProgress: number;
   nextIncidentAt: number;
+  starvationProgress: number;
+  dehydrationProgress: number;
 };
 
 export type MapSector = {
@@ -91,16 +96,9 @@ export type MapSector = {
   loot: ResourceBag;
 };
 
-export type Expedition = {
-  id: string;
-  targetSectorId: string;
-  survivors: number;
-  remainingSeconds: number;
-  totalSeconds: number;
-  risk: number;
-};
+export type GameSpeed = 1 | 24;
 
-export type GameSpeed = 1 | 8;
+export type WorkMode = "day" | "continuous";
 
 export type GameState = {
   saveVersion: number;
@@ -110,6 +108,7 @@ export type GameState = {
   elapsedSeconds: number;
   paused: boolean;
   speed: GameSpeed;
+  workMode: WorkMode;
   resources: Record<ResourceId, number>;
   capacities: Record<ResourceId, number>;
   survivors: SurvivorRoles;
@@ -122,10 +121,8 @@ export type GameState = {
   map: {
     width: number;
     height: number;
-    selectedSectorId: string;
     sectors: MapSector[];
   };
-  expeditions: Expedition[];
   log: string[];
 };
 
