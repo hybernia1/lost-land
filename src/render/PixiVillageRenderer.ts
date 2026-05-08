@@ -28,7 +28,6 @@ import {
   getResourceProductionRates,
   getUpgradeCost,
   hasAvailableBuildingSlot,
-  isDayShiftHour,
   isBuildingInactiveDueToEnergy,
   MAX_ACTIVE_BUILDINGS,
   type ResourceBreakdownLine,
@@ -68,7 +67,7 @@ type PixiActionDetail = {
   continuousShifts?: boolean;
 };
 
-export type VillageInfoPanel = ResourceId;
+export type VillageInfoPanel = ResourceId | "survivors";
 
 type EffectLine = {
   iconId: string;
@@ -492,13 +491,14 @@ export class PixiVillageRenderer {
     this.drawBrand(state.communityName, `${t?.ui.day ?? "Day"} ${day} / ${clock}`);
     this.drawTopPills(
       [
-        { iconId: "day", label: `${t?.ui.day ?? "Day"} ${day} / ${clock}`, tooltip: t?.ui.dayTooltip },
+        { iconId: "clock", label: `${t?.ui.day ?? "Day"} ${day} / ${clock}`, tooltip: t?.ui.dayTooltip },
         {
           iconId: "people",
           label: `${population}`,
           tooltip: t
             ? `${t.ui.populationTooltip}\n${t.ui.housed}: ${housing.housed}\n${t.ui.homeless}: ${housing.homeless}`
             : undefined,
+          action: { action: "open-survivor-overview" },
         },
         { iconId: "shield", label: `${Math.round(this.getDefenseScore(state))}`, tooltip: t?.ui.defenseTooltip },
         {
@@ -513,10 +513,10 @@ export class PixiVillageRenderer {
       width,
     );
     this.drawResourcePills(state, translations, width, rates);
-    this.drawWorkforce(state, translations, width, housing);
     this.drawActiveScouting(state, translations, width);
     this.drawEventLog(state, translations, height);
     this.drawQueue(state, translations, height);
+    this.drawActionPanel(state, translations, width, height);
     this.drawToolbar(state, translations, width, height);
   }
 
@@ -588,6 +588,9 @@ export class PixiVillageRenderer {
     let x = 0;
     for (const resource of resourceDefinitions.filter((definition) => definition.id !== "morale")) {
       const label = `${Math.floor(state.resources[resource.id])}/${Math.floor(state.capacities[resource.id])}`;
+      const stockRatio = state.capacities[resource.id] > 0
+        ? state.resources[resource.id] / state.capacities[resource.id]
+        : 1;
       const rate = rates[resource.id];
       const rateLabel = this.getHourlyRateLabel(rate);
       const tooltip = translations
@@ -600,6 +603,7 @@ export class PixiVillageRenderer {
         rateLabel,
         this.getRateColor(rate),
         { action: "open-resource-breakdown", resourceId: resource.id },
+        stockRatio < 0.2 ? 0xff6f7d : undefined,
       );
       pill.x = x;
       group.addChild(pill);
@@ -609,18 +613,29 @@ export class PixiVillageRenderer {
     group.x = Math.max(28, width - x - 28);
   }
 
-  private drawWorkforce(
+  private drawSurvivorOverviewPanel(
     state: GameState,
-    translations: TranslationPack | undefined,
+    translations: TranslationPack,
     width: number,
-    housing = getHousingStatus(state),
+    height: number,
   ): void {
-    const panelWidth = 308;
-    const layer = new Container();
-    layer.x = Math.max(28, width - panelWidth - 28);
-    layer.y = 152;
-    this.hudLayer.addChild(layer);
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
 
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    overlay.addChild(backdrop);
+    this.bindAction(backdrop, { action: "close-village-modal" });
+
+    const panelWidth = 308;
+    const panelHeight = 278;
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(36, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+
+    const housing = getHousingStatus(state);
     const buildingWorkers = Object.values(state.buildings)
       .reduce((total, building) => total + building.workers, 0);
     const constructionWorkers = Object.values(state.buildings)
@@ -633,99 +648,53 @@ export class PixiVillageRenderer {
       buildingWorkers +
       constructionWorkers +
       state.health.injured;
-    const t = translations;
 
-    this.drawPanel(layer, 0, 0, panelWidth, 304);
-    this.drawIcon(layer, "people", 18, 22, 15);
-    this.drawText(layer, t?.ui.survivors ?? "Survivors", 34, 14, {
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
+    this.drawIcon(panel, "people", 24, 34, 20);
+    this.drawText(panel, translations.ui.survivors, 52, 20, {
       fill: 0xf3edda,
-      fontSize: 12,
-      fontWeight: "800",
+      fontSize: 22,
+      fontWeight: "900",
     });
-    const total = this.drawText(layer, `${totalPopulation}`, panelWidth - 28, 14, {
+    const total = this.drawText(panel, `${totalPopulation}`, panelWidth - 72, 23, {
       fill: 0xf1df9a,
-      fontSize: 13,
+      fontSize: 18,
       fontWeight: "900",
     });
     total.anchor.set(1, 0);
-    const totalHit = new Container();
-    totalHit.x = panelWidth - 92;
-    totalHit.y = 10;
-    totalHit.hitArea = {
-      contains: (x: number, y: number) => x >= 0 && x <= 66 && y >= 0 && y <= 22,
-    };
-    layer.addChild(totalHit);
-    this.bindTooltip(totalHit, t?.ui.totalPopulation ?? "Total population");
 
     const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
-      { iconId: "people", value: `${state.survivors.workers}`, label: t?.ui.availableWorkers ?? "Available workers", tooltip: t?.ui.availableWorkers ?? "Available workers" },
-      { iconId: "build", value: `${buildingWorkers}`, label: t?.ui.buildingWorkers ?? "Working in buildings", tooltip: t?.ui.buildingWorkers ?? "Working in buildings" },
-      { iconId: "material", value: `${constructionWorkers}`, label: t?.ui.constructionCrew ?? "Construction crew", tooltip: t?.ui.constructionCrew ?? "Construction crew" },
-      { iconId: "scout", value: `${state.survivors.troops}`, label: t?.ui.availableTroops ?? "Available troops", tooltip: t?.ui.availableTroops ?? "Available troops" },
-      { iconId: "scout", value: `${scoutingTroops}`, label: t?.ui.scoutingTroops ?? "On scouting", tooltip: t?.ui.scoutingTroops ?? "On scouting" },
-      { iconId: "morale", value: `${state.health.injured}`, label: t?.roles.injured ?? "Injured", tooltip: t?.roles.injured ?? "Injured", missing: state.health.injured > 0 },
+      { iconId: "people", value: `${state.survivors.workers}`, label: translations.ui.availableWorkers, tooltip: translations.ui.availableWorkers },
+      { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
+      { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
+      { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
+      { iconId: "scout", value: `${scoutingTroops}`, label: translations.ui.scoutingTroops, tooltip: translations.ui.scoutingTroops },
+      { iconId: "morale", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
       {
         iconId: "home",
         value: `${housing.housed}/${housing.civilianCapacity + this.getTroopHousingCapacity(state)}`,
-        label: t?.ui.housed ?? "Housed",
-        tooltip: t?.ui.housingTooltip ?? "Housing",
+        label: translations.ui.housed,
+        tooltip: translations.ui.housingTooltip,
       },
       {
         iconId: "home",
         value: `${housing.homeless}`,
-        label: t?.ui.homeless ?? "Homeless",
-        tooltip: t?.ui.housingTooltip ?? "Housing",
+        label: translations.ui.homeless,
+        tooltip: translations.ui.housingTooltip,
         missing: housing.homeless > 0,
       },
     ];
 
     rows.forEach((row, index) => {
-      this.drawWorkforceRow(layer, {
+      this.drawWorkforceRow(panel, {
         ...row,
-        x: 14,
-        y: 42 + index * 23,
+        x: 18,
+        y: 70 + index * 23,
         width: panelWidth - 28,
       });
     });
 
-    const continuousShifts = state.workMode === "continuous";
-    this.drawText(
-      layer,
-      `${t?.ui.workSchedule ?? "Schedule"}: ${continuousShifts ? t?.ui.continuousShifts ?? "24h shifts" : t?.ui.dayShift ?? "Day shift"}`,
-      14,
-      232,
-      {
-        fill: 0xf5efdf,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-    );
-    this.createModalButton(
-      layer,
-      continuousShifts
-        ? t?.ui.dayShift ?? "Day shift"
-        : t?.ui.continuousShifts ?? "24h shifts",
-      176,
-      224,
-      118,
-      30,
-      { action: "set-continuous-shifts", continuousShifts: !continuousShifts },
-    );
-    this.drawText(
-      layer,
-      continuousShifts
-        ? t?.ui.continuousShiftsMorale ?? "Night work lowers morale."
-        : isDayShiftHour(state)
-          ? t?.ui.dayShiftActive ?? "Production active."
-          : t?.ui.nightProductionPaused ?? "Production paused until morning.",
-      14,
-      272,
-      {
-        fill: continuousShifts ? 0xffc0a0 : 0xaeb4b8,
-        fontSize: 10,
-        fontWeight: "800",
-      },
-    );
   }
 
   private drawActiveScouting(
@@ -736,7 +705,7 @@ export class PixiVillageRenderer {
     const panelWidth = 308;
     const layer = new Container();
     layer.x = Math.max(28, width - panelWidth - 28);
-    layer.y = 466;
+    layer.y = 152;
     this.hudLayer.addChild(layer);
 
     const missions = state.scouting.missions.slice(0, 4);
@@ -856,7 +825,7 @@ export class PixiVillageRenderer {
     const width = 308;
     const panelHeight = 128;
     this.drawPanel(layer, 0, 0, width, panelHeight);
-    this.drawIcon(layer, "day", 18, 22, 14);
+    this.drawIcon(layer, "clock", 18, 22, 14);
     this.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
       fill: 0xf5efdf,
       fontSize: 12,
@@ -898,6 +867,45 @@ export class PixiVillageRenderer {
     this.createIconButton(group, "home", 168, 8, 40, 32, { action: "home" }, translations?.ui.home);
   }
 
+  private drawActionPanel(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    height: number,
+  ): void {
+    const panelWidth = 92;
+    const panelHeight = 82;
+    const group = new Container();
+    group.x = (width - panelWidth) / 2;
+    group.y = height - 116;
+    this.hudLayer.addChild(group);
+
+    this.drawPanel(group, 0, 0, panelWidth, panelHeight);
+
+    const continuousShifts = state.workMode === "continuous";
+    const currentMode = continuousShifts
+      ? translations?.ui.continuousShifts ?? "24h shifts"
+      : translations?.ui.dayShift ?? "Day shift";
+    const nextMode = continuousShifts
+      ? translations?.ui.dayShift ?? "Day shift"
+      : translations?.ui.continuousShifts ?? "24h shifts";
+    const detail = continuousShifts
+      ? translations?.ui.continuousShiftsMorale ?? "Night work lowers morale."
+      : translations?.ui.dayShiftActive ?? "Production active.";
+    const tooltip = `${translations?.ui.workSchedule ?? "Schedule"}: ${currentMode}\n${detail}\n${nextMode}`;
+
+    this.createCircularActionButton(
+      group,
+      "fist",
+      panelWidth / 2,
+      40,
+      27,
+      { action: "set-continuous-shifts", continuousShifts: !continuousShifts },
+      tooltip,
+      continuousShifts,
+    );
+  }
+
   private drawInfoPanel(
     state: GameState,
     translations: TranslationPack | undefined,
@@ -906,6 +914,11 @@ export class PixiVillageRenderer {
     infoPanel: VillageInfoPanel | null,
   ): void {
     if (!infoPanel || !translations) {
+      return;
+    }
+
+    if (infoPanel === "survivors") {
+      this.drawSurvivorOverviewPanel(state, translations, width, height);
       return;
     }
 
@@ -934,7 +947,7 @@ export class PixiVillageRenderer {
     panel.y = Math.max(36, (height - panelHeight) / 2);
     panel.eventMode = "static";
     overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
     this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
 
     const breakdown = getResourceBreakdown(state, resourceId);
@@ -1082,7 +1095,7 @@ export class PixiVillageRenderer {
     panel.y = (height - modalHeight) / 2;
     panel.eventMode = "static";
     overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, modalWidth, modalHeight);
+    this.drawPanel(panel, 0, 0, modalWidth, modalHeight, 1);
 
     if (selectedPlot.buildingId === null) {
       const title = translations.ui.availableBuilds;
@@ -1466,19 +1479,16 @@ export class PixiVillageRenderer {
 
     const sideMargin = 28;
     const contentTop = 34;
-    const previewWidth = 150;
-    const previewHeight = 128;
-    const titleX = sideMargin + previewWidth + 24;
+    const previewWidth = 136;
+    const titleX = sideMargin + previewWidth + 22;
     const titleWidth = modalWidth - titleX - sideMargin;
     const bodyWidth = modalWidth - sideMargin * 2;
 
-    this.drawBuildingPreview(content, translated.name, Math.max(1, level), level > 0, sideMargin, contentTop, previewWidth, previewHeight);
-
     const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, level), level > 0));
     asset.anchor.set(0.5);
-    asset.x = sideMargin + previewWidth / 2;
-    asset.y = contentTop + previewHeight / 2 + 4;
-    this.fitSprite(asset, 118, 88);
+    asset.x = sideMargin + 54;
+    asset.y = contentTop + 50;
+    this.fitSprite(asset, 96, 72);
     content.addChild(asset);
 
     this.drawText(content, translated.name, titleX, contentTop + 6, { fill: 0xf5efdf, fontSize: 30, fontWeight: "900" });
@@ -1546,44 +1556,12 @@ export class PixiVillageRenderer {
           ? translations.ui.upgrade
           : translations.ui.queueFull;
     this.createModalButton(content, buttonLabel, modalWidth - 258, footerY + 24, 210, 44, { action: "upgrade", building: buildingId }, disabled);
-    this.drawIcon(content, "day", modalWidth - 172, footerY + 88, 14);
+    this.drawIcon(content, "clock", modalWidth - 172, footerY + 88, 14);
     this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 154, footerY + 80, {
       fill: 0xaeb4b8,
       fontSize: 11,
       fontWeight: "700",
     });
-  }
-
-  private drawBuildingPreview(
-    parent: Container,
-    buildingName: string,
-    level: number,
-    built: boolean,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const frame = new Graphics();
-    frame.roundRect(x, y, width, height, 8)
-      .fill({ color: 0x11140f, alpha: 0.72 })
-      .stroke({ color: 0xe0c46f, alpha: 0.22, width: 1 });
-    frame.circle(x + width * 0.52, y + height * 0.48, width * 0.42)
-      .stroke({ color: 0xe0c46f, alpha: 0.05, width: 1 });
-    frame.moveTo(x + 16, y + height * 0.7)
-      .lineTo(x + width - 16, y + height * 0.7)
-      .stroke({ color: 0xe0c46f, alpha: 0.08, width: 1 });
-    frame.ellipse(x + width / 2, y + height * 0.78, width * 0.34, height * 0.08)
-      .fill({ color: 0x030405, alpha: 0.4 });
-    parent.addChild(frame);
-
-    if (!built) {
-      this.drawText(parent, `${buildingName} / ${level}`, x + 16, y + height - 32, {
-        fill: 0xaeb4b8,
-        fontSize: 11,
-        fontWeight: "800",
-      });
-    }
   }
 
   private getBuildingDetailMetrics(
@@ -2440,12 +2418,13 @@ export class PixiVillageRenderer {
     sublabel?: string,
     sublabelFill = 0xaeb4b8,
     action?: PixiActionDetail,
+    labelFill = 0xe9e4d2,
   ): Container {
     const group = new Container();
     const text = new Text({
       text: label,
       style: {
-        fill: 0xe9e4d2,
+        fill: labelFill,
         fontFamily: "Inter, Arial, sans-serif",
         fontSize: 13,
         fontWeight: "800",
@@ -2540,14 +2519,47 @@ export class PixiVillageRenderer {
     return button;
   }
 
+  private createCircularActionButton(
+    parent: Container,
+    iconId: string,
+    x: number,
+    y: number,
+    radius: number,
+    detail: PixiActionDetail,
+    tooltip: string,
+    active = false,
+  ): Container {
+    const button = new Container();
+    button.x = x;
+    button.y = y;
+    const circle = new Graphics();
+    circle.circle(0, 0, radius)
+      .fill({ color: active ? 0xe0c46f : 0x2d2f23, alpha: active ? 1 : 0.9 })
+      .stroke({ color: 0xe0c46f, alpha: active ? 0.72 : 0.28, width: 1.5 });
+    button.addChild(circle);
+    const icon = this.drawIcon(button, iconId, 0, 0, radius * 1.08);
+    icon.alpha = active ? 0.92 : 1;
+    this.bindAction(button, detail);
+    this.bindTooltip(button, tooltip);
+    parent.addChild(button);
+    return button;
+  }
+
   private drawIcon(parent: Container, iconId: string, x: number, y: number, size: number): Container {
     return drawPixiIcon(parent, iconId, x, y, size);
   }
 
-  private drawPanel(parent: Container, x: number, y: number, width: number, height: number): Graphics {
+  private drawPanel(
+    parent: Container,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fillAlpha = 0.76,
+  ): Graphics {
     const panel = new Graphics();
     panel.roundRect(x, y, width, height, 8)
-      .fill({ color: 0x10120e, alpha: 0.76 })
+      .fill({ color: 0x10120e, alpha: fillAlpha })
       .stroke({ color: 0xe0c46f, alpha: 0.22, width: 1 });
     parent.addChild(panel);
     return panel;
