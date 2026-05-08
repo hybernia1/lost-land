@@ -28,13 +28,22 @@ export type TileKind =
 
 export type ResourceBag = Partial<Record<ResourceId, number>>;
 
+export type BuildingLevelRequirement = {
+  level: number;
+  cost: ResourceBag;
+  buildSeconds: number;
+  constructionWorkers: number;
+};
+
 export type BuildingDefinition = {
   id: BuildingId;
   name: string;
   description: string;
   maxLevel: number;
   buildSeconds: number;
+  baseConstructionWorkers: number;
   baseCost: ResourceBag;
+  levelRequirements: BuildingLevelRequirement[];
   produces?: ResourceBag;
   consumes?: ResourceBag;
   storageBonus?: ResourceBag;

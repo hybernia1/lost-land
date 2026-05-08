@@ -1,12 +1,18 @@
 import type { BuildingDefinition, BuildingId } from "../game/types";
+import { createBuildingLevelRequirements, MAX_BUILDING_LEVEL } from "./buildingProgression";
 
-export const buildingDefinitions: BuildingDefinition[] = [
+type BuildingDefinitionInput = Omit<
+  BuildingDefinition,
+  "maxLevel" | "levelRequirements"
+>;
+
+const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   {
     id: "mainBuilding",
     name: "Main Building",
     description: "Coordinates construction, housing, and camp decisions.",
-    maxLevel: 8,
     buildSeconds: 24,
+    baseConstructionWorkers: 2,
     baseCost: { material: 45 },
     produces: { morale: 0.03 },
   },
@@ -14,8 +20,8 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "storage",
     name: "Storage Depot",
     description: "Raises the stockpile limits for practical supplies.",
-    maxLevel: 10,
     buildSeconds: 28,
+    baseConstructionWorkers: 2,
     baseCost: { material: 60 },
     storageBonus: {
       food: 90,
@@ -27,8 +33,8 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "hydroponics",
     name: "Hydroponics",
     description: "Grows food indoors, but needs water and power.",
-    maxLevel: 10,
     buildSeconds: 32,
+    baseConstructionWorkers: 2,
     baseCost: { material: 70, energy: 8 },
     produces: { food: 0.24 },
     consumes: { water: 0.08, energy: 0.03 },
@@ -37,8 +43,8 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "waterStill",
     name: "Water Still",
     description: "Filters contaminated water into drinkable reserves.",
-    maxLevel: 10,
     buildSeconds: 30,
+    baseConstructionWorkers: 2,
     baseCost: { material: 65 },
     produces: { water: 0.2 },
     consumes: { energy: 0.02 },
@@ -47,8 +53,8 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "workshop",
     name: "Workshop",
     description: "Turns scrap into useful construction material.",
-    maxLevel: 10,
     buildSeconds: 34,
+    baseConstructionWorkers: 3,
     baseCost: { material: 80 },
     produces: { material: 0.14 },
   },
@@ -56,16 +62,16 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "generator",
     name: "Generator",
     description: "Turns assigned workers into power for the camp.",
-    maxLevel: 8,
     buildSeconds: 36,
+    baseConstructionWorkers: 3,
     baseCost: { material: 90 },
   },
   {
     id: "watchtower",
     name: "Watchtower",
     description: "Improves perimeter control against roaming hordes.",
-    maxLevel: 8,
     buildSeconds: 38,
+    baseConstructionWorkers: 2,
     baseCost: { material: 75 },
     defense: 12,
   },
@@ -73,16 +79,16 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "barracks",
     name: "Barracks",
     description: "Trains workers into troops and keeps the militia organized.",
-    maxLevel: 8,
     buildSeconds: 40,
+    baseConstructionWorkers: 2,
     baseCost: { material: 95, food: 18 },
   },
   {
     id: "palisade",
     name: "Palisade",
     description: "A reinforced wooden perimeter that makes the camp safer.",
-    maxLevel: 10,
     buildSeconds: 40,
+    baseConstructionWorkers: 3,
     baseCost: { material: 95 },
     produces: { morale: 0.01 },
     defense: 9,
@@ -91,11 +97,23 @@ export const buildingDefinitions: BuildingDefinition[] = [
     id: "clinic",
     name: "Clinic",
     description: "Reduces expedition losses and keeps people fit.",
-    maxLevel: 6,
     buildSeconds: 42,
+    baseConstructionWorkers: 2,
     baseCost: { material: 85, food: 20 },
   },
 ];
+
+export const buildingDefinitions: BuildingDefinition[] = buildingDefinitionInputs.map(
+  (definition) => ({
+    ...definition,
+    maxLevel: MAX_BUILDING_LEVEL,
+    levelRequirements: createBuildingLevelRequirements({
+      baseCost: definition.baseCost,
+      baseBuildSeconds: definition.buildSeconds,
+      baseConstructionWorkers: definition.baseConstructionWorkers,
+    }),
+  }),
+);
 
 export const buildingIds = buildingDefinitions.map((building) => building.id);
 

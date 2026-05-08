@@ -22,13 +22,6 @@ type PixiActionDetail = {
   view?: "village" | "world";
 };
 
-type PixiTooltipDetail = {
-  visible: boolean;
-  text?: string;
-  x?: number;
-  y?: number;
-};
-
 const TILE_SIZE = 54;
 const TILE_GAP = 4;
 
@@ -37,6 +30,7 @@ export class PixiWorldRenderer {
   private readonly rootLayer = new Container();
   private readonly worldLayer = new Container();
   private readonly hudLayer = new Container();
+  private readonly tooltipLayer = new Container();
   private originX = 0;
   private originY = 0;
 
@@ -44,7 +38,8 @@ export class PixiWorldRenderer {
     private readonly host: HTMLElement,
     private readonly requestRender: () => void = () => {},
   ) {
-    this.rootLayer.addChild(this.worldLayer, this.hudLayer);
+    this.tooltipLayer.eventMode = "none";
+    this.rootLayer.addChild(this.worldLayer, this.hudLayer, this.tooltipLayer);
     void this.initialize();
   }
 
@@ -62,6 +57,7 @@ export class PixiWorldRenderer {
 
     this.worldLayer.removeChildren();
     this.hudLayer.removeChildren();
+    this.hideCanvasTooltip();
     this.drawBackground(width, height);
     this.drawMap(state, width, height);
     this.drawHud(state, translations, width, height);
@@ -253,28 +249,51 @@ export class PixiWorldRenderer {
     layer.x = 28;
     layer.y = 152;
     this.hudLayer.addChild(layer);
-    this.drawPanel(layer, 0, 0, 308, 134);
+    const width = 308;
+    const rowHeight = 20;
+    this.drawPanel(layer, 0, 0, width, 46 + resourceDefinitions.length * rowHeight);
     drawPixiIcon(layer, "build", 18, 22, 14);
     this.drawText(layer, translations.ui.production, 34, 14, { fill: 0xf3edda, fontSize: 12, fontWeight: "800" });
-    this.bindTooltip(layer, translations.ui.productionTooltip);
-    this.drawText(layer, translations.ui.stock, 226, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
+    const headerHit = new Container();
+    headerHit.x = 14;
+    headerHit.y = 8;
+    headerHit.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= 126 && y >= 0 && y <= 26,
+    };
+    layer.addChild(headerHit);
+    this.bindTooltip(headerHit, translations.ui.productionTooltip);
+    this.drawText(layer, translations.ui.stock, 214, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
     this.drawText(layer, translations.ui.perMinute, 290, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
 
     resourceDefinitions.forEach((resource, index) => {
-      const y = 38 + index * 18;
+      const y = 40 + index * rowHeight;
       const perMinute = rates[resource.id] * 60;
       const stock = resource.id === "morale"
         ? `${Math.floor(state.resources[resource.id])}%`
         : `${Math.floor(state.resources[resource.id])}/${Math.floor(state.capacities[resource.id])}`;
       const rateColor = perMinute > 0.004 ? 0x8fe0b8 : perMinute < -0.004 ? 0xff9aa2 : 0xaeb4b8;
-      const resourceCell = new Container();
-      resourceCell.x = 142;
-      resourceCell.y = y + 7;
-      layer.addChild(resourceCell);
-      this.bindTooltip(resourceCell, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
-      drawPixiIcon(resourceCell, resource.id, 0, 0, 15);
-      this.drawText(layer, stock, 226, y, { fill: 0xd7ddd8, fontSize: 11 }).anchor.set(1, 0);
-      this.drawText(layer, `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`, 290, y, { fill: rateColor, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+
+      const row = new Container();
+      row.x = 14;
+      row.y = y - 2;
+      row.hitArea = {
+        contains: (x: number, y: number) => x >= 0 && x <= width - 28 && y >= 0 && y <= 18,
+      };
+      layer.addChild(row);
+      this.bindTooltip(row, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
+      if (index % 2 === 1) {
+        const stripe = new Graphics();
+        stripe.roundRect(0, 0, width - 28, 18, 4).fill({ color: 0xffffff, alpha: 0.025 });
+        row.addChild(stripe);
+      }
+      drawPixiIcon(row, resource.id, 8, 9, 14);
+      this.drawText(row, translations.resources[resource.id], 28, 1, {
+        fill: 0xd7ddd8,
+        fontSize: 11,
+        fontWeight: "800",
+      });
+      this.drawText(row, stock, 200, 1, { fill: 0xd7ddd8, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+      this.drawText(row, `${perMinute > 0 ? "+" : ""}${this.formatRate(perMinute)}`, 276, 1, { fill: rateColor, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
     });
   }
 
@@ -298,38 +317,78 @@ export class PixiWorldRenderer {
       expeditionTroops +
       state.health.injured;
 
-    this.drawPanel(layer, 0, 0, 308, 126);
+    this.drawPanel(layer, 0, 0, 308, 190);
     drawPixiIcon(layer, "people", 18, 22, 15);
     this.drawText(layer, translations.ui.survivors, 34, 14, { fill: 0xf3edda, fontSize: 12, fontWeight: "800" });
-    this.drawInfoToken(layer, {
-      iconId: "people",
-      text: `${totalPopulation}`,
-      tooltip: translations.ui.totalPopulation,
-      x: 246,
-      y: 14,
+    const total = this.drawText(layer, `${totalPopulation}`, 280, 14, {
+      fill: 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
     });
+    total.anchor.set(1, 0);
+    const totalHit = new Container();
+    totalHit.x = 216;
+    totalHit.y = 10;
+    totalHit.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= 66 && y >= 0 && y <= 22,
+    };
+    layer.addChild(totalHit);
+    this.bindTooltip(totalHit, translations.ui.totalPopulation);
 
-    const rows: Array<[string, string, string, number]> = [
-      ["people", `${state.survivors.workers}`, translations.ui.availableWorkers, 0],
-      ["build", `${buildingWorkers}`, translations.ui.buildingWorkers, 1],
-      ["material", `${constructionWorkers}`, translations.ui.constructionCrew, 2],
-      ["scout", `${state.survivors.troops}`, translations.ui.availableTroops, 3],
-      ["day", `${expeditionTroops}`, translations.ui.expeditionTroops, 4],
-      ["morale", `${state.health.injured}`, translations.roles.injured, 5],
+    const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
+      { iconId: "people", value: `${state.survivors.workers}`, label: translations.ui.availableWorkers, tooltip: translations.ui.availableWorkers },
+      { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
+      { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
+      { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
+      { iconId: "expedition", value: `${expeditionTroops}`, label: translations.ui.expeditionTroops, tooltip: translations.ui.expeditionTroops },
+      { iconId: "morale", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
     ];
 
-    rows.forEach(([iconId, value, tooltip, index]) => {
-      const column = index % 2;
-      const row = Math.floor(index / 2);
-      this.drawInfoToken(layer, {
-        iconId,
-        text: value,
-        tooltip,
-        missing: iconId === "morale" && state.health.injured > 0,
-        x: 16 + column * 144,
-        y: 44 + row * 26,
+    rows.forEach((row, index) => {
+      this.drawWorkforceRow(layer, {
+        ...row,
+        x: 14,
+        y: 42 + index * 23,
+        width: 280,
       });
     });
+  }
+
+  private drawWorkforceRow(
+    parent: Container,
+    options: {
+      iconId: string;
+      label: string;
+      value: string;
+      tooltip: string;
+      missing?: boolean;
+      x: number;
+      y: number;
+      width: number;
+    },
+  ): void {
+    const row = new Container();
+    row.x = options.x;
+    row.y = options.y;
+    parent.addChild(row);
+
+    drawPixiIcon(row, options.iconId, 8, 9, 14);
+    this.drawText(row, options.label, 28, 1, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "800",
+    });
+    const value = this.drawText(row, options.value, options.width, 1, {
+      fill: options.missing ? 0xff6f7d : 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+    value.anchor.set(1, 0);
+
+    row.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= options.width && y >= -2 && y <= 21,
+    };
+    this.bindTooltip(row, options.tooltip);
   }
 
   private drawToolbar(state: GameState, translations: TranslationPack, width: number, height: number): void {
@@ -540,15 +599,66 @@ export class PixiWorldRenderer {
 
   private bindTooltip(target: Container, text: string): void {
     target.eventMode = "static";
-    target.on("pointerover", (event) => this.emitTooltip(true, text, event.global.x, event.global.y));
-    target.on("pointermove", (event) => this.emitTooltip(true, text, event.global.x, event.global.y));
-    target.on("pointerout", () => this.emitTooltip(false));
+    target.on("pointerover", (event) => this.showCanvasTooltip(text, event.global.x, event.global.y));
+    target.on("pointermove", (event) => this.showCanvasTooltip(text, event.global.x, event.global.y));
+    target.on("pointerout", () => this.hideCanvasTooltip());
   }
 
-  private emitTooltip(visible: boolean, text?: string, x?: number, y?: number): void {
-    this.host.dispatchEvent(new CustomEvent<PixiTooltipDetail>("pixi-tooltip", {
-      detail: { visible, text, x, y },
-    }));
+  private showCanvasTooltip(text: string, x: number, y: number): void {
+    if (!text) {
+      this.hideCanvasTooltip();
+      return;
+    }
+
+    this.tooltipLayer.removeChildren();
+
+    const label = new Text({
+      text,
+      style: {
+        fill: 0xf4eedf,
+        fontFamily: "Inter, Arial, sans-serif",
+        fontSize: 13,
+        fontWeight: "700",
+        lineHeight: 18,
+        wordWrap: true,
+        wordWrapWidth: 280,
+      },
+    });
+    label.x = 12;
+    label.y = 9;
+
+    const panelWidth = Math.min(320, Math.max(92, label.width + 24));
+    const panelHeight = Math.max(36, label.height + 18);
+    const panel = new Graphics();
+    panel.roundRect(0, 0, panelWidth, panelHeight, 7)
+      .fill({ color: 0x111519, alpha: 0.96 })
+      .stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
+    this.tooltipLayer.addChild(panel, label);
+    this.positionCanvasTooltip(x, y, panelWidth, panelHeight);
+  }
+
+  private positionCanvasTooltip(x: number, y: number, width: number, height: number): void {
+    const margin = 10;
+    const offset = 14;
+    const stageWidth = this.host.clientWidth;
+    const stageHeight = this.host.clientHeight;
+    let nextX = x + offset;
+    let nextY = y + offset;
+
+    if (nextX + width > stageWidth - margin) {
+      nextX = x - width - offset;
+    }
+
+    if (nextY + height > stageHeight - margin) {
+      nextY = y - height - offset;
+    }
+
+    this.tooltipLayer.x = Math.max(margin, Math.min(stageWidth - width - margin, nextX));
+    this.tooltipLayer.y = Math.max(margin, Math.min(stageHeight - height - margin, nextY));
+  }
+
+  private hideCanvasTooltip(): void {
+    this.tooltipLayer.removeChildren();
   }
 
   private getSectorBounds(sector: MapSector): { x: number; y: number } {

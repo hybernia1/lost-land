@@ -259,7 +259,7 @@ button:disabled {
   padding: 8px 10px;
   pointer-events: none;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
   transition: opacity 0.08s ease;
   white-space: normal;
