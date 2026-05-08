@@ -63,7 +63,9 @@ type PixiTooltipDetail = {
 };
 
 type EffectLine = {
-  label: string;
+  iconId: string;
+  value: string;
+  tooltip: string;
   negative?: boolean;
 };
 
@@ -353,6 +355,7 @@ export class PixiVillageRenderer {
     this.drawResourcePills(state, translations, width);
     this.drawViewTabs(translations);
     this.drawProduction(state, translations);
+    this.drawWorkforce(state, translations);
     this.drawActionRail(translations, width, height);
     this.drawQueue(state, translations, height);
     this.drawToolbar(state, translations, width, height);
@@ -434,11 +437,11 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(layer);
 
     const width = 308;
-    const rowHeight = 20;
-    const height = 52 + resourceDefinitions.length * rowHeight;
+    const rowHeight = 18;
+    const height = 44 + resourceDefinitions.length * rowHeight;
     this.drawPanel(layer, 0, 0, width, height);
-    this.drawIcon(layer, "build", 18, 80, 14);
-    this.drawText(layer, translations?.ui.production ?? "Production", 34, 72, {
+    this.drawIcon(layer, "build", 18, 22, 14);
+    this.drawText(layer, translations?.ui.production ?? "Production", 34, 14, {
       fill: 0xf3edda,
       fontSize: 12,
       fontWeight: "800",
@@ -447,12 +450,11 @@ export class PixiVillageRenderer {
       this.bindTooltip(layer, translations.ui.productionTooltip);
     }
 
-    this.drawText(layer, translations?.ui.resource ?? "Resource", 114, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.drawText(layer, translations?.ui.stock ?? "Stock", 216, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.drawText(layer, translations?.ui.perMinute ?? "+/min", 258, 18, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
+    this.drawText(layer, translations?.ui.stock ?? "Stock", 226, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
+    this.drawText(layer, translations?.ui.perMinute ?? "+/min", 290, 14, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" }).anchor.set(1, 0);
 
     resourceDefinitions.forEach((resource, index) => {
-      const y = 42 + index * rowHeight;
+      const y = 38 + index * rowHeight;
       const perMinute = rates[resource.id] * 60;
       const stock = resource.id === "morale"
         ? `${Math.floor(state.resources[resource.id])}%`
@@ -461,16 +463,74 @@ export class PixiVillageRenderer {
       const rateColor = perMinute > 0.004 ? 0x8fe0b8 : perMinute < -0.004 ? 0xff9aa2 : 0xaeb4b8;
 
       const resourceCell = new Container();
-      resourceCell.x = 114;
-      resourceCell.y = y - 1;
+      resourceCell.x = 142;
+      resourceCell.y = y + 7;
       layer.addChild(resourceCell);
-      this.drawIcon(resourceCell, resource.id, 6, 8, 13);
       if (translations) {
         this.bindTooltip(resourceCell, `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`);
       }
-      this.drawText(layer, translations?.resources[resource.id] ?? resource.id, 130, y, { fill: 0xd7ddd8, fontSize: 11 });
-      this.drawText(layer, stock, 216, y, { fill: 0xd7ddd8, fontSize: 11 });
-      this.drawText(layer, rateLabel, 268, y, { fill: rateColor, fontSize: 11, fontWeight: "700" });
+      this.drawIcon(resourceCell, resource.id, 0, 0, 15);
+      this.drawText(layer, stock, 226, y, { fill: 0xd7ddd8, fontSize: 11 }).anchor.set(1, 0);
+      this.drawText(layer, rateLabel, 290, y, { fill: rateColor, fontSize: 11, fontWeight: "700" }).anchor.set(1, 0);
+    });
+  }
+
+  private drawWorkforce(state: GameState, translations: TranslationPack | undefined): void {
+    const layer = new Container();
+    layer.x = 28;
+    layer.y = 304;
+    this.hudLayer.addChild(layer);
+
+    const buildingWorkers = Object.values(state.buildings)
+      .reduce((total, building) => total + building.workers, 0);
+    const constructionWorkers = Object.values(state.buildings)
+      .reduce((total, building) => total + building.constructionWorkers, 0);
+    const expeditionTroops = state.expeditions
+      .reduce((total, expedition) => total + expedition.survivors, 0);
+    const totalPopulation =
+      state.survivors.workers +
+      state.survivors.troops +
+      buildingWorkers +
+      constructionWorkers +
+      expeditionTroops +
+      state.health.injured;
+    const t = translations;
+
+    this.drawPanel(layer, 0, 0, 308, 126);
+    this.drawIcon(layer, "people", 18, 22, 15);
+    this.drawText(layer, t?.ui.survivors ?? "Survivors", 34, 14, {
+      fill: 0xf3edda,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    this.drawInfoToken(layer, {
+      iconId: "people",
+      text: `${totalPopulation}`,
+      tooltip: t?.ui.totalPopulation ?? "Total population",
+      x: 246,
+      y: 14,
+    });
+
+    const rows: Array<[string, string, string, number]> = [
+      ["people", `${state.survivors.workers}`, t?.ui.availableWorkers ?? "Available workers", 0],
+      ["build", `${buildingWorkers}`, t?.ui.buildingWorkers ?? "Working in buildings", 1],
+      ["material", `${constructionWorkers}`, t?.ui.constructionCrew ?? "Construction crew", 2],
+      ["scout", `${state.survivors.troops}`, t?.ui.availableTroops ?? "Available troops", 3],
+      ["day", `${expeditionTroops}`, t?.ui.expeditionTroops ?? "On expedition", 4],
+      ["morale", `${state.health.injured}`, t?.roles.injured ?? "Injured", 5],
+    ];
+
+    rows.forEach(([iconId, value, tooltip, index]) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      this.drawInfoToken(layer, {
+        iconId,
+        text: value,
+        tooltip,
+        missing: iconId === "morale" && state.health.injured > 0,
+        x: 16 + column * 144,
+        y: 44 + row * 26,
+      });
     });
   }
 
@@ -563,8 +623,8 @@ export class PixiVillageRenderer {
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
-    const modalWidth = Math.min(820, width - 48);
-    const modalHeight = Math.min(680, height - 48);
+    const modalWidth = Math.min(1100, width - 48);
+    const modalHeight = Math.min(840, height - 48);
     const panel = new Container();
     panel.x = (width - modalWidth) / 2;
     panel.y = (height - modalHeight) / 2;
@@ -581,7 +641,15 @@ export class PixiVillageRenderer {
     this.createIconButton(panel, "close", modalWidth - 58, 18, 36, 36, { action: "close-village-modal" }, translations.ui.close);
 
     if (selectedPlot.buildingId === null) {
-      this.drawBuildChoices(panel, selectedPlot.id, getAvailableBuildingsForPlot(state, selectedPlot.id), state, translations, modalWidth);
+      this.drawBuildChoices(
+        panel,
+        selectedPlot.id,
+        getAvailableBuildingsForPlot(state, selectedPlot.id),
+        state,
+        translations,
+        modalWidth,
+        modalHeight,
+      );
       return;
     }
 
@@ -598,22 +666,24 @@ export class PixiVillageRenderer {
     state: GameState,
     translations: TranslationPack,
     modalWidth: number,
+    modalHeight: number,
   ): void {
     if (buildableBuildings.length === 0) {
       this.drawText(parent, translations.ui.alreadyBuilt, 24, 96, { fill: 0xaeb4b8, fontSize: 13 });
       return;
     }
 
-    const columns = modalWidth >= 720 ? 2 : 1;
-    const gap = 12;
-    const cardWidth = (modalWidth - 48 - gap * (columns - 1)) / columns;
-    const cardHeight = 132;
+    const gap = 4;
+    const listX = 24;
+    const listY = 88;
+    const rowWidth = modalWidth - 48;
+    const availableHeight = modalHeight - listY - 24;
+    const rowHeight = Math.max(
+      58,
+      Math.min(76, (availableHeight - gap * (buildableBuildings.length - 1)) / buildableBuildings.length),
+    );
 
     buildableBuildings.forEach((buildingId, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      const x = 24 + column * (cardWidth + gap);
-      const y = 86 + row * (cardHeight + gap);
       const translated = translations.buildings[buildingId];
       const cost = getUpgradeCost(buildingId, 0);
       const affordable = canAfford(state.resources, cost);
@@ -627,11 +697,11 @@ export class PixiVillageRenderer {
           ? translations.ui.notEnoughWorkers
           : translations.ui.buildHere;
 
-      this.drawBuildCard(parent, {
-        x,
-        y,
-        width: cardWidth,
-        height: cardHeight,
+      this.drawBuildRow(parent, {
+        x: listX,
+        y: listY + index * (rowHeight + gap),
+        width: rowWidth,
+        height: rowHeight,
         buildingId,
         level: 1,
         built: true,
@@ -649,7 +719,7 @@ export class PixiVillageRenderer {
     });
   }
 
-  private drawBuildCard(
+  private drawBuildRow(
     parent: Container,
     options: {
       x: number;
@@ -671,32 +741,65 @@ export class PixiVillageRenderer {
       effects: EffectLine[];
     },
   ): void {
-    const card = new Container();
-    card.x = options.x;
-    card.y = options.y;
-    parent.addChild(card);
-    this.drawPanel(card, 0, 0, options.width, options.height);
+    const row = new Container();
+    row.x = options.x;
+    row.y = options.y;
+    parent.addChild(row);
+    this.drawPanel(row, 0, 0, options.width, options.height);
 
     const asset = new Sprite(this.getBuildingTexture(options.buildingId, options.level, options.built));
     asset.anchor.set(0.5);
-    asset.x = 52;
-    asset.y = 50;
-    asset.width = 84;
-    asset.height = 64;
-    card.addChild(asset);
+    asset.x = 72;
+    asset.y = options.height / 2;
+    asset.width = Math.min(104, options.height * 1.42);
+    asset.height = Math.min(78, options.height * 0.96);
+    row.addChild(asset);
 
-    this.drawText(card, options.title, 104, 16, { fill: 0xf5efdf, fontSize: 15, fontWeight: "900" });
-    this.drawText(card, options.description, 104, 39, {
+    const textX = 150;
+    const buttonWidth = 124;
+    const buttonHeight = 34;
+    const buttonX = options.width - buttonWidth - 28;
+    const textWidth = Math.max(220, buttonX - textX - 24);
+    const compact = options.height < 66;
+    const tokenY = options.height - 22;
+
+    this.drawText(row, options.title, textX, compact ? 8 : 11, {
+      fill: 0xf5efdf,
+      fontSize: compact ? 14 : 16,
+      fontWeight: "900",
+    });
+    this.drawText(row, options.description, textX, compact ? 30 : 36, {
       fill: 0xc8cabb,
-      fontSize: 11,
+      fontSize: compact ? 10 : 12,
       fontWeight: "600",
       wordWrap: true,
-      wordWrapWidth: Math.max(150, options.width - 220),
+      wordWrapWidth: textWidth,
     });
-    this.drawEffects(card, options.effects, 104, 74, Math.max(150, options.width - 220));
-    this.drawCostLine(card, options.cost, options.state.resources, options.translations, 14, 104);
-    this.drawWorkerRequirement(card, options.requiredWorkers, options.state.survivors.workers, options.translations, 164, 104);
-    this.createModalButton(card, options.buttonLabel, options.width - 142, options.height - 40, 124, 28, options.action, options.disabled);
+
+    let tokenOffset = 0;
+    tokenOffset += this.drawCostLine(row, options.cost, options.state.resources, options.translations, textX, tokenY);
+    tokenOffset += tokenOffset > 0 ? 12 : 0;
+    tokenOffset += this.drawEffects(row, options.effects, textX + tokenOffset, tokenY, buttonX - textX - tokenOffset - 18);
+    if (options.requiredWorkers > 0) {
+      this.drawWorkerRequirement(
+        row,
+        options.requiredWorkers,
+        options.state.survivors.workers,
+        options.translations,
+        Math.min(textX + tokenOffset + 12, buttonX - 64),
+        tokenY,
+      );
+    }
+    this.createModalButton(
+      row,
+      options.disabled ? options.buttonLabel : options.buttonLabel.toUpperCase(),
+      buttonX,
+      (options.height - buttonHeight) / 2,
+      buttonWidth,
+      buttonHeight,
+      options.action,
+      options.disabled,
+    );
   }
 
   private drawBuildingDetail(
@@ -799,7 +902,13 @@ export class PixiVillageRenderer {
     const energyPerMinute = getGeneratorEnergyRate(building.level, building.workers) * 60;
     this.drawPanel(parent, 0, y, 360, 58);
     this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, 14, y + 11, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
-    this.drawText(parent, `${translations.resources.energy}: +${this.formatRate(energyPerMinute)}/min`, 14, y + 33, { fill: 0xf0ce55, fontSize: 12, fontWeight: "800" });
+    this.drawInfoToken(parent, {
+      iconId: "energy",
+      text: `+${this.formatRate(energyPerMinute)}/min`,
+      tooltip: `${translations.resources.energy}: +${this.formatRate(energyPerMinute)}/min`,
+      x: 14,
+      y: y + 32,
+    });
     this.createModalButton(parent, "-", 254, y + 14, 36, 30, { action: "building-workers", building: buildingId, delta: -1 }, building.workers <= 0);
     this.createModalButton(parent, "+", 302, y + 14, 36, 30, { action: "building-workers", building: buildingId, delta: 1 }, building.workers >= workerLimit || state.survivors.workers <= 0);
     return y + 78;
@@ -818,61 +927,93 @@ export class PixiVillageRenderer {
     return y + 92;
   }
 
-  private drawEffects(parent: Container, effects: EffectLine[], x: number, y: number, maxWidth: number): void {
+  private drawEffects(parent: Container, effects: EffectLine[], x: number, y: number, maxWidth: number): number {
     let offsetX = 0;
     let offsetY = 0;
+    let maxOffsetX = 0;
     for (const effect of effects.slice(0, 4)) {
-      const label = new Text({
-        text: effect.label,
-        style: {
-          fill: effect.negative ? 0xff9aa2 : 0x8fe0b8,
-          fontFamily: "Inter, Arial, sans-serif",
-          fontSize: 11,
-          fontWeight: "800",
-        },
+      const token = this.drawInfoToken(parent, {
+        iconId: effect.iconId,
+        text: effect.value,
+        tooltip: effect.tooltip,
+        missing: effect.negative,
+        x: x + offsetX,
+        y: y + offsetY,
       });
-      if (offsetX + label.width > maxWidth) {
+
+      if (offsetX > 0 && offsetX + token.width > maxWidth) {
         offsetX = 0;
         offsetY += 18;
+        token.x = x;
+        token.y = y + offsetY;
       }
-      label.x = x + offsetX;
-      label.y = y + offsetY;
-      parent.addChild(label);
-      offsetX += label.width + 12;
+
+      offsetX += token.width + 8;
+      maxOffsetX = Math.max(maxOffsetX, offsetX);
     }
+
+    return maxOffsetX;
   }
 
-  private drawCostLine(parent: Container, bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack, x: number, y: number): void {
+  private drawCostLine(parent: Container, bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack, x: number, y: number): number {
     let offset = 0;
     for (const part of this.getCostLineParts(bag, availableResources, translations)) {
-      const item = new Container();
-      item.x = x + offset;
-      item.y = y;
-      parent.addChild(item);
-      this.drawIcon(item, part.iconId, 8, 8, 14);
-      const label = this.drawText(item, part.text, 20, 0, {
-        fill: part.missing ? 0xff6f7d : 0xf1df9a,
-        fontSize: 12,
-        fontWeight: "900",
+      const item = this.drawInfoToken(parent, {
+        iconId: part.iconId,
+        text: part.text,
+        tooltip: part.tooltip,
+        missing: part.missing,
+        x: x + offset,
+        y,
       });
-      this.bindTooltip(item, part.tooltip);
-      offset += label.width + 34;
+      offset += item.width + 8;
     }
+
+    return offset;
   }
 
-  private drawWorkerRequirement(parent: Container, required: number, available: number, translations: TranslationPack, x: number, y: number): void {
+  private drawWorkerRequirement(parent: Container, required: number, available: number, translations: TranslationPack, x: number, y: number): number {
     const missing = available < required;
-    const item = new Container();
-    item.x = x;
-    item.y = y;
-    parent.addChild(item);
-    this.drawIcon(item, "people", 8, 8, 14);
-    this.drawText(item, `${required}`, 20, 0, {
-      fill: missing ? 0xff6f7d : 0xf1df9a,
+    const token = this.drawInfoToken(parent, {
+      iconId: "people",
+      text: `${required}`,
+      tooltip: `${translations.ui.constructionWorkers}: ${Math.floor(available)}/${required}`,
+      missing,
+      x,
+      y,
+    });
+
+    return token.width;
+  }
+
+  private drawInfoToken(
+    parent: Container,
+    options: {
+      iconId: string;
+      text: string;
+      tooltip: string;
+      missing?: boolean;
+      x: number;
+      y: number;
+    },
+  ): Container {
+    const token = new Container();
+    token.x = options.x;
+    token.y = options.y;
+    parent.addChild(token);
+
+    this.drawIcon(token, options.iconId, 8, 8, 14);
+    const label = this.drawText(token, options.text, 20, 0, {
+      fill: options.missing ? 0xff6f7d : 0xf1df9a,
       fontSize: 12,
       fontWeight: "900",
     });
-    this.bindTooltip(item, `${translations.ui.constructionWorkers}: ${Math.floor(available)}/${required}`);
+    this.bindTooltip(token, options.tooltip);
+
+    token.hitArea = {
+      contains: (x: number, y: number) => x >= 0 && x <= label.width + 26 && y >= -2 && y <= 18,
+    };
+    return token;
   }
 
   private drawStatPill(parent: Container, iconId: string, label: string, x: number, y: number): void {
@@ -932,13 +1073,25 @@ export class PixiVillageRenderer {
     const effects: EffectLine[] = [];
 
     if (buildingId === "palisade") {
-      effects.push({ label: `${translations.ui.population} +1` });
+      effects.push({
+        iconId: "people",
+        value: "+1",
+        tooltip: `${translations.ui.population} +1`,
+      });
     }
     if (buildingId === "clinic") {
-      effects.push({ label: `${translations.ui.treatment} +1/min (${translations.resources.food} -${getClinicFoodPerTreatment()})` });
+      effects.push({
+        iconId: "people",
+        value: "+1/min",
+        tooltip: `${translations.ui.treatment} +1/min (${translations.resources.food} -${getClinicFoodPerTreatment()})`,
+      });
     }
     if (buildingId === "barracks") {
-      effects.push({ label: translations.ui.unlocksTroopTraining });
+      effects.push({
+        iconId: "scout",
+        value: "+",
+        tooltip: translations.ui.unlocksTroopTraining,
+      });
     }
     if (buildingId === "generator") {
       const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
@@ -946,27 +1099,49 @@ export class PixiVillageRenderer {
       const currentMaxRate = getGeneratorEnergyRate(currentLevel, currentLimit) * 60;
       const nextMaxRate = getGeneratorEnergyRate(currentLevel + 1, nextLimit) * 60;
       if (nextLimit > currentLimit) {
-        effects.push({ label: `${translations.ui.workers} max +${nextLimit - currentLimit}` });
+        effects.push({
+          iconId: "people",
+          value: `+${nextLimit - currentLimit}`,
+          tooltip: `${translations.ui.workers} max +${nextLimit - currentLimit}`,
+        });
       }
-      effects.push({ label: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/min` });
+      effects.push({
+        iconId: "energy",
+        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/min`,
+        tooltip: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/min`,
+      });
     }
     if (definition.defense) {
-      effects.push({ label: `${translations.ui.defense} +${definition.defense}` });
+      effects.push({
+        iconId: "shield",
+        value: `+${definition.defense}`,
+        tooltip: `${translations.ui.defense} +${definition.defense}`,
+      });
     }
     for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
       const typedResourceId = resourceId as ResourceId;
-      effects.push({ label: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * 60)}/min` });
+      effects.push({
+        iconId: typedResourceId,
+        value: `+${this.formatRate((amount ?? 0) * 60)}/min`,
+        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * 60)}/min`,
+      });
     }
     for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
       const typedResourceId = resourceId as ResourceId;
       effects.push({
-        label: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * 60)}/min`,
+        iconId: typedResourceId,
+        value: `-${this.formatRate((amount ?? 0) * 60)}/min`,
+        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * 60)}/min`,
         negative: true,
       });
     }
     for (const [resourceId, amount] of Object.entries(definition.storageBonus ?? {})) {
       const typedResourceId = resourceId as ResourceId;
-      effects.push({ label: `${translations.resources[typedResourceId]} cap +${Math.round(amount ?? 0)}` });
+      effects.push({
+        iconId: typedResourceId,
+        value: `+${Math.round(amount ?? 0)}`,
+        tooltip: `${translations.resources[typedResourceId]} cap +${Math.round(amount ?? 0)}`,
+      });
     }
 
     return effects;
