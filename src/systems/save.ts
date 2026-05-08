@@ -2,7 +2,7 @@ import type { GameState } from "../game/types";
 
 const SAVE_INDEX_KEY = "lost-land.saves";
 const SAVE_SLOT_PREFIX = "lost-land.save.";
-const SAVE_VERSION = 17;
+export const SAVE_VERSION = 17;
 
 type SaveFile = {
   version: number;

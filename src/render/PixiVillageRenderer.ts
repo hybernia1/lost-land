@@ -33,6 +33,11 @@ import {
   type ResourceBreakdownLine,
 } from "../systems/buildings";
 import { getClinicFoodPerTreatment } from "../systems/health";
+import {
+  getAssignedBuildingWorkerCount,
+  getConstructionWorkerCount,
+  getPopulation,
+} from "../systems/population";
 import { canAfford } from "../systems/resources";
 import { SCOUTING_CARRY_PER_TROOP, SCOUTING_DURATION_SECONDS, getScoutingTroopCount } from "../systems/scouting";
 import villageBackgroundUrl from "../assets/village-bg.webp";
@@ -54,7 +59,7 @@ type Bounds = {
   height: number;
 };
 
-type PixiActionDetail = {
+export type PixiActionDetail = {
   action?: string;
   building?: BuildingId;
   plot?: string;
@@ -92,6 +97,52 @@ type BuildingMetric = {
 };
 
 type BarracksTab = "training" | "scouting";
+
+type RectButtonTone = "primary" | "secondary" | "toolbar";
+
+type RectButtonOptions = {
+  label?: string;
+  iconId?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  detail?: PixiActionDetail;
+  onTap?: () => void;
+  tooltip?: string;
+  disabled?: boolean;
+  active?: boolean;
+  tone?: RectButtonTone;
+  fontSize?: number;
+  fontWeight?: TextStyleFontWeight;
+};
+
+type CircleButtonOptions = {
+  iconId: string;
+  x: number;
+  y: number;
+  radius: number;
+  detail: PixiActionDetail;
+  tooltip: string;
+  active?: boolean;
+};
+
+type TabItem<T extends string> = {
+  id: T;
+  label: string;
+};
+
+type TabOptions<T extends string> = {
+  activeId: T;
+  x: number;
+  y: number;
+  height: number;
+  gap?: number;
+  minWidth: number;
+  maxWidth?: number;
+  maxTabWidth?: number;
+  onSelect: (id: T) => void;
+};
 
 type MainBuildingEffect = {
   phase: number;
@@ -482,7 +533,7 @@ export class PixiVillageRenderer {
     const t = translations;
     const day = getGameDay(state.elapsedSeconds);
     const clock = formatGameClock(state.elapsedSeconds);
-    const population = this.getPopulation(state);
+    const population = getPopulation(state) + getScoutingTroopCount(state);
     const housing = getHousingStatus(state);
     const rates = getResourceProductionRates(state);
     const moraleRate = this.getHourlyRateLabel(rates.morale);
@@ -636,18 +687,10 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
 
     const housing = getHousingStatus(state);
-    const buildingWorkers = Object.values(state.buildings)
-      .reduce((total, building) => total + building.workers, 0);
-    const constructionWorkers = Object.values(state.buildings)
-      .reduce((total, building) => total + building.constructionWorkers, 0);
+    const buildingWorkers = getAssignedBuildingWorkerCount(state);
+    const constructionWorkers = getConstructionWorkerCount(state);
     const scoutingTroops = getScoutingTroopCount(state);
-    const totalPopulation =
-      state.survivors.workers +
-      state.survivors.troops +
-      scoutingTroops +
-      buildingWorkers +
-      constructionWorkers +
-      state.health.injured;
+    const totalPopulation = getPopulation(state) + scoutingTroops;
 
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
     this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
@@ -1279,38 +1322,27 @@ export class PixiVillageRenderer {
     y: number,
     maxWidth: number,
   ): void {
-    let offsetX = 0;
-    const gap = 8;
-
-    categories.forEach((category) => {
-      const label = this.getBuildCategoryLabel(category, translations);
-      const tabWidth = Math.min(148, Math.max(96, label.length * 8 + 34));
-      const tab = new Container();
-      tab.x = x + offsetX;
-      tab.y = y;
-      parent.addChild(tab);
-
-      const active = category === activeCategory;
-      const box = new Graphics();
-      box.roundRect(0, 0, tabWidth, 34, 7)
-        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 })
-        .stroke({ color: 0xe0c46f, alpha: active ? 0.62 : 0.22, width: 1 });
-      tab.addChild(box);
-      this.drawCenteredText(tab, label, tabWidth / 2, 17, {
-        fill: active ? 0x11140f : 0xd8d2bd,
-        fontSize: 12,
-        fontWeight: "900",
-      });
-
-      if (!active) {
-        this.bindBuildCategoryAction(tab, category);
-      }
-
-      offsetX += tabWidth + gap;
-      if (offsetX > maxWidth) {
-        tab.visible = false;
-      }
-    });
+    this.drawTabs(
+      parent,
+      categories.map((category) => ({
+        id: category,
+        label: this.getBuildCategoryLabel(category, translations),
+      })),
+      {
+        activeId: activeCategory,
+        x,
+        y,
+        height: 34,
+        minWidth: 96,
+        maxTabWidth: 148,
+        maxWidth,
+        onSelect: (category) => {
+          this.activeBuildCategory = category;
+          this.buildChoicesScrollY = 0;
+          this.requestRender();
+        },
+      },
+    );
   }
 
   private getBuildCategoryLabel(
@@ -1330,18 +1362,6 @@ export class PixiVillageRenderer {
     }
 
     return translations.ui.buildingCategorySupport;
-  }
-
-  private bindBuildCategoryAction(target: Container, category: BuildingCategory): void {
-    target.eventMode = "static";
-    target.cursor = "pointer";
-    target.on("pointerdown", (event) => {
-      event.stopPropagation();
-      this.consumeHostClick();
-      this.activeBuildCategory = category;
-      this.buildChoicesScrollY = 0;
-      this.requestRender();
-    });
   }
 
   private drawBuildChoicesScrollbar(
@@ -1920,39 +1940,16 @@ export class PixiVillageRenderer {
       { id: "training", label: translations.ui.training ?? "Training" },
       { id: "scouting", label: translations.ui.scouting },
     ];
-    let offsetX = 0;
-
-    tabs.forEach((tab) => {
-      const active = this.activeBarracksTab === tab.id;
-      const tabWidth = Math.max(112, tab.label.length * 8 + 34);
-      const tabLayer = new Container();
-      tabLayer.x = x + offsetX;
-      tabLayer.y = y;
-      parent.addChild(tabLayer);
-
-      const box = new Graphics();
-      box.roundRect(0, 0, tabWidth, 32, 7)
-        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 })
-        .stroke({ color: 0xe0c46f, alpha: active ? 0.62 : 0.22, width: 1 });
-      tabLayer.addChild(box);
-      this.drawCenteredText(tabLayer, tab.label, tabWidth / 2, 16, {
-        fill: active ? 0x11140f : 0xd8d2bd,
-        fontSize: 12,
-        fontWeight: "900",
-      });
-
-      if (!active) {
-        tabLayer.eventMode = "static";
-        tabLayer.cursor = "pointer";
-        tabLayer.on("pointerdown", (event) => {
-          event.stopPropagation();
-          this.consumeHostClick();
-          this.activeBarracksTab = tab.id;
-          this.requestRender();
-        });
-      }
-
-      offsetX += tabWidth + 8;
+    this.drawTabs(parent, tabs, {
+      activeId: this.activeBarracksTab,
+      x,
+      y,
+      height: 32,
+      minWidth: 112,
+      onSelect: (tab) => {
+        this.activeBarracksTab = tab;
+        this.requestRender();
+      },
     });
   }
 
@@ -2157,24 +2154,18 @@ export class PixiVillageRenderer {
   }
 
   private createModalButton(parent: Container, label: string, x: number, y: number, width: number, height: number, detail: PixiActionDetail, disabled = false): Container {
-    const button = new Container();
-    button.x = x;
-    button.y = y;
-    parent.addChild(button);
-    const box = new Graphics();
-    box.roundRect(0, 0, width, height, 6)
-      .fill({ color: disabled ? 0x34362e : 0xe0c46f, alpha: disabled ? 0.62 : 1 })
-      .stroke({ color: 0xe0c46f, alpha: disabled ? 0.22 : 0.54, width: 1 });
-    button.addChild(box);
-    this.drawCenteredText(button, label, width / 2, height / 2, {
-      fill: disabled ? 0xaeb4b8 : 0x141719,
+    return this.createRectButton(parent, {
+      label,
+      x,
+      y,
+      width,
+      height,
+      detail,
+      disabled,
+      tone: "primary",
       fontSize: 12,
       fontWeight: "900",
     });
-    if (!disabled) {
-      this.bindAction(button, detail);
-    }
-    return button;
   }
 
   private createLocalModalButton(
@@ -2187,33 +2178,18 @@ export class PixiVillageRenderer {
     onTap: () => void,
     disabled = false,
   ): Container {
-    const button = new Container();
-    button.x = x;
-    button.y = y;
-    parent.addChild(button);
-
-    const box = new Graphics();
-    box.roundRect(0, 0, width, height, 6)
-      .fill({ color: disabled ? 0x34362e : 0x262719, alpha: disabled ? 0.52 : 0.92 })
-      .stroke({ color: 0xe0c46f, alpha: disabled ? 0.16 : 0.36, width: 1 });
-    button.addChild(box);
-    this.drawCenteredText(button, label, width / 2, height / 2, {
-      fill: disabled ? 0xaeb4b8 : 0xf1df9a,
+    return this.createRectButton(parent, {
+      label,
+      x,
+      y,
+      width,
+      height,
+      onTap,
+      disabled,
+      tone: "secondary",
       fontSize: 14,
       fontWeight: "900",
     });
-
-    if (!disabled) {
-      button.eventMode = "static";
-      button.cursor = "pointer";
-      button.on("pointerdown", (event) => {
-        event.stopPropagation();
-        this.consumeHostClick();
-        onTap();
-      });
-    }
-
-    return button;
   }
 
   private getCostLineParts(bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack): CostLinePart[] {
@@ -2472,22 +2448,18 @@ export class PixiVillageRenderer {
     detail: PixiActionDetail,
     active = false,
   ): Container {
-    const button = new Container();
-    button.x = x;
-    button.y = y;
-    const box = new Graphics();
-    box.roundRect(0, 0, width, height, 7)
-      .fill({ color: active ? 0xe0c46f : 0x2d2f23, alpha: active ? 1 : 0.84 })
-      .stroke({ color: 0xe0c46f, alpha: active ? 0.6 : 0.18, width: 1 });
-    button.addChild(box);
-    this.drawCenteredText(button, label, width / 2, height / 2, {
-      fill: active ? 0x141719 : 0xf4eedf,
+    return this.createRectButton(parent, {
+      label,
+      x,
+      y,
+      width,
+      height,
+      detail,
+      active,
+      tone: "toolbar",
       fontSize: 13,
       fontWeight: "700",
     });
-    this.bindAction(button, detail);
-    parent.addChild(button);
-    return button;
   }
 
   private createIconButton(
@@ -2501,22 +2473,17 @@ export class PixiVillageRenderer {
     tooltip?: string,
     active = false,
   ): Container {
-    const button = new Container();
-    button.x = x;
-    button.y = y;
-    const box = new Graphics();
-    box.roundRect(0, 0, width, height, 7)
-      .fill({ color: active ? 0xe0c46f : 0x2d2f23, alpha: active ? 1 : 0.84 })
-      .stroke({ color: 0xe0c46f, alpha: active ? 0.6 : 0.18, width: 1 });
-    button.addChild(box);
-    const icon = this.drawIcon(button, iconId, width / 2, height / 2, Math.min(width, height) - 14);
-    icon.alpha = active ? 0.9 : 1;
-    this.bindAction(button, detail);
-    if (tooltip) {
-      this.bindTooltip(button, tooltip);
-    }
-    parent.addChild(button);
-    return button;
+    return this.createRectButton(parent, {
+      iconId,
+      x,
+      y,
+      width,
+      height,
+      detail,
+      tooltip,
+      active,
+      tone: "toolbar",
+    });
   }
 
   private createCircularActionButton(
@@ -2529,20 +2496,156 @@ export class PixiVillageRenderer {
     tooltip: string,
     active = false,
   ): Container {
+    return this.createCircleButton(parent, {
+      iconId,
+      x,
+      y,
+      radius,
+      detail,
+      tooltip,
+      active,
+    });
+  }
+
+  private createRectButton(parent: Container, options: RectButtonOptions): Container {
     const button = new Container();
-    button.x = x;
-    button.y = y;
-    const circle = new Graphics();
-    circle.circle(0, 0, radius)
-      .fill({ color: active ? 0xe0c46f : 0x2d2f23, alpha: active ? 1 : 0.9 })
-      .stroke({ color: 0xe0c46f, alpha: active ? 0.72 : 0.28, width: 1.5 });
-    button.addChild(circle);
-    const icon = this.drawIcon(button, iconId, 0, 0, radius * 1.08);
-    icon.alpha = active ? 0.92 : 1;
-    this.bindAction(button, detail);
-    this.bindTooltip(button, tooltip);
+    button.x = options.x;
+    button.y = options.y;
+
+    const style = this.getRectButtonStyle(options.tone ?? "toolbar", options.disabled ?? false, options.active ?? false);
+    const box = new Graphics();
+    box.roundRect(0, 0, options.width, options.height, 7)
+      .fill({ color: style.fill, alpha: style.fillAlpha })
+      .stroke({ color: 0xe0c46f, alpha: style.strokeAlpha, width: 1 });
+    button.addChild(box);
+
+    if (options.iconId) {
+      const icon = this.drawIcon(button, options.iconId, options.width / 2, options.height / 2, Math.min(options.width, options.height) - 14);
+      icon.alpha = options.active ? 0.9 : 1;
+    }
+
+    if (options.label) {
+      this.drawCenteredText(button, options.label, options.width / 2, options.height / 2, {
+        fill: style.textFill,
+        fontSize: options.fontSize ?? 13,
+        fontWeight: options.fontWeight ?? "900",
+      });
+    }
+
+    if (!options.disabled) {
+      if (options.detail) {
+        this.bindAction(button, options.detail);
+      } else if (options.onTap) {
+        this.bindLocalAction(button, options.onTap);
+      }
+    }
+
+    if (options.tooltip) {
+      this.bindTooltip(button, options.tooltip);
+    }
+
     parent.addChild(button);
     return button;
+  }
+
+  private createCircleButton(parent: Container, options: CircleButtonOptions): Container {
+    const button = new Container();
+    button.x = options.x;
+    button.y = options.y;
+
+    const circle = new Graphics();
+    circle.circle(0, 0, options.radius)
+      .fill({ color: options.active ? 0xe0c46f : 0x2d2f23, alpha: options.active ? 1 : 0.9 })
+      .stroke({ color: 0xe0c46f, alpha: options.active ? 0.72 : 0.28, width: 1.5 });
+    button.addChild(circle);
+
+    const icon = this.drawIcon(button, options.iconId, 0, 0, options.radius * 1.08);
+    icon.alpha = options.active ? 0.92 : 1;
+    this.bindAction(button, options.detail);
+    this.bindTooltip(button, options.tooltip);
+    parent.addChild(button);
+    return button;
+  }
+
+  private getRectButtonStyle(
+    tone: RectButtonTone,
+    disabled: boolean,
+    active: boolean,
+  ): { fill: number; fillAlpha: number; strokeAlpha: number; textFill: number } {
+    if (disabled) {
+      return {
+        fill: 0x34362e,
+        fillAlpha: tone === "secondary" ? 0.52 : 0.62,
+        strokeAlpha: tone === "secondary" ? 0.16 : 0.22,
+        textFill: 0xaeb4b8,
+      };
+    }
+
+    if (active || tone === "primary") {
+      return {
+        fill: 0xe0c46f,
+        fillAlpha: 1,
+        strokeAlpha: tone === "primary" ? 0.54 : 0.6,
+        textFill: 0x141719,
+      };
+    }
+
+    if (tone === "secondary") {
+      return {
+        fill: 0x262719,
+        fillAlpha: 0.92,
+        strokeAlpha: 0.36,
+        textFill: 0xf1df9a,
+      };
+    }
+
+    return {
+      fill: 0x2d2f23,
+      fillAlpha: 0.84,
+      strokeAlpha: 0.18,
+      textFill: 0xf4eedf,
+    };
+  }
+
+  private drawTabs<T extends string>(
+    parent: Container,
+    tabs: Array<TabItem<T>>,
+    options: TabOptions<T>,
+  ): void {
+    let offsetX = 0;
+    const gap = options.gap ?? 8;
+
+    tabs.forEach((tab) => {
+      const active = tab.id === options.activeId;
+      const tabWidth = Math.min(
+        options.maxTabWidth ?? Number.POSITIVE_INFINITY,
+        Math.max(options.minWidth, tab.label.length * 8 + 34),
+      );
+      const tabLayer = new Container();
+      tabLayer.x = options.x + offsetX;
+      tabLayer.y = options.y;
+      parent.addChild(tabLayer);
+
+      const box = new Graphics();
+      box.roundRect(0, 0, tabWidth, options.height, 7)
+        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 })
+        .stroke({ color: 0xe0c46f, alpha: active ? 0.62 : 0.22, width: 1 });
+      tabLayer.addChild(box);
+      this.drawCenteredText(tabLayer, tab.label, tabWidth / 2, options.height / 2, {
+        fill: active ? 0x11140f : 0xd8d2bd,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+
+      if (!active) {
+        this.bindLocalAction(tabLayer, () => options.onSelect(tab.id));
+      }
+
+      offsetX += tabWidth + gap;
+      if (options.maxWidth !== undefined && offsetX > options.maxWidth) {
+        tabLayer.visible = false;
+      }
+    });
   }
 
   private drawIcon(parent: Container, iconId: string, x: number, y: number, size: number): Container {
@@ -2571,6 +2674,16 @@ export class PixiVillageRenderer {
     target.on("pointerdown", (event) => {
       event.stopPropagation();
       this.host.dispatchEvent(new CustomEvent<PixiActionDetail>("pixi-action", { detail }));
+    });
+  }
+
+  private bindLocalAction(target: Container, onTap: () => void): void {
+    target.eventMode = "static";
+    target.cursor = "pointer";
+    target.on("pointerdown", (event) => {
+      event.stopPropagation();
+      this.consumeHostClick();
+      onTap();
     });
   }
 
@@ -3083,20 +3196,6 @@ export class PixiVillageRenderer {
     }
 
     return 0xaeb4b8;
-  }
-
-  private getPopulation(state: GameState): number {
-    const buildingWorkers = Object.values(state.buildings)
-      .reduce((total, building) => total + building.workers, 0);
-    const constructionWorkers = Object.values(state.buildings)
-      .reduce((total, building) => total + building.constructionWorkers, 0);
-
-    return state.survivors.workers +
-      state.survivors.troops +
-      getScoutingTroopCount(state) +
-      buildingWorkers +
-      constructionWorkers +
-      state.health.injured;
   }
 
   private getDefenseScore(state: GameState): number {

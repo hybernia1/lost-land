@@ -1,5 +1,6 @@
 import type { BuildingId, GameState } from "../game/types";
 import { pushLocalizedLog } from "./log";
+import { getPopulation } from "./population";
 
 const CLINIC_FOOD_PER_TREATMENT = 2;
 const INCIDENT_BASE_DELAY_SECONDS = 600;
@@ -114,7 +115,7 @@ function tickDeprivationDeaths(state: GameState, deltaSeconds: number): void {
     deathSeconds: number,
     logKey: string,
   ): void {
-    if (currentState.resources[resourceId] > 0 || getCampPopulation(currentState) <= 0) {
+    if (currentState.resources[resourceId] > 0 || getPopulation(currentState) <= 0) {
       currentState.health[progressKey] = 0;
       return;
     }
@@ -237,16 +238,6 @@ function killCampSurvivor(state: GameState): boolean {
 
   state.health.injured -= 1;
   return true;
-}
-
-function getCampPopulation(state: GameState): number {
-  const buildingWorkers = Object.values(state.buildings)
-    .reduce((total, building) => total + building.workers + building.constructionWorkers, 0);
-
-  return state.survivors.workers +
-    state.survivors.troops +
-    buildingWorkers +
-    state.health.injured;
 }
 
 function stableRoll(seed: string): number {
