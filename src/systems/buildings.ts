@@ -10,6 +10,7 @@ import type {
 } from "../game/types";
 import { maybeInjureFromConstruction } from "./health";
 import { getLocalizedBuildingName, pushLocalizedLog } from "./log";
+import { getPopulation } from "./population";
 import { addResources, canAfford, spendResources } from "./resources";
 
 const BASE_CAPACITY: Record<ResourceId, number> = {
@@ -567,21 +568,6 @@ function applyRate(
 
     delta[resourceId] = (delta[resourceId] ?? 0) + rate * level * deltaSeconds * sign;
   }
-}
-
-function getPopulation(state: GameState): number {
-  return (
-    Object.values(state.survivors).reduce((total, count) => total + count, 0) +
-    getAssignedBuildingWorkers(state) +
-    state.health.injured
-  );
-}
-
-function getAssignedBuildingWorkers(state: GameState): number {
-  return Object.values(state.buildings).reduce(
-    (total, building) => total + building.workers + building.constructionWorkers,
-    0,
-  );
 }
 
 function createEmptyResourceDelta(): Record<ResourceId, number> {

@@ -4,6 +4,7 @@ import { villagePlotDefinitions } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialMap } from "../systems/map";
+import { SAVE_VERSION } from "../systems/save";
 import type { BuildingId, BuildingState, GameState } from "./types";
 
 export function createInitialState(
@@ -24,7 +25,7 @@ export function createInitialState(
   ) as Record<BuildingId, BuildingState>;
 
   const state: GameState = {
-    saveVersion: 17,
+    saveVersion: SAVE_VERSION,
     saveId,
     communityName,
     startedAt: new Date().toISOString(),

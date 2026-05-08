@@ -1,10 +1,10 @@
 import type { Game } from "../game/Game";
 import { formatGameClock, getGameDay } from "../game/time";
-import type { BuildingId, GameSpeed, GameState, ResourceId, ScoutingMode } from "../game/types";
+import type { BuildingId, GameSpeed, GameState, ScoutingMode } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import type { VillageInfoPanel } from "../render/PixiVillageRenderer";
+import type { PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
 
 type AppMode = "menu" | "new-game" | "load-game" | "settings" | "game";
@@ -227,18 +227,7 @@ export class App {
     this.villageRenderer = new PixiVillageRenderer(villageScene, () => this.requestRender());
     villageScene.addEventListener("click", (event) => this.handleCanvasClick(event));
     const handlePixiAction = (event: Event) => {
-      this.handlePixiAction(event as CustomEvent<{
-        action?: string;
-        building?: BuildingId;
-        plot?: string;
-        delta?: number;
-        troopCount?: number;
-        scoutMode?: ScoutingMode;
-        scoutTroops?: number;
-        resourceId?: ResourceId;
-        speed?: GameSpeed;
-        continuousShifts?: boolean;
-      }>);
+      this.handlePixiAction(event as CustomEvent<PixiActionDetail>);
     };
     villageScene.addEventListener("pixi-action", handlePixiAction);
     this.shellReady = true;
@@ -277,20 +266,13 @@ export class App {
     }
   }
 
-  private handlePixiAction(event: CustomEvent<{
-    action?: string;
-    building?: BuildingId;
-    plot?: string;
-    delta?: number;
-    troopCount?: number;
-    scoutMode?: ScoutingMode;
-    scoutTroops?: number;
-    resourceId?: ResourceId;
-    speed?: GameSpeed;
-    continuousShifts?: boolean;
-  }>): void {
+  private handlePixiAction(event: CustomEvent<PixiActionDetail>): void {
     this.suppressVillageClickUntil = Date.now() + 400;
-    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed, troopCount } = event.detail;
+    this.handleGameAction(event.detail);
+  }
+
+  private handleGameAction(detail: PixiActionDetail): void {
+    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed, troopCount } = detail;
 
     if (action === "consume-pointer") {
       return;
@@ -392,24 +374,6 @@ export class App {
 
     const action = button.dataset.action;
 
-    if (action === "close-village-modal") {
-      this.villageModalPlotId = null;
-      this.villageInfoPanel = null;
-      this.requestRender();
-      return;
-    }
-
-    if (action === "open-selected-plot" && this.state) {
-      this.villageModalPlotId = this.state.village.selectedPlotId;
-      this.requestRender();
-      return;
-    }
-
-    if (button.dataset.speed) {
-      this.game.setSpeed(Number(button.dataset.speed) as GameSpeed);
-      return;
-    }
-
     if (action === "new-game") {
       this.mode = "new-game";
       this.requestRender();
@@ -446,46 +410,62 @@ export class App {
       return;
     }
 
-    if (action === "pause" && this.state) {
-      this.game.setPaused(!this.state.paused);
+    const gameAction = this.getDomGameAction(button, action);
+
+    if (gameAction) {
+      this.handleGameAction(gameAction);
+    }
+  }
+
+  private getDomGameAction(
+    button: HTMLButtonElement,
+    action: string | undefined,
+  ): PixiActionDetail | null {
+    if (button.dataset.speed) {
+      return { speed: Number(button.dataset.speed) as GameSpeed };
     }
 
-    if (action === "home") {
-      this.returnHome();
+    if (
+      action === "close-village-modal" ||
+      action === "open-selected-plot" ||
+      action === "pause" ||
+      action === "home" ||
+      action === "barracks-worker-to-troop" ||
+      action === "barracks-troop-to-worker"
+    ) {
+      return {
+        action,
+        troopCount: button.dataset.troopCount
+          ? Number(button.dataset.troopCount)
+          : undefined,
+      };
     }
 
-    if (action === "upgrade" && button.dataset.building) {
-      this.game.upgradeBuilding(button.dataset.building as BuildingId);
-    }
-
-    if (action === "building-workers" && button.dataset.building && this.state) {
-      const buildingId = button.dataset.building as BuildingId;
-      const delta = Number(button.dataset.delta ?? 0);
-      const currentWorkers = this.state.buildings[buildingId].workers;
-      this.game.setBuildingWorkers(buildingId, currentWorkers + delta);
-    }
-
-    if (action === "barracks-worker-to-troop") {
-      this.game.convertWorkerToTroop();
-    }
-
-    if (action === "barracks-troop-to-worker") {
-      this.game.convertTroopToWorker();
+    if ((action === "upgrade" || action === "building-workers") && button.dataset.building) {
+      return {
+        action,
+        building: button.dataset.building as BuildingId,
+        delta: Number(button.dataset.delta ?? 0),
+      };
     }
 
     if (action === "start-scouting" && button.dataset.scoutMode && button.dataset.scoutTroops) {
-      this.game.startScouting(
-        button.dataset.scoutMode as ScoutingMode,
-        Number(button.dataset.scoutTroops),
-      );
+      return {
+        action,
+        scoutMode: button.dataset.scoutMode as ScoutingMode,
+        scoutTroops: Number(button.dataset.scoutTroops),
+      };
     }
 
     if (action === "build" && button.dataset.building && button.dataset.plot) {
-      this.game.buildAtPlot(
-        button.dataset.plot,
-        button.dataset.building as BuildingId,
-      );
+      return {
+        action,
+        building: button.dataset.building as BuildingId,
+        plot: button.dataset.plot,
+      };
     }
+
+    return null;
   }
 
   private handleTooltipOver(event: MouseEvent): void {

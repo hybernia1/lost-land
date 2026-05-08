@@ -8,7 +8,7 @@ import {
 } from "../systems/buildings";
 import { tickHealth } from "../systems/health";
 import { localizeStaticLogEntries } from "../systems/log";
-import { loadGame, saveGame } from "../systems/save";
+import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
 import { startScoutingMission, tickScouting } from "../systems/scouting";
 import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
 import { createInitialState } from "./createInitialState";
@@ -186,7 +186,7 @@ export class Game {
 function normalizeGameState(state: GameState): void {
   state.communityName = state.communityName?.trim() || "Lost Land";
   state.saveId = state.saveId?.trim() || `community-${Date.now().toString(36)}`;
-  state.saveVersion = 17;
+  state.saveVersion = SAVE_VERSION;
   state.workMode = state.workMode === "continuous" ? "continuous" : "day";
   state.log = localizeStaticLogEntries(state.log ?? []);
   state.scouting = {
