@@ -1,0 +1,33 @@
+{
+  "columns": 4,
+  "image": "../../assets/tiles/water.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "water",
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.11.2",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "waterPlain" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "waterNorth" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "waterWest" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "waterCorner" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "waterBankSmall" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "waterBankThin" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "waterBankLight" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "waterBankWide" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "waterBendDirt" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "waterCurve" }] },
+    { "id": 10, "properties": [{ "name": "tileId", "type": "string", "value": "waterCornerOuter" }] },
+    { "id": 11, "properties": [{ "name": "tileId", "type": "string", "value": "waterRiverLeft" }] },
+    { "id": 12, "properties": [{ "name": "tileId", "type": "string", "value": "waterRiverRight" }] },
+    { "id": 13, "properties": [{ "name": "tileId", "type": "string", "value": "waterFordNorth" }] },
+    { "id": 14, "properties": [{ "name": "tileId", "type": "string", "value": "waterFordSouth" }] },
+    { "id": 15, "properties": [{ "name": "tileId", "type": "string", "value": "waterShoreWhite" }] }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}

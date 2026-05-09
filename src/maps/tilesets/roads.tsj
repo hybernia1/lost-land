@@ -1,0 +1,33 @@
+{
+  "columns": 4,
+  "image": "../../assets/tiles/roads.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "roads",
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.11.2",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "roadFill" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "roadVertical" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "roadCurveEast" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "roadCurveWest" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "roadHorizontal" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "roadNarrow" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "roadBendNorth" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "roadBendSouth" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "roadCorner" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "roadEdge" }] },
+    { "id": 10, "properties": [{ "name": "tileId", "type": "string", "value": "roadFork" }] },
+    { "id": 11, "properties": [{ "name": "tileId", "type": "string", "value": "roadWide" }] },
+    { "id": 12, "properties": [{ "name": "tileId", "type": "string", "value": "roadPebbles" }] },
+    { "id": 13, "properties": [{ "name": "tileId", "type": "string", "value": "roadPebblesSoft" }] },
+    { "id": 14, "properties": [{ "name": "tileId", "type": "string", "value": "roadPebblesLarge" }] },
+    { "id": 15, "properties": [{ "name": "tileId", "type": "string", "value": "woodBridge" }] }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}

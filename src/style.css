@@ -295,7 +295,6 @@ button:disabled {
 .game-shell.is-village .scene-panel {
   background:
     linear-gradient(180deg, rgba(8, 10, 8, 0.08), rgba(8, 10, 8, 0.18)),
-    url("./assets/village-bg.webp") center / cover no-repeat,
     #171b20;
 }
 

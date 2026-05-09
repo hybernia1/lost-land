@@ -13,6 +13,7 @@ import { getBuildingVisualLevel, getBuildingVisualPhase } from "../data/building
 import { getEnvironmentDefinition } from "../data/environment";
 import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
 import { objectiveQuestById } from "../data/quests";
+import { defaultVillageLayout } from "../data/villageLayouts";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
 import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, EnvironmentConditionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
@@ -236,10 +237,13 @@ type MainBuildingEffect = {
 };
 
 type PalisadeGeometry = {
-  centerX: number;
-  centerY: number;
-  radiusX: number;
-  radiusY: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  gateX: number;
+  gateY: number;
+  points: Array<{ x: number; y: number }>;
 };
 
 const resourceColors: Record<ResourceId, number> = {
@@ -253,6 +257,9 @@ const resourceColors: Record<ResourceId, number> = {
 const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 const HUD_MAX_PIXEL_SCALE = 1.2;
+const CAMERA_MIN_ZOOM = 0.75;
+const CAMERA_MAX_ZOOM = 1.75;
+const CAMERA_ZOOM_STEP = 0.0018;
 
 function upgradingTooltip(
   name: string,
@@ -274,6 +281,7 @@ export class PixiVillageRenderer {
   private app: Application | null = null;
   private readonly rootLayer = new Container();
   private readonly worldLayer = new Container();
+  private readonly cameraLayer = new Container();
   private readonly hudLayer = new Container();
   private readonly tooltipLayer = new Container();
   private readonly assets = new VillageAssets();
@@ -311,8 +319,17 @@ export class PixiVillageRenderer {
   private marketToResource: MarketResourceId = "food";
   private marketAmount = 10;
   private hudPixelScale = 1;
+  private cameraOffsetX = 0;
+  private cameraOffsetY = 0;
+  private cameraZoom = 1;
+  private cameraDragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null;
+  private cameraDragMoved = false;
+  private cameraDragBlocked = false;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
+  private readonly handlePointerDown = (event: PointerEvent) => this.handleHostPointerDown(event);
+  private readonly handlePointerMove = (event: PointerEvent) => this.handleHostPointerMove(event);
+  private readonly handlePointerUp = (event: PointerEvent) => this.handleHostPointerUp(event);
 
   constructor(
     private readonly host: HTMLElement,
@@ -322,6 +339,10 @@ export class PixiVillageRenderer {
     this.rootLayer.addChild(this.worldLayer, this.hudLayer, this.tooltipLayer);
     this.host.addEventListener("wheel", this.handleWheel, { passive: false });
     this.host.addEventListener("mouseleave", this.handleMouseLeave);
+    this.host.addEventListener("pointerdown", this.handlePointerDown);
+    this.host.addEventListener("pointermove", this.handlePointerMove);
+    this.host.addEventListener("pointerup", this.handlePointerUp);
+    this.host.addEventListener("pointercancel", this.handlePointerUp);
     void this.initialize();
   }
 
@@ -333,6 +354,7 @@ export class PixiVillageRenderer {
   ): void {
     this.lastState = state;
     this.lastTranslations = translations;
+    this.cameraDragBlocked = Boolean(modalPlotId || infoPanel || state.quests.activeDecision);
 
     if (!this.app) {
       return;
@@ -353,6 +375,7 @@ export class PixiVillageRenderer {
     this.hudPixelScale = hudPixelScale;
     this.mainBuildingEffects = [];
     this.worldLayer.removeChildren();
+    this.cameraLayer.removeChildren();
     this.hudLayer.removeChildren();
     this.buildChoicesScrollArea = null;
     this.buildChoicesScrollMax = 0;
@@ -363,7 +386,13 @@ export class PixiVillageRenderer {
     this.decisionHistoryScrollArea = null;
     this.decisionHistoryScrollMax = 0;
     this.hudLayer.scale.set(1);
+    this.clampCamera(width, height);
+    this.cameraLayer.x = this.cameraOffsetX;
+    this.cameraLayer.y = this.cameraOffsetY;
+    this.cameraLayer.scale.set(this.cameraZoom);
     this.drawBackground(state, width, height);
+    this.drawDecorObjects();
+    this.worldLayer.addChild(this.cameraLayer);
     this.drawEnvironmentOverlay(state, width, height, visualTime);
     this.drawPalisade(state, translations);
 
@@ -383,8 +412,8 @@ export class PixiVillageRenderer {
 
   hitTest(clientX: number, clientY: number): string | null {
     const rect = this.host.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const x = (clientX - rect.left - this.cameraOffsetX) / this.cameraZoom;
+    const y = (clientY - rect.top - this.cameraOffsetY) / this.cameraZoom;
 
     return (
       villagePlotDefinitions.find((plot) => {
@@ -430,8 +459,16 @@ export class PixiVillageRenderer {
       return;
     }
 
-    if (!this.buildChoicesScrollArea || this.buildChoicesScrollMax <= 0) {
+    if (this.handleBuildChoicesWheel(event)) {
       return;
+    }
+
+    this.handleCameraZoom(event);
+  }
+
+  private handleBuildChoicesWheel(event: WheelEvent): boolean {
+    if (!this.buildChoicesScrollArea || this.buildChoicesScrollMax <= 0) {
+      return false;
     }
 
     const rect = this.host.getBoundingClientRect();
@@ -445,7 +482,7 @@ export class PixiVillageRenderer {
       y < area.y ||
       y > area.y + area.height
     ) {
-      return;
+      return false;
     }
 
     event.preventDefault();
@@ -455,11 +492,12 @@ export class PixiVillageRenderer {
     );
 
     if (nextScroll === this.buildChoicesScrollY) {
-      return;
+      return true;
     }
 
     this.buildChoicesScrollY = nextScroll;
     this.requestRender();
+    return true;
   }
 
   private handleScrollableWheel(
@@ -498,9 +536,102 @@ export class PixiVillageRenderer {
     return true;
   }
 
+  private handleCameraZoom(event: WheelEvent): void {
+    if (this.cameraDragBlocked || this.isHudPointer(event.clientX, event.clientY)) {
+      return;
+    }
+
+    const rect = this.host.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const previousZoom = this.cameraZoom;
+    const nextZoom = Math.max(
+      CAMERA_MIN_ZOOM,
+      Math.min(CAMERA_MAX_ZOOM, previousZoom * Math.exp(-event.deltaY * CAMERA_ZOOM_STEP)),
+    );
+
+    if (nextZoom === previousZoom) {
+      event.preventDefault();
+      return;
+    }
+
+    const worldX = (x - this.cameraOffsetX) / previousZoom;
+    const worldY = (y - this.cameraOffsetY) / previousZoom;
+    this.cameraZoom = nextZoom;
+    this.cameraOffsetX = x - worldX * nextZoom;
+    this.cameraOffsetY = y - worldY * nextZoom;
+    this.clampCamera(this.host.clientWidth, this.host.clientHeight);
+    event.preventDefault();
+    this.requestRender();
+  }
+
+  private handleHostPointerDown(event: PointerEvent): void {
+    if (this.cameraDragBlocked || event.button !== 0 || this.isHudPointer(event.clientX, event.clientY)) {
+      return;
+    }
+
+    this.cameraDragStart = {
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: this.cameraOffsetX,
+      offsetY: this.cameraOffsetY,
+    };
+    this.cameraDragMoved = false;
+    this.host.setPointerCapture(event.pointerId);
+  }
+
+  private handleHostPointerMove(event: PointerEvent): void {
+    if (!this.cameraDragStart) {
+      return;
+    }
+
+    const deltaX = event.clientX - this.cameraDragStart.x;
+    const deltaY = event.clientY - this.cameraDragStart.y;
+
+    if (!this.cameraDragMoved && Math.hypot(deltaX, deltaY) < 5) {
+      return;
+    }
+
+    this.cameraDragMoved = true;
+    this.cameraOffsetX = this.cameraDragStart.offsetX + deltaX;
+    this.cameraOffsetY = this.cameraDragStart.offsetY + deltaY;
+    this.clampCamera(this.host.clientWidth, this.host.clientHeight);
+    this.requestRender();
+    event.preventDefault();
+  }
+
+  private handleHostPointerUp(event: PointerEvent): void {
+    if (!this.cameraDragStart) {
+      return;
+    }
+
+    this.cameraDragStart = null;
+
+    if (this.host.hasPointerCapture(event.pointerId)) {
+      this.host.releasePointerCapture(event.pointerId);
+    }
+
+    if (this.cameraDragMoved) {
+      this.cameraDragMoved = false;
+      this.consumeHostClick();
+    }
+  }
+
+  private isHudPointer(clientX: number, clientY: number): boolean {
+    const rect = this.host.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    return y < 88 || x < 360 || x > this.host.clientWidth - 360;
+  }
+
   destroy(): void {
     this.host.removeEventListener("wheel", this.handleWheel);
     this.host.removeEventListener("mouseleave", this.handleMouseLeave);
+    this.host.removeEventListener("pointerdown", this.handlePointerDown);
+    this.host.removeEventListener("pointermove", this.handlePointerMove);
+    this.host.removeEventListener("pointerup", this.handlePointerUp);
+    this.host.removeEventListener("pointercancel", this.handlePointerUp);
     this.app?.destroy(true);
     this.app = null;
   }
@@ -526,7 +657,19 @@ export class PixiVillageRenderer {
   }
 
   private drawBackground(state: GameState, width: number, height: number): void {
+    const base = new Graphics();
+    base.rect(0, 0, width, height).fill({ color: 0x151812, alpha: 1 });
+    this.worldLayer.addChild(base);
+    this.drawTerrain(state, width, height);
+
     const backgroundTexture = this.assets.getBackgroundTexture(state.environment.condition);
+
+    if (!backgroundTexture || defaultVillageLayout.tileLayers.some((layer) => layer.tiles.length > 0)) {
+      const overlay = new Graphics();
+      overlay.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.08 });
+      this.worldLayer.addChild(overlay);
+      return;
+    }
 
     if (backgroundTexture) {
       const sprite = new Sprite(backgroundTexture);
@@ -543,6 +686,89 @@ export class PixiVillageRenderer {
     this.worldLayer.addChild(overlay);
   }
 
+  private drawTerrain(state: GameState, _viewportWidth: number, _viewportHeight: number): void {
+    const layout = defaultVillageLayout;
+
+    const scale = this.layout.scale;
+    const tileSize = layout.tileSize * scale;
+    const terrainWidth = layout.width * scale;
+    const terrainHeight = layout.height * scale;
+    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
+    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+
+    for (const layer of layout.tileLayers) {
+      for (const tile of layer.tiles) {
+        const gridX = tile.x;
+        const gridY = tile.y;
+
+        const texture = this.assets.getTerrainTileTexture(tile.textureKey);
+
+        if (!texture) {
+          continue;
+        }
+
+        const sprite = new Sprite(texture);
+        const tileDefinition = layout.tileTextures[tile.textureKey];
+        const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
+
+        if (tint) {
+          sprite.tint = tint;
+        }
+
+        sprite.alpha = layer.opacity;
+
+        if (tile.rotation) {
+          sprite.anchor.set(0.5);
+          sprite.rotation = (tile.rotation * Math.PI) / 180;
+          sprite.x = originX + gridX * tileSize + tileSize / 2;
+          sprite.y = originY + gridY * tileSize + tileSize / 2;
+        } else {
+          sprite.x = originX + gridX * tileSize;
+          sprite.y = originY + gridY * tileSize;
+        }
+
+        sprite.width = tileSize + 0.5;
+        sprite.height = tileSize + 0.5;
+        this.cameraLayer.addChild(sprite);
+      }
+    }
+  }
+
+  private drawDecorObjects(): void {
+    const layout = defaultVillageLayout;
+    const scale = this.layout.scale;
+    const terrainWidth = layout.width * scale;
+    const terrainHeight = layout.height * scale;
+    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
+    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+
+    for (const layer of layout.objectLayers.filter((candidate) => candidate.name === "decor")) {
+      const objects = [...layer.objects].sort((left, right) => left.y - right.y);
+
+      for (const object of objects) {
+        if (!object.textureKey) {
+          continue;
+        }
+
+        const texture = this.assets.getTerrainTileTexture(object.textureKey);
+
+        if (!texture) {
+          continue;
+        }
+
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0, 1);
+        sprite.x = originX + object.x * scale;
+        sprite.y = originY + object.y * scale;
+        sprite.width = object.width * scale;
+        sprite.height = object.height * scale;
+        sprite.rotation = (object.rotation * Math.PI) / 180;
+        sprite.alpha = object.opacity * layer.opacity;
+        this.cameraLayer.addChild(sprite);
+      }
+    }
+  }
+
   private drawPalisade(
     state: GameState,
     translations?: TranslationPack,
@@ -553,32 +779,35 @@ export class PixiVillageRenderer {
     const hasStarted = plot?.buildingId === "palisade";
     const built = (building?.level ?? 0) > 0;
     const selected = state.village.selectedPlotId === "plot-palisade";
-    const { centerX, centerY, radiusX, radiusY } = this.getPalisadeGeometry();
+    const geometry = this.getPalisadeGeometry();
     const alpha = built ? 1 : hasStarted ? 0.58 : 0.25;
 
     const palisade = new Graphics();
+    const innerInset = 18 * scale;
     palisade
-      .ellipse(centerX, centerY, radiusX * 0.93, radiusY * 0.9)
+      .poly([
+        geometry.left + innerInset, geometry.top + innerInset,
+        geometry.right - innerInset, geometry.top + innerInset,
+        geometry.right - innerInset, geometry.bottom - innerInset,
+        geometry.left + innerInset, geometry.bottom - innerInset,
+      ])
       .fill({ color: 0x4f4a2d, alpha: 0.26 });
-    palisade
-      .ellipse(centerX, centerY, radiusX, radiusY)
-      .stroke({ color: 0x2c2119, alpha, width: 18 + (building?.level ?? 0) * 1.2 });
-    palisade
-      .ellipse(centerX, centerY, radiusX, radiusY)
-      .stroke({ color: 0x8f6842, alpha, width: 7 + (building?.level ?? 0) * 0.7 });
-    this.worldLayer.addChild(palisade);
+    this.drawPalisadeLine(palisade, geometry.points, 0x2c2119, alpha, 18 + (building?.level ?? 0) * 1.2);
+    this.drawPalisadeLine(palisade, geometry.points, 0x8f6842, alpha, 7 + (building?.level ?? 0) * 0.7);
+    this.cameraLayer.addChild(palisade);
 
     const posts = new Container();
-    for (let index = 0; index < 76; index += 1) {
-      const angle = (Math.PI * 2 * index) / 76 - Math.PI / 2;
+    const postSpacing = 22 * scale;
+    const postPoints = this.getPalisadePostPoints(geometry.points, postSpacing);
+    for (const postPoint of postPoints) {
       const post = new Graphics();
       post.rect(-2.5 * scale, -14 * scale, 5 * scale, 28 * scale).fill({ color: 0xa77a4d, alpha });
-      post.x = centerX + Math.cos(angle) * radiusX;
-      post.y = centerY + Math.sin(angle) * radiusY;
-      post.rotation = angle + Math.PI / 2;
+      post.x = postPoint.x;
+      post.y = postPoint.y;
+      post.rotation = postPoint.angle;
       posts.addChild(post);
     }
-    this.worldLayer.addChild(posts);
+    this.cameraLayer.addChild(posts);
 
     this.addPalisadeTooltip(
       selected,
@@ -589,10 +818,10 @@ export class PixiVillageRenderer {
 
     if (building) {
       this.drawBuildingLevelBadge(
-        this.worldLayer,
+        this.cameraLayer,
         Math.max(1, building.level),
-        centerX - 30 * scale,
-        centerY + radiusY - 58 * scale,
+        geometry.gateX - 30 * scale,
+        geometry.gateY - 58 * scale,
         translations,
         translations?.buildings.palisade.name ?? "Palisade",
       );
@@ -600,14 +829,57 @@ export class PixiVillageRenderer {
 
     if (building && building.upgradingRemaining > 0) {
       this.drawConstructionCountdown(
-        this.worldLayer,
+        this.cameraLayer,
         building.upgradingRemaining,
-        centerX,
-        centerY + radiusY - 92 * scale,
+        geometry.gateX,
+        geometry.gateY - 92 * scale,
         Math.max(70, 86 * scale),
         undefined,
       );
     }
+  }
+
+  private drawPalisadeLine(
+    graphics: Graphics,
+    points: Array<{ x: number; y: number }>,
+    color: number,
+    alpha: number,
+    width: number,
+  ): void {
+    if (points.length === 0) {
+      return;
+    }
+
+    graphics.moveTo(points[0].x, points[0].y);
+
+    for (const point of points.slice(1)) {
+      graphics.lineTo(point.x, point.y);
+    }
+
+    graphics.closePath().stroke({ color, alpha, width });
+  }
+
+  private getPalisadePostPoints(
+    points: Array<{ x: number; y: number }>,
+    spacing: number,
+  ): Array<{ x: number; y: number; angle: number }> {
+    return points.flatMap((point, index) => {
+      const nextPoint = points[(index + 1) % points.length];
+      const deltaX = nextPoint.x - point.x;
+      const deltaY = nextPoint.y - point.y;
+      const length = Math.hypot(deltaX, deltaY);
+      const steps = Math.max(1, Math.floor(length / spacing));
+      const angle = Math.atan2(deltaY, deltaX) + Math.PI / 2;
+
+      return Array.from({ length: steps }, (_, step) => {
+        const progress = step / steps;
+        return {
+          x: point.x + deltaX * progress,
+          y: point.y + deltaY * progress,
+          angle,
+        };
+      });
+    });
   }
 
   private drawPlot(
@@ -637,7 +909,7 @@ export class PixiVillageRenderer {
         y >= -bounds.height / 2 &&
         y <= bounds.height / 2,
     };
-    this.worldLayer.addChild(plotLayer);
+    this.cameraLayer.addChild(plotLayer);
 
     if (buildingId && building) {
       const tooltip = upgradingTooltip(
@@ -718,15 +990,14 @@ export class PixiVillageRenderer {
     const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
     const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
     const alpha = (building?.level ?? 0) > 0 ? 1 : plot?.buildingId ? 0.58 : 0.3;
-    const { centerX, centerY, radiusY } = this.getPalisadeGeometry();
-    const gateX = centerX;
-    const gateY = centerY + radiusY;
+    const { gateX, gateY } = this.getPalisadeGeometry();
+    const scale = this.layout.scale;
     const gate = new Graphics();
 
-    gate.rect(gateX - 42, gateY - 56, 84, 70).fill({ color: 0x4d3629, alpha });
-    gate.rect(gateX - 24, gateY - 38, 48, 52).fill({ color: 0x161916, alpha });
-    gate.rect(gateX - 52, gateY - 64, 104, 12).fill({ color: 0xb0834d, alpha });
-    this.worldLayer.addChild(gate);
+    gate.rect(gateX - 46 * scale, gateY - 64 * scale, 92 * scale, 74 * scale).fill({ color: 0x4d3629, alpha });
+    gate.rect(gateX - 25 * scale, gateY - 42 * scale, 50 * scale, 52 * scale).fill({ color: 0x161916, alpha });
+    gate.rect(gateX - 58 * scale, gateY - 72 * scale, 116 * scale, 13 * scale).fill({ color: 0xb0834d, alpha });
+    this.cameraLayer.addChild(gate);
   }
 
   private drawHud(
@@ -4388,7 +4659,7 @@ export class PixiVillageRenderer {
       hitLayer,
       upgradingTooltip(name, level, upgradingRemaining, "Lvl"),
     );
-    this.worldLayer.addChild(hitLayer);
+    this.cameraLayer.addChild(hitLayer);
 
     if (!selected) {
       return;
@@ -4403,7 +4674,7 @@ export class PixiVillageRenderer {
         width: 2,
       },
     );
-    this.worldLayer.addChild(marker);
+    this.cameraLayer.addChild(marker);
   }
 
   private drawBuildingVisualEffects(
@@ -4866,6 +5137,32 @@ export class PixiVillageRenderer {
     return event.deltaY / this.hudPixelScale;
   }
 
+  private clampCamera(viewportWidth: number, viewportHeight: number): void {
+    const scale = this.layout.scale;
+    const terrainWidth = defaultVillageLayout.width * scale;
+    const terrainHeight = defaultVillageLayout.height * scale;
+    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
+    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+    const scaledTerrainWidth = terrainWidth * this.cameraZoom;
+    const scaledTerrainHeight = terrainHeight * this.cameraZoom;
+
+    if (scaledTerrainWidth <= viewportWidth) {
+      this.cameraOffsetX = (viewportWidth - scaledTerrainWidth) / 2 - originX * this.cameraZoom;
+    } else {
+      const minX = viewportWidth - (originX + terrainWidth) * this.cameraZoom;
+      const maxX = -originX * this.cameraZoom;
+      this.cameraOffsetX = Math.max(minX, Math.min(maxX, this.cameraOffsetX));
+    }
+
+    if (scaledTerrainHeight <= viewportHeight) {
+      this.cameraOffsetY = (viewportHeight - scaledTerrainHeight) / 2 - originY * this.cameraZoom;
+    } else {
+      const minY = viewportHeight - (originY + terrainHeight) * this.cameraZoom;
+      const maxY = -originY * this.cameraZoom;
+      this.cameraOffsetY = Math.max(minY, Math.min(maxY, this.cameraOffsetY));
+    }
+  }
+
   private getLayout(width: number, height: number): SceneLayout {
     const scale = Math.min(width / 1420, height / 880);
     const villageWidth = 1120 * scale;
@@ -4886,12 +5183,36 @@ export class PixiVillageRenderer {
 
   private getPalisadeGeometry(): PalisadeGeometry {
     const { originX, originY, width, height } = this.layout;
+    const left = originX + width * 0.11;
+    const top = originY + height * 0.16;
+    const right = originX + width * 0.89;
+    const bottom = originY + height * 0.86;
+    const corner = Math.min(width, height) * 0.065;
+    const gateWidth = width * 0.1;
+    const gateX = originX + width * 0.5;
+    const gateY = bottom;
 
     return {
-      centerX: originX + width * 0.5,
-      centerY: originY + height * 0.525,
-      radiusX: width * 0.535,
-      radiusY: height * 0.425,
+      left,
+      top,
+      right,
+      bottom,
+      gateX,
+      gateY,
+      points: [
+        { x: left + corner, y: top },
+        { x: right - corner, y: top },
+        { x: right, y: top + corner },
+        { x: right, y: bottom - corner },
+        { x: right - corner, y: bottom },
+        { x: gateX + gateWidth / 2, y: bottom },
+        { x: gateX + gateWidth / 2, y: bottom - corner * 0.42 },
+        { x: gateX - gateWidth / 2, y: bottom - corner * 0.42 },
+        { x: gateX - gateWidth / 2, y: bottom },
+        { x: left + corner, y: bottom },
+        { x: left, y: bottom - corner },
+        { x: left, y: top + corner },
+      ],
     };
   }
 
@@ -4914,11 +5235,11 @@ export class PixiVillageRenderer {
   private getPalisadePlotBounds(plot: VillagePlotDefinition): Bounds {
     const width = plot.width * this.layout.scale;
     const height = plot.height * this.layout.scale;
-    const { centerX, centerY, radiusY } = this.getPalisadeGeometry();
+    const { gateX, gateY } = this.getPalisadeGeometry();
 
     return {
-      x: centerX - width / 2,
-      y: centerY + radiusY - height * 0.62,
+      x: gateX - width / 2,
+      y: gateY - height * 0.72,
       width,
       height,
     };
