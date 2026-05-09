@@ -207,6 +207,7 @@ const resourceColors: Record<ResourceId, number> = {
 
 const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
+const HUD_MAX_PIXEL_SCALE = 1.2;
 
 function upgradingTooltip(
   name: string,
@@ -264,6 +265,7 @@ export class PixiVillageRenderer {
   private marketFromResource: MarketResourceId = "material";
   private marketToResource: MarketResourceId = "food";
   private marketAmount = 10;
+  private hudPixelScale = 1;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
 
@@ -299,10 +301,11 @@ export class PixiVillageRenderer {
     }
 
     this.layout = this.getLayout(width, height);
-    const hudScale = this.getHudScale(width, height);
-    const hudWidth = width / hudScale;
-    const hudHeight = height / hudScale;
+    const hudPixelScale = this.getHudPixelScale(width, height);
+    const hudWidth = width / hudPixelScale;
+    const hudHeight = height / hudPixelScale;
     const visualTime = performance.now() / 1000;
+    this.hudPixelScale = hudPixelScale;
     this.mainBuildingEffects = [];
     this.worldLayer.removeChildren();
     this.hudLayer.removeChildren();
@@ -314,7 +317,7 @@ export class PixiVillageRenderer {
     this.resourceBreakdownScrollMax = 0;
     this.decisionHistoryScrollArea = null;
     this.decisionHistoryScrollMax = 0;
-    this.hudLayer.scale.set(hudScale);
+    this.hudLayer.scale.set(1);
     this.drawBackground(state, width, height);
     this.drawEnvironmentOverlay(state, width, height, visualTime);
     this.drawPalisade(state, translations);
@@ -329,6 +332,8 @@ export class PixiVillageRenderer {
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
     this.drawQuestDecisionModal(state, translations, hudWidth, hudHeight);
+    this.applyHudPixelScale(this.hudLayer, hudPixelScale);
+    this.scaleHudInteractionBounds(hudPixelScale);
   }
 
   hitTest(clientX: number, clientY: number): string | null {
@@ -385,9 +390,8 @@ export class PixiVillageRenderer {
     }
 
     const rect = this.host.getBoundingClientRect();
-    const hudScale = this.hudLayer.scale.x || 1;
-    const x = (event.clientX - rect.left) / hudScale;
-    const y = (event.clientY - rect.top) / hudScale;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
     const area = this.buildChoicesScrollArea;
 
     if (
@@ -402,7 +406,7 @@ export class PixiVillageRenderer {
     event.preventDefault();
     const nextScroll = Math.max(
       0,
-      Math.min(this.buildChoicesScrollMax, this.buildChoicesScrollY + event.deltaY),
+      Math.min(this.buildChoicesScrollMax, this.buildChoicesScrollY + this.getLogicalWheelDelta(event)),
     );
 
     if (nextScroll === this.buildChoicesScrollY) {
@@ -425,9 +429,8 @@ export class PixiVillageRenderer {
     }
 
     const rect = this.host.getBoundingClientRect();
-    const hudScale = this.hudLayer.scale.x || 1;
-    const x = (event.clientX - rect.left) / hudScale;
-    const y = (event.clientY - rect.top) / hudScale;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
     if (
       x < area.x ||
@@ -439,7 +442,7 @@ export class PixiVillageRenderer {
     }
 
     event.preventDefault();
-    const nextScroll = Math.max(0, Math.min(scrollMax, scrollY + event.deltaY));
+    const nextScroll = Math.max(0, Math.min(scrollMax, scrollY + this.getLogicalWheelDelta(event)));
 
     if (nextScroll === scrollY) {
       return true;
@@ -1490,9 +1493,7 @@ export class PixiVillageRenderer {
     });
     value.anchor.set(1, 0);
 
-    row.hitArea = {
-      contains: (x: number, y: number) => x >= 0 && x <= options.width && y >= -2 && y <= 21,
-    };
+    row.hitArea = new Rectangle(0, -2, options.width, 23);
     this.bindTooltip(row, options.tooltip);
   }
 
@@ -3324,10 +3325,7 @@ export class PixiVillageRenderer {
     rowContainer.addChild(row);
     this.drawIcon(rowContainer, mode === "safe" ? "scout" : "shield", x + 34, y + 12, 17);
     this.drawText(rowContainer, modeLabel, x + 50, y + 3, { fill: 0xf5efdf, fontSize: 12, fontWeight: "900" });
-    rowContainer.hitArea = {
-      contains: (hitX: number, hitY: number) =>
-        hitX >= x + 18 && hitX <= x + width - 34 && hitY >= y - 2 && hitY <= y + 26,
-    };
+    rowContainer.hitArea = new Rectangle(x + 18, y - 2, width - 52, 28);
     this.bindTooltip(rowContainer, riskLabel);
     this.createModalButton(
       parent,
@@ -3473,9 +3471,7 @@ export class PixiVillageRenderer {
     });
     this.bindTooltip(token, options.tooltip);
 
-    token.hitArea = {
-      contains: (x: number, y: number) => x >= 0 && x <= label.width + 26 && y >= -2 && y <= 18,
-    };
+    token.hitArea = new Rectangle(0, -2, label.width + 26, 20);
     return token;
   }
 
@@ -4636,6 +4632,89 @@ export class PixiVillageRenderer {
     return label;
   }
 
+  private applyHudPixelScale(container: Container, scale: number): void {
+    if (scale === 1) {
+      return;
+    }
+
+    for (const child of container.children) {
+      child.x *= scale;
+      child.y *= scale;
+      this.scaleHitArea(child, scale);
+
+      if (child instanceof Text) {
+        const fontSize = this.scaleTextStyleValue(child.style.fontSize, scale);
+        const lineHeight = this.scaleTextStyleValue(child.style.lineHeight, scale);
+        const wordWrapWidth = this.scaleTextStyleValue(child.style.wordWrapWidth, scale);
+
+        if (fontSize !== undefined) {
+          child.style.fontSize = fontSize;
+        }
+        if (lineHeight !== undefined) {
+          child.style.lineHeight = lineHeight;
+        }
+        if (wordWrapWidth !== undefined) {
+          child.style.wordWrapWidth = wordWrapWidth;
+        }
+        child.resolution = window.devicePixelRatio || 1;
+        continue;
+      }
+
+      if (child instanceof Graphics || child instanceof Sprite) {
+        child.scale.x *= scale;
+        child.scale.y *= scale;
+        continue;
+      }
+
+      if (child instanceof Container) {
+        this.applyHudPixelScale(child, scale);
+      }
+    }
+  }
+
+  private scaleHudInteractionBounds(scale: number): void {
+    if (scale === 1) {
+      return;
+    }
+
+    this.scaleBounds(this.buildChoicesScrollArea, scale);
+    this.scaleBounds(this.logScrollArea, scale);
+    this.scaleBounds(this.resourceBreakdownScrollArea, scale);
+    this.scaleBounds(this.decisionHistoryScrollArea, scale);
+  }
+
+  private scaleBounds(bounds: Bounds | null, scale: number): void {
+    if (!bounds) {
+      return;
+    }
+
+    bounds.x *= scale;
+    bounds.y *= scale;
+    bounds.width *= scale;
+    bounds.height *= scale;
+  }
+
+  private scaleHitArea(target: Container, scale: number): void {
+    if (target.hitArea instanceof Rectangle) {
+      target.hitArea.x *= scale;
+      target.hitArea.y *= scale;
+      target.hitArea.width *= scale;
+      target.hitArea.height *= scale;
+    }
+  }
+
+  private scaleTextStyleValue(value: number | string | undefined, scale: number): number | undefined {
+    if (typeof value !== "number") {
+      return undefined;
+    }
+
+    return Math.round(value * scale * 100) / 100;
+  }
+
+  private getLogicalWheelDelta(event: WheelEvent): number {
+    return event.deltaY / this.hudPixelScale;
+  }
+
   private getLayout(width: number, height: number): SceneLayout {
     const scale = Math.min(width / 1420, height / 880);
     const villageWidth = 1120 * scale;
@@ -4650,8 +4729,8 @@ export class PixiVillageRenderer {
     };
   }
 
-  private getHudScale(width: number, height: number): number {
-    return Math.min(1.2, Math.max(1, Math.min(width / 1120, height / 640)));
+  private getHudPixelScale(width: number, height: number): number {
+    return Math.min(HUD_MAX_PIXEL_SCALE, Math.max(1, Math.min(width / 1120, height / 640)));
   }
 
   private getPalisadeGeometry(): PalisadeGeometry {
