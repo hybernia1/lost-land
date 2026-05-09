@@ -2,6 +2,7 @@ import {
   Assets,
   Rectangle,
   Texture,
+  type FrameObject,
 } from "pixi.js";
 import constructionSiteAtlasUrl from "../assets/buildings/construction-site-atlas.png";
 import {
@@ -38,6 +39,34 @@ export class VillageAssets {
     }
 
     return built ? Texture.WHITE : this.constructionSiteTexture ?? Texture.WHITE;
+  }
+
+  getBuildingAnimationFrames(buildingId: BuildingId, level: number, built: boolean): FrameObject[] | null {
+    if (!built) {
+      return null;
+    }
+
+    const visual = buildingVisualDefinitions[buildingId];
+
+    if (!visual || visual.kind !== "atlas") {
+      return null;
+    }
+
+    const frameKey = getBuildingVisualFrameKey(buildingId, level);
+    const animation = visual.animations?.[frameKey];
+
+    if (!animation || animation.length <= 1) {
+      return null;
+    }
+
+    const frames = animation.flatMap((frame): FrameObject[] => {
+      const texture = this.getAtlasFrameTexture(buildingId, visual, getBuildingVisualLevel(level), frame.frameKey);
+      return texture
+        ? [{ texture, time: frame.durationMs }]
+        : [];
+    });
+
+    return frames.length > 1 ? frames : null;
   }
 
   getTerrainTileTexture(textureKey: string): Texture | null {
@@ -157,16 +186,15 @@ export class VillageAssets {
     visualLevel: number,
     frameKey: string,
   ): Texture | null {
-    const frameIndex = visualLevel - 1;
-    const frameCount = visual.columns * visual.rows;
-
-    if (frameIndex < 0 || frameIndex >= frameCount) {
-      return null;
-    }
-
     const atlas = this.buildingAtlases.get(visual.atlasId);
 
     if (!atlas) {
+      return null;
+    }
+
+    const frame = visual.frames?.[frameKey] ?? this.getGridFrame(visual, visualLevel);
+
+    if (!frame) {
       return null;
     }
 
@@ -180,14 +208,30 @@ export class VillageAssets {
     const texture = new Texture({
       source: atlas.source,
       frame: new Rectangle(
-        (frameIndex % visual.columns) * visual.frameWidth,
-        Math.floor(frameIndex / visual.columns) * visual.frameHeight,
-        visual.frameWidth,
-        visual.frameHeight,
+        frame.x,
+        frame.y,
+        frame.width,
+        frame.height,
       ),
     });
 
     buildingTextureCache.set(key, texture);
     return texture;
+  }
+
+  private getGridFrame(visual: BuildingAtlasVisualDefinition, visualLevel: number) {
+    const frameIndex = visualLevel - 1;
+    const frameCount = visual.columns * visual.rows;
+
+    if (frameIndex < 0 || frameIndex >= frameCount) {
+      return null;
+    }
+
+    return {
+      x: (frameIndex % visual.columns) * visual.frameWidth,
+      y: Math.floor(frameIndex / visual.columns) * visual.frameHeight,
+      width: visual.frameWidth,
+      height: visual.frameHeight,
+    };
   }
 }
