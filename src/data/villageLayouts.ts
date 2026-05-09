@@ -15,7 +15,10 @@ export type TerrainTileLayerDefinition = {
   id: string;
   name: string;
   opacity: number;
+  width: number;
+  height: number;
   tiles: TerrainTilePlacement[];
+  tileByIndex: Array<TerrainTilePlacement | null>;
 };
 
 export type VillageObjectLayerDefinition = {
