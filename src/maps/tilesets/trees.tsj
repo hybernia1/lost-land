@@ -1,7 +1,7 @@
 {
   "columns": 4,
   "image": "../../assets/tiles/trees.png",
-  "imageheight": 384,
+  "imageheight": 512,
   "imagewidth": 512,
   "margin": 0,
   "name": "trees",

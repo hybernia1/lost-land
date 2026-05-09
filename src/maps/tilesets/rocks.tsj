@@ -1,7 +1,7 @@
 {
   "columns": 4,
   "image": "../../assets/tiles/rocks.png",
-  "imageheight": 256,
+  "imageheight": 512,
   "imagewidth": 512,
   "margin": 0,
   "name": "rocks",
