@@ -185,8 +185,8 @@ function getTileLayers(
     layer.type === "tilelayer" && layer.visible !== false,
   );
 
-  if (!layers.some((layer) => layer.name === "terrain_base")) {
-    throw new Error("Tiled map is missing tile layer \"terrain_base\".");
+  if (!layers.some((layer) => layer.name === "tarrain")) {
+    throw new Error("Tiled map is missing tile layer \"tarrain\".");
   }
 
   return layers.map((layer) => {
