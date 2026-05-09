@@ -5,11 +5,11 @@ import dormitoryAtlasUrl from "../assets/buildings/dormitory-atlas.png";
 import generatorAtlasUrl from "../assets/buildings/generator-atlas.png";
 import hydroponicsAtlasUrl from "../assets/buildings/hydroponics-atlas.png";
 import marketAtlasUrl from "../assets/buildings/market-atlas.png";
+import mainBuildingAtlasUrl from "../assets/buildings/main-building-atlas.png";
 import storageAtlasUrl from "../assets/buildings/storage-atlas.png";
 import watchtowerAtlasUrl from "../assets/buildings/watchtower-atlas.png";
 import waterStillAtlasUrl from "../assets/buildings/water-still-atlas.png";
 import workshopAtlasUrl from "../assets/buildings/workshop-atlas.png";
-import mainBuildingTilesetSource from "../maps/tilesets/main-building.tsj?raw";
 import { getBuildingAssetUrl } from "./tiledAssets";
 
 export const BUILDING_VISUAL_LEVELS = 1;
@@ -158,7 +158,7 @@ function getStringProperty(properties: TiledProperty[] | undefined, name: string
 }
 
 export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisualDefinition>> = {
-  mainBuilding: tiledBuildingAtlas("main-building-tiled-atlas", mainBuildingTilesetSource, "mainBuilding"),
+  mainBuilding: singleFrameAtlas("main-building-atlas", mainBuildingAtlasUrl, "mainBuilding"),
   storage: singleFrameAtlas("storage-atlas", storageAtlasUrl, "storage"),
   dormitory: singleFrameAtlas("dormitory-atlas", dormitoryAtlasUrl, "dormitory"),
   hydroponics: singleFrameAtlas("hydroponics-atlas", hydroponicsAtlasUrl, "hydroponics"),
