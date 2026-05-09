@@ -2,7 +2,7 @@ export type ResourceId =
   | "food"
   | "water"
   | "material"
-  | "energy"
+  | "coal"
   | "morale";
 
 export type BuildingId =
@@ -140,10 +140,23 @@ export type ObjectiveQuestId =
 export type DecisionQuestId =
   | "survivorsAtGate"
   | "rationDispute"
-  | "radioCall";
+  | "radioCall"
+  | "bittenStranger"
+  | "traderAtDusk"
+  | "nightScreams"
+  | "waterTheft"
+  | "generatorSpareParts"
+  | "provenTheft"
+  | "collapsedUnderpass"
+  | "brokenWaterFilter";
 
 export type SuddenQuestId =
   | "cropSpoilage";
+
+export type DecisionProfileAxisId =
+  | "philanthropyPrinciple"
+  | "mercySecurity"
+  | "opennessCaution";
 
 export type DecisionOptionId = string;
 
@@ -159,12 +172,20 @@ export type ActiveDecisionQuestState = {
   wasPaused: boolean;
 };
 
+export type DecisionHistoryEntry = {
+  definitionId: DecisionQuestId;
+  optionId: DecisionOptionId;
+  resolvedAt: number;
+};
+
 export type QuestState = {
   objectives: ObjectiveQuestState[];
   activeDecision: ActiveDecisionQuestState | null;
   resolvedDecisionCount: number;
   resolvedSuddenCount: number;
   nextDecisionAt: number;
+  resolvedDecisionIds: DecisionQuestId[];
+  decisionHistory: DecisionHistoryEntry[];
   recentDecisionIds: DecisionQuestId[];
   recentSuddenIds: SuddenQuestId[];
 };

@@ -8,8 +8,8 @@ import { createInitialQuestState } from "../systems/quests";
 import { SAVE_VERSION } from "../systems/save";
 import type { BuildingId, BuildingState, GameState, ResourceId } from "./types";
 
-const STARTING_STOCK_RATIO = 0.9;
-const startingStockResources: ResourceId[] = ["food", "water", "material", "energy"];
+const STARTING_STOCK_RATIO = 1;
+const startingStockResources: ResourceId[] = ["food", "water", "material", "coal"];
 
 export function createInitialState(
   communityName = "Lost Land",
@@ -39,7 +39,7 @@ export function createInitialState(
     workMode: "day",
     resources: {
       ...emptyResourceRecord(),
-      morale: 72,
+      morale: 100,
     },
     capacities: emptyResourceRecord(),
     survivors: {

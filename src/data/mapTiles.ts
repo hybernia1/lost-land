@@ -21,7 +21,7 @@ export const tileDefinitions: TileDefinition[] = [
     name: "City Ruins",
     color: "#4b4f57",
     accent: "#b8bec8",
-    lootBias: { material: 42, energy: 5 },
+    lootBias: { material: 42, coal: 5 },
   },
   {
     id: "forest",
@@ -35,7 +35,7 @@ export const tileDefinitions: TileDefinition[] = [
     name: "Dead Highway",
     color: "#514b43",
     accent: "#d6b06b",
-    lootBias: { energy: 12, material: 24 },
+    lootBias: { coal: 12, material: 24 },
   },
   {
     id: "hospital",
@@ -56,7 +56,7 @@ export const tileDefinitions: TileDefinition[] = [
     name: "Infested Block",
     color: "#523b46",
     accent: "#f07a87",
-    lootBias: { food: 14, water: 10, energy: 7, material: 24 },
+    lootBias: { food: 14, water: 10, coal: 7, material: 24 },
   },
 ];
 

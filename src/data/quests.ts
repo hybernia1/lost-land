@@ -1,7 +1,5 @@
 import type {
   BuildingId,
-  DecisionOptionId,
-  DecisionQuestId,
   ObjectiveQuestId,
   ResourceBag,
   ResourceId,
@@ -14,21 +12,6 @@ export type ObjectiveQuestDefinition = {
   requiredLevel: number;
   prerequisiteIds?: ObjectiveQuestId[];
   reward: ResourceBag;
-};
-
-export type DecisionQuestOptionDefinition = {
-  id: DecisionOptionId;
-  resources?: ResourceBag;
-  workers?: number;
-  injured?: number;
-  morale?: number;
-};
-
-export type DecisionQuestDefinition = {
-  id: DecisionQuestId;
-  minElapsedSeconds: number;
-  weight: number;
-  options: DecisionQuestOptionDefinition[];
 };
 
 export type SuddenQuestDefinition = {
@@ -50,7 +33,7 @@ export const objectiveQuestDefinitions: ObjectiveQuestDefinition[] = [
     buildingId: "generator",
     requiredLevel: 1,
     prerequisiteIds: ["buildStorage"],
-    reward: { material: 50, energy: 20 },
+    reward: { material: 50, coal: 20 },
   },
   {
     id: "buildWaterStill",
@@ -82,67 +65,6 @@ export const objectiveQuestDefinitions: ObjectiveQuestDefinition[] = [
   },
 ];
 
-export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
-  {
-    id: "survivorsAtGate",
-    minElapsedSeconds: 0,
-    weight: 5,
-    options: [
-      {
-        id: "accept",
-        resources: { food: -5 },
-        workers: 2,
-        injured: 1,
-      },
-      {
-        id: "refuse",
-      },
-      {
-        id: "execute",
-        morale: -5,
-      },
-    ],
-  },
-  {
-    id: "rationDispute",
-    minElapsedSeconds: 0,
-    weight: 3,
-    options: [
-      {
-        id: "share",
-        resources: { food: -6 },
-        morale: 4,
-      },
-      {
-        id: "guards",
-        morale: -4,
-      },
-      {
-        id: "ignore",
-      },
-    ],
-  },
-  {
-    id: "radioCall",
-    minElapsedSeconds: 0,
-    weight: 2,
-    options: [
-      {
-        id: "answer",
-        resources: { energy: -6, material: 14 },
-      },
-      {
-        id: "listen",
-        resources: { energy: -2 },
-        morale: 2,
-      },
-      {
-        id: "silence",
-      },
-    ],
-  },
-];
-
 export const suddenQuestDefinitions: SuddenQuestDefinition[] = [
   {
     id: "cropSpoilage",
@@ -157,10 +79,6 @@ export const suddenQuestDefinitions: SuddenQuestDefinition[] = [
 export const objectiveQuestById = Object.fromEntries(
   objectiveQuestDefinitions.map((quest) => [quest.id, quest]),
 ) as Record<ObjectiveQuestId, ObjectiveQuestDefinition>;
-
-export const decisionQuestById = Object.fromEntries(
-  decisionQuestDefinitions.map((quest) => [quest.id, quest]),
-) as Record<DecisionQuestId, DecisionQuestDefinition>;
 
 export const suddenQuestById = Object.fromEntries(
   suddenQuestDefinitions.map((quest) => [quest.id, quest]),
