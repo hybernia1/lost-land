@@ -10,6 +10,7 @@ import {
   getBuildingVisualLevel,
   type BuildingAtlasVisualDefinition,
 } from "../data/buildingVisuals";
+import { villageLayoutDefinitions } from "../data/villageLayouts";
 import type { BuildingId, EnvironmentConditionId } from "../game/types";
 import { drawBuildingAsset } from "./buildingAssets";
 
@@ -21,10 +22,12 @@ const fallbackBackgroundUrls: Record<EnvironmentConditionId, string> = {
 };
 
 const buildingTextureCache = new Map<string, Texture>();
+const terrainTextureCache = new Map<string, Texture>();
 
 export class VillageAssets {
   private readonly backgroundTextures = new Map<EnvironmentConditionId, Texture>();
   private readonly buildingAtlases = new Map<string, Texture>();
+  private readonly terrainAtlases = new Map<string, Texture>();
   private loadPromise: Promise<void> | null = null;
 
   load(): Promise<void> {
@@ -79,10 +82,40 @@ export class VillageAssets {
     return texture;
   }
 
+  getTerrainTileTexture(textureKey: string): Texture | null {
+    const tile = this.getTerrainTextureDefinition(textureKey);
+    const atlas = tile ? this.terrainAtlases.get(tile.atlasUrl) : null;
+
+    if (!atlas || !tile) {
+      return null;
+    }
+
+    const key = `terrain:${textureKey}`;
+    const cached = terrainTextureCache.get(key);
+
+    if (cached) {
+      return cached;
+    }
+
+    const texture = new Texture({
+      source: atlas.source,
+      frame: new Rectangle(
+        tile.frame.x,
+        tile.frame.y,
+        tile.frame.width,
+        tile.frame.height,
+      ),
+    });
+
+    terrainTextureCache.set(key, texture);
+    return texture;
+  }
+
   private async loadTextures(): Promise<void> {
     await Promise.all([
       this.loadBackgroundTextures(),
       this.loadBuildingAtlases(),
+      this.loadTerrainAtlases(),
     ]);
   }
 
@@ -110,6 +143,35 @@ export class VillageAssets {
         this.buildingAtlases.set(atlasId, texture);
       }),
     );
+  }
+
+  private async loadTerrainAtlases(): Promise<void> {
+    const atlasUrls = new Set<string>();
+
+    for (const layout of villageLayoutDefinitions) {
+      for (const tile of Object.values(layout.tileTextures)) {
+        atlasUrls.add(tile.atlasUrl);
+      }
+    }
+
+    await Promise.all(
+      Array.from(atlasUrls).map(async (atlasUrl) => {
+        const texture = await Assets.load<Texture>(atlasUrl);
+        this.terrainAtlases.set(atlasUrl, texture);
+      }),
+    );
+  }
+
+  private getTerrainTextureDefinition(textureKey: string) {
+    for (const layout of villageLayoutDefinitions) {
+      const tile = layout.tileTextures[textureKey];
+
+      if (tile) {
+        return tile;
+      }
+    }
+
+    return null;
   }
 
   private getAtlasBuildingTexture(

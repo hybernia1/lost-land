@@ -1,0 +1,29 @@
+{
+  "columns": 4,
+  "image": "../../assets/tiles/trees.png",
+  "imageheight": 384,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "trees",
+  "spacing": 0,
+  "tilecount": 12,
+  "tiledversion": "1.11.2",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "treeOrange" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "treeGreen" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "treeDarkGreen" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "treeOakGreen" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "treeOakGold" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "treeOakRust" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "treeSmallGreen" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "treeSmallGold" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "treeSmallRust" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "treePine" }] },
+    { "id": 10, "properties": [{ "name": "tileId", "type": "string", "value": "cactus" }] },
+    { "id": 11, "properties": [{ "name": "tileId", "type": "string", "value": "bushLarge" }] }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}
