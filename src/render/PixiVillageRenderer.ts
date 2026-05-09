@@ -701,18 +701,22 @@ export class PixiVillageRenderer {
 
           sprite.alpha = layer.opacity;
 
-          if (tile.rotation) {
+          if (tile.rotation || tile.flipX || tile.flipY) {
             sprite.anchor.set(0.5);
-            sprite.rotation = (tile.rotation * Math.PI) / 180;
+            sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
             sprite.x = tileX + tileSize / 2;
             sprite.y = tileY + tileSize / 2;
+            sprite.scale.set(
+              (tile.flipX ? -1 : 1) * ((tileSize + 0.5) / texture.width),
+              (tile.flipY ? -1 : 1) * ((tileSize + 0.5) / texture.height),
+            );
           } else {
             sprite.x = tileX;
             sprite.y = tileY;
+            sprite.width = tileSize + 0.5;
+            sprite.height = tileSize + 0.5;
           }
 
-          sprite.width = tileSize + 0.5;
-          sprite.height = tileSize + 0.5;
           this.cameraLayer.addChild(sprite);
         }
       }
