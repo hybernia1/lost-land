@@ -1,0 +1,130 @@
+{
+  "image": "main-building-atlas.png",
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "columns": 5,
+  "rows": 4,
+  "frames": {
+    "mainBuilding_1": {
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_2": {
+      "x": 256,
+      "y": 0,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_3": {
+      "x": 512,
+      "y": 0,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_4": {
+      "x": 768,
+      "y": 0,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_5": {
+      "x": 1024,
+      "y": 0,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_6": {
+      "x": 0,
+      "y": 256,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_7": {
+      "x": 256,
+      "y": 256,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_8": {
+      "x": 512,
+      "y": 256,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_9": {
+      "x": 768,
+      "y": 256,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_10": {
+      "x": 1024,
+      "y": 256,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_11": {
+      "x": 0,
+      "y": 512,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_12": {
+      "x": 256,
+      "y": 512,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_13": {
+      "x": 512,
+      "y": 512,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_14": {
+      "x": 768,
+      "y": 512,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_15": {
+      "x": 1024,
+      "y": 512,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_16": {
+      "x": 0,
+      "y": 768,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_17": {
+      "x": 256,
+      "y": 768,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_18": {
+      "x": 512,
+      "y": 768,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_19": {
+      "x": 768,
+      "y": 768,
+      "w": 256,
+      "h": 256
+    },
+    "mainBuilding_20": {
+      "x": 1024,
+      "y": 768,
+      "w": 256,
+      "h": 256
+    }
+  },
+  "layout": "levels-left-to-right-top-to-bottom"
+}

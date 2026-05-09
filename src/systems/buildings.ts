@@ -1,7 +1,8 @@
 import { buildingById, buildingDefinitions } from "../data/buildings";
+import { getEnvironmentMoralePenaltyPerHour } from "../data/environment";
 import { resourceIds } from "../data/resources";
 import { villagePlotDefinitions } from "../data/villagePlots";
-import { GAME_HOUR_REAL_SECONDS, getGameHour } from "../game/time";
+import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "../game/time";
 import type {
   BuildingId,
   GameState,
@@ -47,6 +48,7 @@ export type ResourceBreakdownLine = {
     | "foodShortage"
     | "waterShortage"
     | "continuousShifts"
+    | "environment"
     | "mainBuildingBonus"
     | "moraleProductionPenalty";
   resourceId: ResourceId;
@@ -277,9 +279,7 @@ export function isBuildingInactiveDueToCoal(
 }
 
 export function isDayShiftHour(state: GameState): boolean {
-  const hour = getGameHour(state.elapsedSeconds);
-
-  return hour >= 8 && hour < 22;
+  return isDaylightHour(state.elapsedSeconds);
 }
 
 export function isProductionShiftActive(state: GameState): boolean {
@@ -493,6 +493,15 @@ export function getResourceBreakdown(
       resourceId,
       ratePerSecond: -getContinuousShiftMoralePenaltyPerHour(state) /
         GAME_HOUR_REAL_SECONDS,
+    });
+  }
+
+  const environmentMoralePenaltyPerHour = getEnvironmentMoralePenaltyPerHour(state.environment);
+  if (resourceId === "morale" && environmentMoralePenaltyPerHour > 0) {
+    lines.push({
+      source: "environment",
+      resourceId,
+      ratePerSecond: -environmentMoralePenaltyPerHour / GAME_HOUR_REAL_SECONDS,
     });
   }
 
@@ -796,6 +805,11 @@ function getProductionDelta(
         deltaSeconds /
         GAME_HOUR_REAL_SECONDS;
   }
+
+  delta.morale = (delta.morale ?? 0) -
+    getEnvironmentMoralePenaltyPerHour(state.environment) *
+      deltaSeconds /
+      GAME_HOUR_REAL_SECONDS;
 
   if ((delta.food ?? 0) < 0 && state.resources.food <= 0) {
     delta.morale = (delta.morale ?? 0) - 0.08 * deltaSeconds;

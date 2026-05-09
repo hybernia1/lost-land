@@ -1,13 +1,14 @@
 import { buildingDefinitions } from "../data/buildings";
+import { ENVIRONMENT_INITIAL_DELAY_SECONDS } from "../data/environment";
 import { emptyResourceRecord } from "../data/resources";
 import { villagePlotDefinitions } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialQuestState } from "../systems/quests";
 import { SAVE_VERSION } from "../systems/save";
+import { gameConfig } from "./config";
 import type { BuildingId, BuildingState, GameState, ResourceId } from "./types";
 
-const STARTING_STOCK_RATIO = 1;
 const startingStockResources: ResourceId[] = ["food", "water", "material", "coal"];
 
 export function createInitialState(
@@ -60,6 +61,14 @@ export function createInitialState(
       starvationProgress: 0,
       dehydrationProgress: 0,
     },
+    environment: {
+      condition: "stable",
+      intensity: 1,
+      startedAt: 0,
+      endsAt: 0,
+      nextConditionAt: ENVIRONMENT_INITIAL_DELAY_SECONDS,
+      activeCrisis: null,
+    },
     buildings,
     village: {
       selectedPlotId: "plot-main",
@@ -79,7 +88,7 @@ export function createInitialState(
 function fillStartingStocks(state: GameState): void {
   for (const resourceId of startingStockResources) {
     state.resources[resourceId] = Math.floor(
-      state.capacities[resourceId] * STARTING_STOCK_RATIO,
+      state.capacities[resourceId] * gameConfig.simulation.startingStockRatio,
     );
   }
 }

@@ -70,12 +70,19 @@ patterns. Use `rg` / `rg --files` for searches when available.
 
 Keep game logic independent from rendering and UI.
 
+Global game tuning values belong in `src/game/config.ts` under the exported
+`gameConfig` object. Prefer importing that config into domain helpers and
+deriving named constants there, instead of scattering raw timing/cooldown values
+through systems. Keep static content definitions such as building stats, quest
+texts, and environment condition data in `src/data/`.
+
 Preferred structure once the app is created:
 
 ```txt
 src/
   main.ts
   game/
+    config.ts
     Game.ts
     GameState.ts
     tick.ts
@@ -187,6 +194,8 @@ cleanly instead of carrying compatibility branches.
   fast `24x`.
 - The visible game clock starts at 08:00 on a new game. One full in-game day
   lasts 45 real-time minutes at 1x speed.
+- Day/night lighting is derived from `src/game/time.ts`: day starts at 08:00,
+  dusk runs 20:00-22:00, night starts at 22:00, and dawn runs 06:00-08:00.
 - Keep survivor management simple: only workers, injured survivors, and troops.
   Workers can be assigned to buildings or become troops. Injured survivors can
   only be treated by the Clinic. Troops do not become injured; combat losses are
@@ -206,9 +215,15 @@ cleanly instead of carrying compatibility branches.
 - Do not use an ammo resource. Troops are currently a dummy/simple role until
   future random outside expeditions are designed.
 - Use a minimal 2D/2.5D visual style before investing in detailed art.
-- Building visuals currently live as canvas vector assets in
-  `src/render/buildingAssets.ts`. Keep individual building silhouettes readable
-  at small slot sizes and avoid moving game rules into visual asset code.
+- Building visuals load through `src/render/villageAssets.ts`. Real atlas
+  definitions live in `src/data/buildingVisuals.ts`; buildings without atlas
+  art still fall back to canvas vector assets in `src/render/buildingAssets.ts`.
+  Keep individual building silhouettes readable at small slot sizes and avoid
+  moving game rules into visual asset code.
+- The Main Building currently uses `src/assets/buildings/main-building-atlas.png`
+  as a `5x4` static atlas with 20 level frames at `256x256`. Do not animate the
+  building by cycling atlas frames; use Pixi effects for smoke, lights, weather,
+  radiation, disabled-power warnings, and similar state overlays.
 - The village screen renders through PixiJS. Keep menu, settings, and save/load
   flows in DOM for now, but avoid adding DOM fallback for in-game HUD, build
   modals, or scene overlays.

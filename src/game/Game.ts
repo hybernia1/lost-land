@@ -6,6 +6,7 @@ import {
   startBuildingUpgrade,
   tickBuildings,
 } from "../systems/buildings";
+import { normalizeEnvironmentState, tickEnvironment } from "../systems/environment";
 import { tickHealth } from "../systems/health";
 import { normalizeLogEntries } from "../systems/log";
 import { normalizeMarketState, tickMarket, tradeAtMarket as executeMarketTrade } from "../systems/market";
@@ -13,11 +14,10 @@ import { normalizeQuestState, resolveDecisionQuest, tickQuests } from "../system
 import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
 import { startScoutingMission, tickScouting } from "../systems/scouting";
 import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
+import { gameConfig } from "./config";
 import { createInitialState } from "./createInitialState";
-import type { BuildingId, DecisionOptionId, GameListener, GameSpeed, GameState, ResourceId, ScoutingMode } from "./types";
-
-const TICK_SECONDS = 1;
-const AUTOSAVE_REAL_SECONDS = 10;
+import { GAME_HOUR_REAL_SECONDS } from "./time";
+import type { BuildingId, DecisionOptionId, EnvironmentConditionId, GameListener, GameSpeed, GameState, ResourceId, ScoutingMode } from "./types";
 
 export class Game {
   private state: GameState;
@@ -37,8 +37,8 @@ export class Game {
     }
 
     this.intervalId = window.setInterval(() => {
-      this.tick(TICK_SECONDS);
-    }, TICK_SECONDS * 1000);
+      this.tick(gameConfig.simulation.tickSeconds);
+    }, gameConfig.simulation.tickSeconds * 1000);
 
     this.emit();
   }
@@ -136,6 +136,67 @@ export class Game {
     this.commit();
   }
 
+  devAddResources(amount: number): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    for (const resourceId of ["food", "water", "material", "coal"] as const) {
+      this.state.resources[resourceId] = Math.min(
+        this.state.capacities[resourceId],
+        this.state.resources[resourceId] + amount,
+      );
+    }
+    this.state.resources.morale = Math.min(100, this.state.resources.morale + Math.max(0, amount / 10));
+    this.commit();
+  }
+
+  devAddWorkers(count: number): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    this.state.survivors.workers += Math.max(1, Math.floor(count));
+    this.commit();
+  }
+
+  devSetEnvironment(condition: EnvironmentConditionId, intensity = 1): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const clampedIntensity = Math.max(1, Math.min(3, Math.floor(intensity)));
+    const durationSeconds = condition === "stable"
+      ? 0
+      : gameConfig.environment.devConditionDurationHours * GAME_HOUR_REAL_SECONDS;
+    this.state.environment = {
+      condition,
+      intensity: clampedIntensity,
+      startedAt: this.state.elapsedSeconds,
+      endsAt: this.state.elapsedSeconds + durationSeconds,
+      nextConditionAt: condition === "stable"
+        ? this.state.elapsedSeconds + gameConfig.environment.devConditionDurationHours * GAME_HOUR_REAL_SECONDS
+        : this.state.elapsedSeconds + durationSeconds,
+      activeCrisis: null,
+    };
+    tickEnvironment(this.state, 0);
+    this.commit();
+  }
+
+  devFinishActiveBuilds(): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    for (const building of Object.values(this.state.buildings)) {
+      if (building.upgradingRemaining > 0) {
+        building.upgradingRemaining = 1;
+      }
+    }
+    tickBuildings(this.state, 1);
+    this.commit();
+  }
+
   load(saveId?: string): boolean {
     const loadedState = loadGame(saveId);
 
@@ -169,6 +230,7 @@ export class Game {
     tickMarket(this.state, scaledDelta);
     tickQuests(this.state);
     tickScouting(this.state, scaledDelta);
+    tickEnvironment(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
     tickHealth(this.state, scaledDelta);
     this.autosaveIfDue();
@@ -183,7 +245,7 @@ export class Game {
   private autosaveIfDue(): void {
     const now = Date.now();
 
-    if (now - this.lastAutosaveAt < AUTOSAVE_REAL_SECONDS * 1000) {
+    if (now - this.lastAutosaveAt < gameConfig.simulation.autosaveRealSeconds * 1000) {
       return;
     }
 
@@ -210,6 +272,7 @@ function normalizeGameState(state: GameState): void {
   state.log = normalizeLogEntries(state.log ?? []);
   normalizeQuestState(state);
   normalizeMarketState(state);
+  normalizeEnvironmentState(state);
   state.scouting = {
     missions: Array.isArray(state.scouting?.missions)
       ? state.scouting.missions

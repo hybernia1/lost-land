@@ -109,6 +109,29 @@ export type GameSpeed = 1 | 24;
 
 export type WorkMode = "day" | "continuous";
 
+export type EnvironmentConditionId =
+  | "stable"
+  | "rain"
+  | "snowFront"
+  | "radiation";
+
+export type EnvironmentCrisisState = {
+  kind: "shelter";
+  startedAt: number;
+  deadlineAt: number;
+  initialHomeless: number;
+  lastWarningAt: number;
+};
+
+export type EnvironmentState = {
+  condition: EnvironmentConditionId;
+  intensity: number;
+  startedAt: number;
+  endsAt: number;
+  nextConditionAt: number;
+  activeCrisis: EnvironmentCrisisState | null;
+};
+
 export type ObjectiveQuestId =
   | "buildStorage"
   | "buildGenerator"
@@ -194,6 +217,7 @@ export type GameState = {
   scouting: ScoutingState;
   market: MarketState;
   health: HealthState;
+  environment: EnvironmentState;
   buildings: Record<BuildingId, BuildingState>;
   village: {
     selectedPlotId: string;
