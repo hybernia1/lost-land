@@ -180,12 +180,35 @@ function getTileLayers(
     throw new Error("Tiled map is missing tile layer \"terrain_base\".");
   }
 
-  return layers.map((layer) => ({
-    id: String(layer.id),
-    name: layer.name,
-    opacity: layer.opacity ?? 1,
-    tiles: getTerrainTiles(layer, gidToTile),
-  }));
+  return layers.map((layer) => {
+    validateTileLayer(map, layer);
+    const terrainTiles = getTerrainTiles(layer, gidToTile);
+
+    return {
+      id: String(layer.id),
+      name: layer.name,
+      opacity: layer.opacity ?? 1,
+      width: layer.width,
+      height: layer.height,
+      ...terrainTiles,
+    };
+  });
+}
+
+function validateTileLayer(map: TiledMap, layer: TiledTileLayer): void {
+  if (layer.width !== map.width || layer.height !== map.height) {
+    throw new Error(
+      `Tiled layer "${layer.name}" has size ${layer.width}x${layer.height}, expected ${map.width}x${map.height}.`,
+    );
+  }
+
+  const expectedTileCount = layer.width * layer.height;
+
+  if (layer.data.length !== expectedTileCount) {
+    throw new Error(
+      `Tiled layer "${layer.name}" has ${layer.data.length} tiles, expected ${expectedTileCount}.`,
+    );
+  }
 }
 
 function getObjectLayers(
@@ -207,21 +230,30 @@ function getObjectLayers(
 function getTerrainTiles(
   layer: TiledTileLayer,
   gidToTile: Map<number, GidTileReference>,
-): TerrainTilePlacement[] {
-  return layer.data.flatMap((rawGid, index) => {
+): Pick<TerrainTileLayerDefinition, "tiles" | "tileByIndex"> {
+  const tileByIndex: Array<TerrainTilePlacement | null> = [];
+  const tiles: TerrainTilePlacement[] = [];
+
+  layer.data.forEach((rawGid, index) => {
     const tile = getTileReference(rawGid, gidToTile);
 
     if (!tile) {
-      return [];
+      tileByIndex.push(null);
+      return;
     }
 
-    return [{
+    const placement = {
       x: index % layer.width,
       y: Math.floor(index / layer.width),
       tileId: tile.tileId,
       textureKey: tile.textureKey,
-    }];
+    };
+
+    tileByIndex.push(placement);
+    tiles.push(placement);
   });
+
+  return { tiles, tileByIndex };
 }
 
 function getMapObjects(

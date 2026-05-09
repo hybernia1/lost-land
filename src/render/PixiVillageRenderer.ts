@@ -655,41 +655,66 @@ export class PixiVillageRenderer {
     const terrainHeight = layout.height * scale;
     const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
     const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+    const visibleBounds = this.getVisibleWorldBounds();
+    const cullPadding = tileSize * 2;
 
     for (const layer of layout.tileLayers) {
-      for (const tile of layer.tiles) {
-        const gridX = tile.x;
-        const gridY = tile.y;
+      const minGridX = Math.max(0, Math.floor((visibleBounds.x - cullPadding - originX) / tileSize));
+      const minGridY = Math.max(0, Math.floor((visibleBounds.y - cullPadding - originY) / tileSize));
+      const maxGridX = Math.min(
+        layer.width - 1,
+        Math.ceil((visibleBounds.x + visibleBounds.width + cullPadding - originX) / tileSize),
+      );
+      const maxGridY = Math.min(
+        layer.height - 1,
+        Math.ceil((visibleBounds.y + visibleBounds.height + cullPadding - originY) / tileSize),
+      );
 
-        const texture = this.assets.getTerrainTileTexture(tile.textureKey);
+      if (minGridX > maxGridX || minGridY > maxGridY) {
+        continue;
+      }
 
-        if (!texture) {
-          continue;
+      for (let gridY = minGridY; gridY <= maxGridY; gridY += 1) {
+        for (let gridX = minGridX; gridX <= maxGridX; gridX += 1) {
+          const tile = layer.tileByIndex[gridY * layer.width + gridX];
+
+          if (!tile) {
+            continue;
+          }
+
+          const tileX = originX + gridX * tileSize;
+          const tileY = originY + gridY * tileSize;
+
+          const texture = this.assets.getTerrainTileTexture(tile.textureKey);
+
+          if (!texture) {
+            continue;
+          }
+
+          const sprite = new Sprite(texture);
+          const tileDefinition = layout.tileTextures[tile.textureKey];
+          const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
+
+          if (tint) {
+            sprite.tint = tint;
+          }
+
+          sprite.alpha = layer.opacity;
+
+          if (tile.rotation) {
+            sprite.anchor.set(0.5);
+            sprite.rotation = (tile.rotation * Math.PI) / 180;
+            sprite.x = tileX + tileSize / 2;
+            sprite.y = tileY + tileSize / 2;
+          } else {
+            sprite.x = tileX;
+            sprite.y = tileY;
+          }
+
+          sprite.width = tileSize + 0.5;
+          sprite.height = tileSize + 0.5;
+          this.cameraLayer.addChild(sprite);
         }
-
-        const sprite = new Sprite(texture);
-        const tileDefinition = layout.tileTextures[tile.textureKey];
-        const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
-
-        if (tint) {
-          sprite.tint = tint;
-        }
-
-        sprite.alpha = layer.opacity;
-
-        if (tile.rotation) {
-          sprite.anchor.set(0.5);
-          sprite.rotation = (tile.rotation * Math.PI) / 180;
-          sprite.x = originX + gridX * tileSize + tileSize / 2;
-          sprite.y = originY + gridY * tileSize + tileSize / 2;
-        } else {
-          sprite.x = originX + gridX * tileSize;
-          sprite.y = originY + gridY * tileSize;
-        }
-
-        sprite.width = tileSize + 0.5;
-        sprite.height = tileSize + 0.5;
-        this.cameraLayer.addChild(sprite);
       }
     }
   }
@@ -701,12 +726,28 @@ export class PixiVillageRenderer {
     const terrainHeight = layout.height * scale;
     const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
     const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+    const visibleBounds = this.getVisibleWorldBounds();
+    const cullPadding = layout.tileSize * scale * 2;
 
     for (const layer of layout.objectLayers.filter((candidate) => candidate.name === "decor")) {
       const objects = [...layer.objects].sort((left, right) => left.y - right.y);
 
       for (const object of objects) {
         if (!object.textureKey) {
+          continue;
+        }
+
+        const objectX = originX + object.x * scale;
+        const objectY = originY + object.y * scale;
+        const objectWidth = object.width * scale;
+        const objectHeight = object.height * scale;
+
+        if (
+          objectX + objectWidth < visibleBounds.x - cullPadding ||
+          objectX > visibleBounds.x + visibleBounds.width + cullPadding ||
+          objectY < visibleBounds.y - cullPadding ||
+          objectY - objectHeight > visibleBounds.y + visibleBounds.height + cullPadding
+        ) {
           continue;
         }
 
@@ -718,10 +759,10 @@ export class PixiVillageRenderer {
 
         const sprite = new Sprite(texture);
         sprite.anchor.set(0, 1);
-        sprite.x = originX + object.x * scale;
-        sprite.y = originY + object.y * scale;
-        sprite.width = object.width * scale;
-        sprite.height = object.height * scale;
+        sprite.x = objectX;
+        sprite.y = objectY;
+        sprite.width = objectWidth;
+        sprite.height = objectHeight;
         sprite.rotation = (object.rotation * Math.PI) / 180;
         sprite.alpha = object.opacity * layer.opacity;
         this.cameraLayer.addChild(sprite);
@@ -4915,6 +4956,17 @@ export class PixiVillageRenderer {
 
   private getHudPixelScale(width: number, height: number): number {
     return Math.min(HUD_MAX_PIXEL_SCALE, Math.max(1, Math.min(width / 1120, height / 640)));
+  }
+
+  private getVisibleWorldBounds(): Bounds {
+    const zoom = this.cameraZoom || 1;
+
+    return {
+      x: -this.cameraOffsetX / zoom,
+      y: -this.cameraOffsetY / zoom,
+      width: this.host.clientWidth / zoom,
+      height: this.host.clientHeight / zoom,
+    };
   }
 
   private getPlotBounds(plot: VillagePlotDefinition): Bounds {
