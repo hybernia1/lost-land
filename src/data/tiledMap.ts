@@ -96,6 +96,15 @@ type TiledTilesetRegistry = {
 };
 
 const GID_MASK = 0x0fffffff;
+const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
+const FLIPPED_VERTICALLY_FLAG = 0x40000000;
+const FLIPPED_DIAGONALLY_FLAG = 0x20000000;
+
+type TiledTileTransform = {
+  rotation?: 0 | 90 | 180 | 270;
+  flipX?: boolean;
+  flipY?: boolean;
+};
 
 export function createVillageLayoutFromTiled(
   id: string,
@@ -247,6 +256,7 @@ function getTerrainTiles(
       y: Math.floor(index / layer.width),
       tileId: tile.tileId,
       textureKey: tile.textureKey,
+      ...getTileTransform(rawGid),
     };
 
     tileByIndex.push(placement);
@@ -330,6 +340,37 @@ function getTileReference(rawGid: number, gidToTile: Map<number, GidTileReferenc
   }
 
   return tile;
+}
+
+function getTileTransform(rawGid: number): TiledTileTransform {
+  const horizontal = (rawGid & FLIPPED_HORIZONTALLY_FLAG) !== 0;
+  const vertical = (rawGid & FLIPPED_VERTICALLY_FLAG) !== 0;
+  const diagonal = (rawGid & FLIPPED_DIAGONALLY_FLAG) !== 0;
+
+  if (!horizontal && !vertical && !diagonal) {
+    return {};
+  }
+
+  if (!diagonal) {
+    return {
+      flipX: horizontal || undefined,
+      flipY: vertical || undefined,
+    };
+  }
+
+  if (horizontal && vertical) {
+    return { rotation: 90, flipY: true };
+  }
+
+  if (horizontal) {
+    return { rotation: 90 };
+  }
+
+  if (vertical) {
+    return { rotation: 270 };
+  }
+
+  return { rotation: 90, flipX: true };
 }
 
 function getEnvironmentTint(tileId: string): TerrainTextureDefinition["tintByEnvironment"] {

@@ -9,6 +9,8 @@ export type TerrainTilePlacement = {
   tileId: TerrainTileId;
   textureKey: TerrainTextureKey;
   rotation?: 0 | 90 | 180 | 270;
+  flipX?: boolean;
+  flipY?: boolean;
 };
 
 export type TerrainTileLayerDefinition = {
