@@ -15,7 +15,7 @@ import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/d
 import { objectiveQuestById } from "../data/quests";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
-import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
+import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, EnvironmentConditionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
@@ -66,7 +66,9 @@ import {
   decisionProfileAxes,
   getActiveObjectiveQuests,
   getDecisionProfileAxisValue,
+  getDecisionProfileKind,
   getObjectiveQuestProgress,
+  type DecisionProfileKind,
 } from "../systems/quests";
 import { SCOUTING_CARRY_PER_TROOP, SCOUTING_DURATION_SECONDS, getScoutingTroopCount } from "../systems/scouting";
 import { drawPixiIcon } from "./pixiIcons";
@@ -111,6 +113,49 @@ type EffectLine = {
   value: string;
   tooltip: string;
   negative?: boolean;
+};
+
+type BrandAlert = {
+  iconId: string;
+  label?: string;
+  tooltip?: string;
+  tone: "cold" | "danger" | "warning" | "neutral";
+};
+
+type ActiveEnvironmentConditionId = Exclude<EnvironmentConditionId, "stable">;
+
+const decisionProfileIconByKind: Record<DecisionProfileKind, string> = {
+  noData: "profile-no-data",
+  balanced: "profile-balanced",
+  philanthropist: "profile-philanthropist",
+  principled: "profile-principled",
+  merciful: "profile-merciful",
+  security: "profile-security",
+  open: "profile-open",
+  cautious: "profile-cautious",
+};
+
+const decisionProfileLabelKeyByKind: Record<DecisionProfileKind, string> = {
+  noData: "profileNoData",
+  balanced: "profileBalanced",
+  philanthropist: "profilePhilanthropist",
+  principled: "profilePrincipled",
+  merciful: "profileMerciful",
+  security: "profileSecurity",
+  open: "profileOpen",
+  cautious: "profileCautious",
+};
+
+const environmentAlertIconByCondition: Record<ActiveEnvironmentConditionId, string> = {
+  rain: "crisis-rain",
+  snowFront: "crisis-snow",
+  radiation: "crisis-radiation",
+};
+
+const environmentAlertToneByCondition: Record<ActiveEnvironmentConditionId, BrandAlert["tone"]> = {
+  rain: "neutral",
+  snowFront: "cold",
+  radiation: "danger",
 };
 
 type DecisionHistoryRow = {
@@ -699,7 +744,19 @@ export class PixiVillageRenderer {
     const moraleRate = this.getHourlyRateLabel(rates.morale);
     const moraleRateColor = this.getRateColor(rates.morale);
 
-    this.drawBrand(state.communityName, `${t?.ui.day ?? "Day"} ${day} / ${clock}`);
+    const profileKind = getDecisionProfileKind(state);
+    const profileLabel = t ? this.getDecisionProfileOverallLabel(state, t) : undefined;
+    const profileTooltip = t && profileLabel
+      ? `${t.ui.leadershipProfile ?? "Leadership profile"}\n${profileLabel}`
+      : undefined;
+
+    this.drawBrand(
+      state.communityName,
+      `${t?.ui.day ?? "Day"} ${day} / ${clock}`,
+      decisionProfileIconByKind[profileKind],
+      profileTooltip,
+      this.getBrandAlerts(state, t),
+    );
     this.drawTopPills(
       [
         {
@@ -716,11 +773,6 @@ export class PixiVillageRenderer {
           action: { action: "open-survivor-overview" },
         },
         { iconId: "shield", label: `${Math.round(this.getDefenseScore(state))}`, tooltip: t?.ui.defenseTooltip },
-        {
-          iconId: "shield",
-          label: this.getEnvironmentLabel(state, t),
-          tooltip: this.getEnvironmentTooltip(state, t),
-        },
         {
           iconId: "morale",
           label: `${Math.floor(state.resources.morale)}%`,
@@ -741,7 +793,13 @@ export class PixiVillageRenderer {
     this.drawToolbar(state, translations, width, height);
   }
 
-  private drawBrand(title: string, subtitle: string): void {
+  private drawBrand(
+    title: string,
+    subtitle: string,
+    iconId: string,
+    tooltip?: string,
+    alerts: BrandAlert[] = [],
+  ): void {
     const layer = new Container();
     layer.x = 28;
     layer.y = 22;
@@ -750,7 +808,11 @@ export class PixiVillageRenderer {
     const mark = new Graphics();
     mark.roundRect(0, 0, 52, 52, 8).fill({ color: 0x141611, alpha: 0.76 }).stroke({ color: 0xe0c46f, alpha: 0.5, width: 2 });
     layer.addChild(mark);
-    this.drawIcon(layer, "shield", 26, 26, 28);
+    this.drawIcon(layer, iconId, 26, 26, 30);
+    if (tooltip) {
+      mark.hitArea = new Rectangle(0, 0, 52, 52);
+      this.bindTooltip(mark, tooltip);
+    }
     this.drawText(layer, title.toUpperCase(), 64, 4, {
       fill: 0xf5efdf,
       fontSize: 33,
@@ -761,41 +823,154 @@ export class PixiVillageRenderer {
       fontSize: 12,
       fontWeight: "700",
     });
+
+    this.drawBrandAlerts(layer, alerts, 0, 62);
   }
 
-  private getEnvironmentLabel(state: GameState, translations?: TranslationPack): string {
-    const definition = getEnvironmentDefinition(state.environment.condition);
-    const baseLabel = translations?.ui[definition.labelKey] ?? definition.id;
+  private drawBrandAlerts(parent: Container, alerts: BrandAlert[], x: number, y: number): void {
+    let cursorX = x;
 
-    if (state.environment.condition === "stable") {
-      return baseLabel;
+    for (const alert of alerts.slice(0, 4)) {
+      const badge = this.createBrandAlertBadge(alert);
+      badge.x = cursorX;
+      badge.y = y;
+      parent.addChild(badge);
+      cursorX += badge.width + 6;
     }
-
-    return `${baseLabel} ${state.environment.intensity}`;
   }
 
-  private getEnvironmentTooltip(state: GameState, translations?: TranslationPack): string | undefined {
-    if (!translations) {
-      return undefined;
+  private createBrandAlertBadge(alert: BrandAlert): Container {
+    const group = new Container();
+    const label = alert.label
+      ? new Text({
+        text: alert.label,
+        style: {
+          fill: 0xf5efdf,
+          fontFamily: "Inter, Arial, sans-serif",
+          fontSize: 13,
+          fontWeight: "900",
+        },
+      })
+      : null;
+    const width = label ? Math.max(62, label.width + 42) : 40;
+    const height = 36;
+    const colors = this.getBrandAlertColors(alert.tone);
+    const background = new Graphics();
+    background.roundRect(0, 0, width, height, 8)
+      .fill({ color: colors.fill, alpha: 0.82 })
+      .stroke({ color: colors.stroke, alpha: 0.78, width: 1.5 });
+    group.addChild(background);
+    this.drawIcon(group, alert.iconId, 20, height / 2, 21);
+
+    if (label) {
+      label.x = 38;
+      label.y = 10;
+      group.addChild(label);
     }
 
-    const definition = getEnvironmentDefinition(state.environment.condition);
-    const label = translations.ui[definition.labelKey] ?? definition.id;
-    const lines = [
-      `${translations.ui.environment}: ${label}`,
-      `${translations.ui.environmentIntensity}: ${state.environment.intensity}`,
-    ];
-
-    if (state.environment.condition !== "stable") {
-      lines.push(`${translations.ui.environmentEndsIn}: ${this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds))}`);
+    if (alert.tooltip) {
+      group.hitArea = new Rectangle(0, 0, width, height);
+      this.bindTooltip(group, alert.tooltip);
     }
 
+    return group;
+  }
+
+  private getBrandAlertColors(tone: BrandAlert["tone"]): { fill: number; stroke: number } {
+    if (tone === "cold") {
+      return { fill: 0x12232d, stroke: 0x86c4df };
+    }
+
+    if (tone === "danger") {
+      return { fill: 0x2c1715, stroke: 0xd26858 };
+    }
+
+    if (tone === "warning") {
+      return { fill: 0x2a2412, stroke: 0xe0c46f };
+    }
+
+    return { fill: 0x141611, stroke: 0x9fc0ba };
+  }
+
+  private getBrandAlerts(state: GameState, translations?: TranslationPack): BrandAlert[] {
+    const alerts: BrandAlert[] = [];
+    const condition = state.environment.condition;
     const crisis = state.environment.activeCrisis;
+
     if (crisis?.kind === "shelter") {
-      lines.push(`${translations.ui.shelterCrisis}: ${this.formatScoutingRemaining(Math.max(0, crisis.deadlineAt - state.elapsedSeconds))}`);
+      const remaining = this.formatScoutingRemaining(Math.max(0, crisis.deadlineAt - state.elapsedSeconds));
+      const tooltip = translations
+        ? `${translations.ui.shelterCrisis}: ${remaining}`
+        : `Shelter crisis: ${remaining}`;
+
+      alerts.push({
+        iconId: "crisis-shelter",
+        label: remaining,
+        tooltip,
+        tone: "warning",
+      });
     }
 
-    return lines.join("\n");
+    if (condition !== "stable") {
+      const definition = getEnvironmentDefinition(condition);
+      const conditionLabel = translations?.ui[definition.labelKey] ?? definition.id;
+      const remaining = this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
+      const tooltip = translations
+        ? [
+          `${translations.ui.environment}: ${conditionLabel}`,
+          `${translations.ui.environmentIntensity}: ${state.environment.intensity}`,
+          `${translations.ui.environmentEndsIn}: ${remaining}`,
+        ].join("\n")
+        : conditionLabel;
+
+      alerts.push({
+        iconId: environmentAlertIconByCondition[condition],
+        tooltip,
+        tone: environmentAlertToneByCondition[condition],
+      });
+      alerts.push({
+        iconId: "crisis-countdown",
+        label: remaining,
+        tooltip,
+        tone: condition === "radiation" ? "danger" : "warning",
+      });
+    }
+
+    const housing = getHousingStatus(state);
+    if (housing.homeless > 0) {
+      const tooltip = translations
+        ? [
+          `${translations.ui.homeless}: ${housing.homeless}`,
+          `${translations.ui.housed}: ${housing.housed}/${housing.civilianCapacity + this.getTroopHousingCapacity(state)}`,
+          translations.ui.housingTooltip,
+        ].join("\n")
+        : `Homeless: ${housing.homeless}`;
+
+      alerts.push({
+        iconId: "crisis-homeless",
+        label: `${housing.homeless}`,
+        tooltip,
+        tone: "warning",
+      });
+    }
+
+    if (state.health.injured > 0) {
+      const tooltip = translations
+        ? [
+          `${translations.roles.injured}: ${state.health.injured}`,
+          `${translations.buildings.clinic.name}: ${translations.buildings.clinic.description}`,
+        ].join("\n")
+        : `Injured: ${state.health.injured}`;
+
+      alerts.push({
+        iconId: "crisis-injured",
+        label: `${state.health.injured}`,
+        tooltip,
+        tone: "danger",
+      });
+    }
+
+    return alerts;
   }
 
   private getDaylightTooltip(state: GameState, translations?: TranslationPack): string | undefined {
@@ -996,7 +1171,8 @@ export class PixiVillageRenderer {
       fontSize: 13,
       fontWeight: "900",
     });
-    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 28, 94, {
+    this.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, 106, 24);
+    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 62, 94, {
       fill: 0xf1df9a,
       fontSize: 20,
       fontWeight: "900",
@@ -1313,25 +1489,7 @@ export class PixiVillageRenderer {
   }
 
   private getDecisionProfileOverallLabel(state: GameState, translations: TranslationPack): string {
-    if (state.quests.decisionHistory.length === 0) {
-      return translations.ui.profileNoData ?? "No profile yet";
-    }
-
-    const strongest = decisionProfileAxes
-      .map((axis) => ({
-        axis,
-        value: getDecisionProfileAxisValue(state, axis.id),
-      }))
-      .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))[0];
-
-    if (!strongest || Math.abs(strongest.value) < 18) {
-      return translations.ui.profileBalanced ?? "Balanced leadership";
-    }
-
-    const key = strongest.value < 0
-      ? strongest.axis.leftLabelKey
-      : strongest.axis.rightLabelKey;
-
+    const key = decisionProfileLabelKeyByKind[getDecisionProfileKind(state)];
     return translations.ui[key] ?? key;
   }
 
