@@ -6,6 +6,7 @@ import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
 import type { PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
+import type { GodModeController } from "../dev/godMode";
 
 type AppMode = "menu" | "new-game" | "load-game" | "settings" | "game";
 
@@ -20,6 +21,8 @@ export class App {
   private renderQueued = false;
   private tooltipTarget: HTMLElement | null = null;
   private suppressVillageClickUntil = 0;
+  private readonly handleWindowKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
+  private godMode: GodModeController | null = null;
 
   constructor(
     private readonly root: HTMLDivElement,
@@ -33,7 +36,7 @@ export class App {
     this.root.addEventListener("mouseout", (event) => this.handleTooltipOut(event));
     this.root.addEventListener("focusin", (event) => this.handleTooltipFocus(event));
     this.root.addEventListener("focusout", () => this.hideTooltip());
-    this.root.addEventListener("keydown", (event) => this.handleKeyDown(event));
+    window.addEventListener("keydown", this.handleWindowKeyDown);
     window.addEventListener("resize", () => this.requestRender());
     this.game.subscribe((state) => {
       this.state = state;
@@ -202,6 +205,7 @@ export class App {
     );
 
     this.updateShellMode();
+    this.godMode?.update(this.state);
   }
 
   private renderGameShell(): void {
@@ -231,6 +235,7 @@ export class App {
     };
     villageScene.addEventListener("pixi-action", handlePixiAction);
     this.shellReady = true;
+    this.installGodMode();
   }
 
   private updateShellMode(): void {
@@ -569,6 +574,8 @@ export class App {
     this.mode = "menu";
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
+    this.godMode?.destroy();
+    this.godMode = null;
     this.game.stop();
     this.destroyVillageRenderer();
     this.shellReady = false;
@@ -653,5 +660,22 @@ export class App {
 
   private t(): TranslationPack {
     return packs[this.locale];
+  }
+
+  private installGodMode(): void {
+    if (!import.meta.env.DEV || this.godMode) {
+      return;
+    }
+
+    void import("../dev/godMode").then(({ installGodMode }) => {
+      if (!this.shellReady || this.godMode) {
+        return;
+      }
+
+      this.godMode = installGodMode(this.root, this.game);
+      if (this.state) {
+        this.godMode.update(this.state);
+      }
+    });
   }
 }

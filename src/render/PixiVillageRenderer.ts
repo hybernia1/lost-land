@@ -1,21 +1,20 @@
 import {
   Application,
-  Assets,
   Container,
   Graphics,
   Rectangle,
   Text,
   Sprite,
-  Texture,
   type TextStyleFontWeight,
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
-import { buildingVisualDefinitions, getBuildingVisualFrame } from "../data/buildingVisuals";
+import { getBuildingVisualLevel, getBuildingVisualPhase } from "../data/buildingVisuals";
+import { getEnvironmentDefinition } from "../data/environment";
 import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
 import { objectiveQuestById } from "../data/quests";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
-import { formatGameClock, GAME_HOUR_REAL_SECONDS, getGameDay } from "../game/time";
+import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
 import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
@@ -70,9 +69,8 @@ import {
   getObjectiveQuestProgress,
 } from "../systems/quests";
 import { SCOUTING_CARRY_PER_TROOP, SCOUTING_DURATION_SECONDS, getScoutingTroopCount } from "../systems/scouting";
-import villageBackgroundUrl from "../assets/village-bg.webp";
-import { drawBuildingAsset } from "./buildingAssets";
 import { drawPixiIcon } from "./pixiIcons";
+import { VillageAssets } from "./villageAssets";
 
 type SceneLayout = {
   originX: number;
@@ -186,7 +184,7 @@ type TabOptions<T extends string> = {
 
 type MainBuildingEffect = {
   phase: number;
-  bounds: Bounds;
+  effectBounds: Bounds;
   base: Graphics;
   lights: Graphics;
   smoke: Graphics;
@@ -210,8 +208,6 @@ const resourceColors: Record<ResourceId, number> = {
 const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 
-const buildingTextureCache = new Map<string, Texture>();
-
 function upgradingTooltip(
   name: string,
   level: number,
@@ -224,14 +220,17 @@ function upgradingTooltip(
   return `${name} / ${status}`;
 }
 
+function capitalize(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
 export class PixiVillageRenderer {
   private app: Application | null = null;
   private readonly rootLayer = new Container();
   private readonly worldLayer = new Container();
   private readonly hudLayer = new Container();
   private readonly tooltipLayer = new Container();
-  private readonly buildingSpritesheets = new Map<BuildingId, Texture>();
-  private backgroundTexture: Texture | null = null;
+  private readonly assets = new VillageAssets();
   private mainBuildingEffects: MainBuildingEffect[] = [];
   private layout: SceneLayout = {
     originX: 0,
@@ -316,7 +315,8 @@ export class PixiVillageRenderer {
     this.decisionHistoryScrollArea = null;
     this.decisionHistoryScrollMax = 0;
     this.hudLayer.scale.set(hudScale);
-    this.drawBackground(width, height);
+    this.drawBackground(state, width, height);
+    this.drawEnvironmentOverlay(state, width, height, visualTime);
     this.drawPalisade(state, translations);
 
     for (const plot of villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter")) {
@@ -324,6 +324,7 @@ export class PixiVillageRenderer {
     }
 
     this.drawGate(state);
+    this.drawDaylightOverlay(state, width, height);
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
@@ -472,30 +473,15 @@ export class PixiVillageRenderer {
     app.ticker.add(() => this.updateMainBuildingEffects());
     this.app = app;
 
-    const [backgroundTexture] = await Promise.all([
-      Assets.load<Texture>(villageBackgroundUrl),
-      this.loadBuildingSpritesheets(),
-    ]);
-    this.backgroundTexture = backgroundTexture;
+    await this.assets.load();
     this.requestRender();
   }
 
-  private async loadBuildingSpritesheets(): Promise<void> {
-    await Promise.all(
-      Object.entries(buildingVisualDefinitions).map(async ([buildingId, visual]) => {
-        if (!visual) {
-          return;
-        }
+  private drawBackground(state: GameState, width: number, height: number): void {
+    const backgroundTexture = this.assets.getBackgroundTexture(state.environment.condition);
 
-        const texture = await Assets.load<Texture>(visual.spritesheetUrl);
-        this.buildingSpritesheets.set(buildingId as BuildingId, texture);
-      }),
-    );
-  }
-
-  private drawBackground(width: number, height: number): void {
-    if (this.backgroundTexture) {
-      const sprite = new Sprite(this.backgroundTexture);
+    if (backgroundTexture) {
+      const sprite = new Sprite(backgroundTexture);
       const scale = Math.max(width / sprite.texture.width, height / sprite.texture.height);
       sprite.width = sprite.texture.width * scale;
       sprite.height = sprite.texture.height * scale;
@@ -620,7 +606,7 @@ export class PixiVillageRenderer {
         .fill({ color: 0x000000, alpha: 0.36 });
       plotLayer.addChild(shadow);
 
-      const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
+      const asset = new Sprite(this.assets.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
       asset.anchor.set(0.5);
       this.fitSprite(
         asset,
@@ -713,7 +699,11 @@ export class PixiVillageRenderer {
     this.drawBrand(state.communityName, `${t?.ui.day ?? "Day"} ${day} / ${clock}`);
     this.drawTopPills(
       [
-        { iconId: "clock", label: `${t?.ui.day ?? "Day"} ${day} / ${clock}`, tooltip: t?.ui.dayTooltip },
+        {
+          iconId: "clock",
+          label: `${t?.ui.day ?? "Day"} ${day} / ${clock}`,
+          tooltip: this.getDaylightTooltip(state, t),
+        },
         {
           iconId: "people",
           label: `${population}`,
@@ -723,6 +713,11 @@ export class PixiVillageRenderer {
           action: { action: "open-survivor-overview" },
         },
         { iconId: "shield", label: `${Math.round(this.getDefenseScore(state))}`, tooltip: t?.ui.defenseTooltip },
+        {
+          iconId: "shield",
+          label: this.getEnvironmentLabel(state, t),
+          tooltip: this.getEnvironmentTooltip(state, t),
+        },
         {
           iconId: "morale",
           label: `${Math.floor(state.resources.morale)}%`,
@@ -763,6 +758,56 @@ export class PixiVillageRenderer {
       fontSize: 12,
       fontWeight: "700",
     });
+  }
+
+  private getEnvironmentLabel(state: GameState, translations?: TranslationPack): string {
+    const definition = getEnvironmentDefinition(state.environment.condition);
+    const baseLabel = translations?.ui[definition.labelKey] ?? definition.id;
+
+    if (state.environment.condition === "stable") {
+      return baseLabel;
+    }
+
+    return `${baseLabel} ${state.environment.intensity}`;
+  }
+
+  private getEnvironmentTooltip(state: GameState, translations?: TranslationPack): string | undefined {
+    if (!translations) {
+      return undefined;
+    }
+
+    const definition = getEnvironmentDefinition(state.environment.condition);
+    const label = translations.ui[definition.labelKey] ?? definition.id;
+    const lines = [
+      `${translations.ui.environment}: ${label}`,
+      `${translations.ui.environmentIntensity}: ${state.environment.intensity}`,
+    ];
+
+    if (state.environment.condition !== "stable") {
+      lines.push(`${translations.ui.environmentEndsIn}: ${this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds))}`);
+    }
+
+    const crisis = state.environment.activeCrisis;
+    if (crisis?.kind === "shelter") {
+      lines.push(`${translations.ui.shelterCrisis}: ${this.formatScoutingRemaining(Math.max(0, crisis.deadlineAt - state.elapsedSeconds))}`);
+    }
+
+    return lines.join("\n");
+  }
+
+  private getDaylightTooltip(state: GameState, translations?: TranslationPack): string | undefined {
+    if (!translations) {
+      return undefined;
+    }
+
+    const daylight = getDaylightState(state.elapsedSeconds);
+    const phaseLabel = translations.ui[`daylight${capitalize(daylight.phase)}`] ?? daylight.phase;
+
+    return [
+      translations.ui.dayTooltip,
+      `${translations.ui.daylightPhase ?? "Light"}: ${phaseLabel}`,
+      `${translations.ui.daylightSchedule ?? "Day"}: ${DAY_START_HOUR}:00-${NIGHT_START_HOUR}:00`,
+    ].join("\n");
   }
 
   private drawTopPills(
@@ -1855,7 +1900,102 @@ export class PixiVillageRenderer {
       return translations.ui.moraleContinuousShifts;
     }
 
+    if (line.source === "environment") {
+      return translations.ui.environment;
+    }
+
     return translations.ui.moraleWaterShortage;
+  }
+
+  private drawEnvironmentOverlay(
+    state: GameState,
+    width: number,
+    height: number,
+    visualTime: number,
+  ): void {
+    const condition = state.environment.condition;
+
+    if (condition === "stable") {
+      return;
+    }
+
+    const intensity = Math.max(1, Math.min(3, state.environment.intensity));
+    const overlay = new Graphics();
+    const color = condition === "radiation"
+      ? 0xa7d85f
+      : condition === "snowFront"
+        ? 0xdde8ef
+        : 0x5d86a3;
+    const alpha = condition === "radiation"
+      ? 0.05 + intensity * 0.035
+      : condition === "snowFront"
+        ? 0.06 + intensity * 0.025
+        : 0.05 + intensity * 0.02;
+
+    overlay.rect(0, 0, width, height).fill({ color, alpha });
+
+    if (condition === "rain") {
+      const spacing = Math.max(28, 48 - intensity * 6);
+      const drift = (visualTime * 70) % spacing;
+      for (let x = -width; x < width * 1.4; x += spacing) {
+        overlay.moveTo(x + drift, 0);
+        overlay.lineTo(x + drift + height * 0.42, height);
+      }
+      overlay.stroke({ color: 0x9fc6d8, alpha: 0.15 + intensity * 0.05, width: 1 });
+    }
+
+    if (condition === "snowFront") {
+      const spacing = Math.max(34, 58 - intensity * 7);
+      const drift = (visualTime * 16) % spacing;
+      for (let x = 0; x < width; x += spacing) {
+        for (let y = -spacing; y < height; y += spacing) {
+          overlay.circle(x + Math.sin(y * 0.04 + visualTime) * 8, y + drift, 1.2 + intensity * 0.35)
+            .fill({ color: 0xffffff, alpha: 0.18 + intensity * 0.05 });
+        }
+      }
+    }
+
+    if (condition === "radiation") {
+      const spacing = Math.max(24, 42 - intensity * 5);
+      const offset = (visualTime * 20) % spacing;
+      for (let y = offset; y < height; y += spacing) {
+        overlay.moveTo(0, y);
+        overlay.lineTo(width, y + Math.sin(y * 0.02) * 4);
+      }
+      overlay.stroke({ color: 0xcdfb84, alpha: 0.08 + intensity * 0.03, width: 1 });
+    }
+
+    this.worldLayer.addChild(overlay);
+  }
+
+  private drawDaylightOverlay(state: GameState, width: number, height: number): void {
+    const daylight = getDaylightState(state.elapsedSeconds);
+
+    if (daylight.darkness <= 0) {
+      return;
+    }
+
+    const overlay = new Graphics();
+    overlay.eventMode = "none";
+
+    const tint = daylight.phase === "dusk"
+      ? 0x211920
+      : daylight.phase === "dawn"
+        ? 0x17212c
+        : 0x07111f;
+
+    overlay.rect(0, 0, width, height)
+      .fill({ color: tint, alpha: daylight.darkness });
+
+    if (daylight.phase === "dusk" || daylight.phase === "dawn") {
+      overlay.rect(0, height * 0.56, width, height * 0.44)
+        .fill({
+          color: daylight.phase === "dusk" ? 0x5f3927 : 0x31475c,
+          alpha: Math.min(0.1, daylight.darkness * 0.22),
+        });
+    }
+
+    this.worldLayer.addChild(overlay);
   }
 
   private drawQuestDecisionModal(
@@ -2257,7 +2397,7 @@ export class PixiVillageRenderer {
     parent.addChild(row);
     this.drawPanel(row, 0, 0, options.width, options.height);
 
-    const asset = new Sprite(this.getBuildingTexture(options.buildingId, options.level, options.built));
+    const asset = new Sprite(this.assets.getBuildingTexture(options.buildingId, options.level, options.built));
     asset.anchor.set(0.5);
     asset.x = 72;
     asset.y = options.height / 2;
@@ -2347,7 +2487,7 @@ export class PixiVillageRenderer {
     const titleWidth = modalWidth - titleX - sideMargin;
     const bodyWidth = modalWidth - sideMargin * 2;
 
-    const asset = new Sprite(this.getBuildingTexture(buildingId, Math.max(1, level), level > 0));
+    const asset = new Sprite(this.assets.getBuildingTexture(buildingId, Math.max(1, level), level > 0));
     asset.anchor.set(0.5);
     asset.x = sideMargin + 54;
     asset.y = contentTop + 50;
@@ -4130,7 +4270,8 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const phase = getBuildingVisualFrame(buildingId, level);
+    const phase = getBuildingVisualPhase(level);
+    const effectBounds = this.getMainBuildingEffectBounds(level, bounds);
     const effects = new Container();
     effects.eventMode = "none";
     const base = new Graphics();
@@ -4142,12 +4283,26 @@ export class PixiVillageRenderer {
     effects.addChild(base);
     effects.addChild(lights);
     effects.addChild(smoke);
-    this.drawMainBuildingBaseGlow(base, phase, bounds, visualTime);
-    this.drawMainBuildingLights(lights, phase, bounds, visualTime);
-    this.drawMainBuildingSmoke(smoke, phase, bounds, visualTime);
-    this.mainBuildingEffects.push({ phase, bounds, base, lights, smoke });
+    this.drawMainBuildingBaseGlow(base, phase, effectBounds, visualTime);
+    this.drawMainBuildingLights(lights, phase, effectBounds, visualTime);
+    this.drawMainBuildingSmoke(smoke, phase, effectBounds, visualTime);
+    this.mainBuildingEffects.push({ phase, effectBounds, base, lights, smoke });
 
     parent.addChild(effects);
+  }
+
+  private getMainBuildingEffectBounds(level: number, plotBounds: Bounds): Bounds {
+    const progress = (getBuildingVisualLevel(level) - 1) / 19;
+    const width = plotBounds.width * (0.58 + progress * 0.58);
+    const height = plotBounds.height * (0.42 + progress * 0.48);
+    const baseY = plotBounds.height * (0.34 - progress * 0.02);
+
+    return {
+      x: -width / 2,
+      y: baseY - height,
+      width,
+      height,
+    };
   }
 
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
@@ -4324,9 +4479,11 @@ export class PixiVillageRenderer {
   ): void {
     const baseGlowAlpha = 0.08 + phase * 0.025;
     const lightPulse = 0.75 + Math.sin(visualTime * 4.4 + phase) * 0.18;
+    const centerX = bounds.x + bounds.width / 2;
+    const baseY = bounds.y + bounds.height * 0.9;
 
     graphics.clear()
-      .ellipse(0, bounds.height * 0.3, bounds.width * (0.18 + phase * 0.035), bounds.height * 0.07)
+      .ellipse(centerX, baseY, bounds.width * (0.26 + phase * 0.025), bounds.height * 0.085)
       .fill({ color: 0xf0c766, alpha: baseGlowAlpha * lightPulse });
   }
 
@@ -4338,18 +4495,18 @@ export class PixiVillageRenderer {
   ): void {
     graphics.clear();
     const positions = [
-      { x: -0.2, y: 0.03, delay: 0 },
-      { x: -0.04, y: -0.1, delay: 1.1 },
-      { x: 0.17, y: 0.0, delay: 2.2 },
-      { x: 0.28, y: -0.14, delay: 3.1 },
+      { x: 0.28, y: 0.62, delay: 0 },
+      { x: 0.45, y: 0.46, delay: 1.1 },
+      { x: 0.64, y: 0.56, delay: 2.2 },
+      { x: 0.76, y: 0.38, delay: 3.1 },
     ];
 
     for (let index = 0; index <= Math.min(phase, positions.length - 1); index += 1) {
       const position = positions[index];
       const flicker = 0.58 + Math.sin(visualTime * 7.2 + position.delay) * 0.22 +
         Math.sin(visualTime * 13.4 + position.delay) * 0.08;
-      const x = bounds.width * position.x;
-      const y = bounds.height * position.y;
+      const x = bounds.x + bounds.width * position.x;
+      const y = bounds.y + bounds.height * position.y;
       const radius = Math.max(2, (3.3 + phase * 0.25) * this.layout.scale);
 
       graphics
@@ -4374,8 +4531,8 @@ export class PixiVillageRenderer {
     const sourceCount = Math.min(3, 1 + Math.floor(phase / 2));
 
     for (let source = 0; source < sourceCount; source += 1) {
-      const sourceX = bounds.width * (-0.06 + source * 0.11);
-      const sourceY = -bounds.height * (0.32 + source * 0.03);
+      const sourceX = bounds.x + bounds.width * (0.46 + source * 0.11);
+      const sourceY = bounds.y + bounds.height * (0.2 + source * 0.035);
 
       for (let puff = 0; puff < 4; puff += 1) {
         const progress = (visualTime * (0.13 + source * 0.02) + puff * 0.25 + source * 0.17) % 1;
@@ -4396,7 +4553,11 @@ export class PixiVillageRenderer {
     for (let index = 0; index < phase; index += 1) {
       const blink = 0.45 + Math.sin(visualTime * 5 + index) * 0.2;
       graphics
-        .circle(bounds.width * 0.08, -bounds.height * (0.34 + index * 0.055), Math.max(1.5, 2.3 * this.layout.scale))
+        .circle(
+          bounds.x + bounds.width * 0.6,
+          bounds.y + bounds.height * (0.18 - index * 0.06),
+          Math.max(1.5, 2.3 * this.layout.scale),
+        )
         .fill({ color: 0x9bd8ff, alpha: 0.12 * blink });
     }
   }
@@ -4415,82 +4576,10 @@ export class PixiVillageRenderer {
 
     const visualTime = performance.now() / 1000;
     for (const effect of this.mainBuildingEffects) {
-      this.drawMainBuildingBaseGlow(effect.base, effect.phase, effect.bounds, visualTime);
-      this.drawMainBuildingLights(effect.lights, effect.phase, effect.bounds, visualTime);
-      this.drawMainBuildingSmoke(effect.smoke, effect.phase, effect.bounds, visualTime);
+      this.drawMainBuildingBaseGlow(effect.base, effect.phase, effect.effectBounds, visualTime);
+      this.drawMainBuildingLights(effect.lights, effect.phase, effect.effectBounds, visualTime);
+      this.drawMainBuildingSmoke(effect.smoke, effect.phase, effect.effectBounds, visualTime);
     }
-  }
-
-  private getBuildingTexture(buildingId: BuildingId, level: number, built: boolean): Texture {
-    const spritesheetTexture = this.getSpritesheetBuildingTexture(buildingId, level, built);
-
-    if (spritesheetTexture) {
-      return spritesheetTexture;
-    }
-
-    const key = `${buildingId}:${level}:${built ? "built" : "ghost"}`;
-    const cached = buildingTextureCache.get(key);
-
-    if (cached) {
-      return cached;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 160;
-    canvas.height = 120;
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      return Texture.WHITE;
-    }
-
-    context.translate(canvas.width / 2, canvas.height * 0.52);
-    drawBuildingAsset(context, {
-      id: buildingId,
-      width: 130,
-      height: 92,
-      level,
-      built,
-      scale: 1.25,
-    });
-
-    const texture = Texture.from(canvas);
-    buildingTextureCache.set(key, texture);
-    return texture;
-  }
-
-  private getSpritesheetBuildingTexture(
-    buildingId: BuildingId,
-    level: number,
-    built: boolean,
-  ): Texture | null {
-    if (!built) {
-      return null;
-    }
-
-    const visual = buildingVisualDefinitions[buildingId];
-    const spritesheet = this.buildingSpritesheets.get(buildingId);
-
-    if (!visual || !spritesheet) {
-      return null;
-    }
-
-    const frame = getBuildingVisualFrame(buildingId, level);
-    const key = `${buildingId}:spritesheet:${frame}`;
-    const cached = buildingTextureCache.get(key);
-
-    if (cached) {
-      return cached;
-    }
-
-    const frameWidth = spritesheet.width / visual.frames;
-    const texture = new Texture({
-      source: spritesheet.source,
-      frame: new Rectangle(frame * frameWidth, 0, frameWidth, spritesheet.height),
-    });
-
-    buildingTextureCache.set(key, texture);
-    return texture;
   }
 
   private drawCenteredText(

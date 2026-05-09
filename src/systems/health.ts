@@ -1,4 +1,5 @@
 import type { BuildingId, GameState } from "../game/types";
+import { getEnvironmentDefinition, getEnvironmentIntensityIndex } from "../data/environment";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
@@ -172,8 +173,14 @@ function getScarcityInjuryChance(state: GameState): number {
   const waterIndex = getResourceIndex(state, "water");
   const foodPressure = Math.max(0, 1 - foodIndex);
   const waterPressure = Math.max(0, 1 - waterIndex);
+  const environment = state.environment;
+  const environmentDefinition = getEnvironmentDefinition(environment.condition);
+  const environmentChance =
+    environmentDefinition.healthIncidentChanceByIntensity[
+      getEnvironmentIntensityIndex(environment.intensity)
+    ] ?? 0;
 
-  return Math.round(foodPressure * 10 + waterPressure * 14);
+  return Math.round(foodPressure * 10 + waterPressure * 14 + environmentChance);
 }
 
 function getResourceIndex(state: GameState, resourceId: "food" | "water"): number {
@@ -209,7 +216,7 @@ function injureWorker(state: GameState): boolean {
   return true;
 }
 
-function killCampSurvivor(state: GameState): boolean {
+export function killCampSurvivor(state: GameState): boolean {
   if (state.survivors.workers > 0) {
     state.survivors.workers -= 1;
     return true;

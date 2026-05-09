@@ -1,8 +1,10 @@
+import { gameConfig } from "../game/config";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type { GameState, MarketResourceId, ResourceId } from "../game/types";
 import { pushLocalizedLog } from "./log";
 
-export const MARKET_TRADE_COOLDOWN_SECONDS = 4 * GAME_HOUR_REAL_SECONDS;
+export const MARKET_TRADE_COOLDOWN_SECONDS =
+  gameConfig.market.tradeCooldownHours * GAME_HOUR_REAL_SECONDS;
 export const marketResourceIds: MarketResourceId[] = ["food", "water", "material", "coal"];
 
 const MARKET_TRADE_LIMIT_BY_LEVEL = [0, 100, 120, 150, 180, 200];

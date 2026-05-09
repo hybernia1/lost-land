@@ -1,10 +1,11 @@
+import { gameConfig } from "../game/config";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type { GameState, ResourceBag, ScoutingMode, ScoutingMission } from "../game/types";
 import { pushLocalizedLog } from "./log";
 import { addResources } from "./resources";
 
-export const SCOUTING_DURATION_SECONDS = GAME_HOUR_REAL_SECONDS * 12;
-export const SCOUTING_CARRY_PER_TROOP = 25;
+export const SCOUTING_DURATION_SECONDS = GAME_HOUR_REAL_SECONDS * gameConfig.scouting.durationHours;
+export const SCOUTING_CARRY_PER_TROOP = gameConfig.scouting.carryPerTroop;
 
 const SCOUTING_MODE_DEATH_RISK: Record<ScoutingMode, number> = {
   safe: 0.1,
