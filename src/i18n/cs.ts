@@ -1,4 +1,5 @@
 import type { TranslationPack } from "./types";
+import { questTranslations } from "./quests";
 
 export const cs: TranslationPack = {
   locale: "cs",
@@ -43,6 +44,8 @@ export const cs: TranslationPack = {
     moraleFoodShortage: "Nedostatek jídla",
     moraleWaterShortage: "Nedostatek vody",
     moraleContinuousShifts: "24h směny",
+    mainBuildingProductionBonus: "Bonus hlavní budovy",
+    moraleProductionPenalty: "Nízká morálka",
     activeBuilds: "Aktivní stavby",
     villageBuildings: "Budovy vesnice",
     level: "Úr.",
@@ -82,6 +85,7 @@ export const cs: TranslationPack = {
     population: "Populace",
     globalStatus: "Globální stav",
     production: "Produkce",
+    consumption: "Spotřeba",
     productionTooltip: "Čistá změna surovin za herní hodinu po budovách a spotřebě přeživších.",
     resource: "Surovina",
     stock: "Stav",
@@ -91,6 +95,7 @@ export const cs: TranslationPack = {
     maxLevelReached: "Dosažena maximální úroveň.",
     treatment: "Léčení",
     workers: "Pracovníci",
+    sleeping: "Spí",
     operations: "Provoz",
     training: "Výcvik",
     squadSize: "Velikost družstva",
@@ -138,7 +143,21 @@ export const cs: TranslationPack = {
     continuousShifts: "24h směny",
     dayShiftActive: "Produkce běží do 22:00.",
     nightProductionPaused: "Produkce stojí do 08:00.",
-    continuousShiftsMorale: "Noční produkce pokračuje, ale morálka klesá.",
+    continuousShiftsMorale: "Produkce běží pořád, ale únava trvale sráží morálku a v noci prudce.",
+    requiresMainBuildingLevel: "Vyžaduje hlavní budovu úrovně {level}.",
+    requiresMainBuildingLevelShort: "Hlavní úr. {level}",
+    marketExchange: "Směna",
+    marketGive: "Dát",
+    marketReceive: "Získat",
+    marketAmount: "Množství",
+    marketTrade: "Směnit",
+    marketTradeLimit: "Limit směny",
+    marketTrades: "Směny",
+    marketCooldown: "Cooldown",
+    marketNoTrades: "Tržiště čeká na další obchodní okno.",
+    marketSameResource: "Vyber dvě různé suroviny.",
+    marketNoCapacity: "Není dost zásob nebo volné kapacity.",
+    logMarketTrade: "Tržiště směnilo {amount} {fromResource} za {toResource}.",
   },
   resources: {
     food: "Jídlo",
@@ -152,12 +171,12 @@ export const cs: TranslationPack = {
     water: "Spotřebovává se každým tickem přeživšími. Produkují ji vodní systémy a lze ji najít v terénu.",
     material: "Hlavní stavební surovina pro budovy, vylepšení a perimetr.",
     energy: "Zásoba elektřiny z obsazených generátorů pro technické budovy a vnitřní produkci.",
-    morale: "Celková stabilita komunity. Nízká morálka zhorší survival události.",
+    morale: "Celková stabilita komunity. Nízká morálka zhorší survival události a snižuje produkci.",
   },
   buildings: {
     mainBuilding: {
       name: "Hlavní budova",
-      description: "Řídí stavbu, ubytování a rozhodnutí celého tábora.",
+      description: "Řídí stavbu, rozhodnutí a na klíčových úrovních přitahuje nové přeživší.",
     },
     storage: {
       name: "Sklad",
@@ -165,7 +184,7 @@ export const cs: TranslationPack = {
     },
     dormitory: {
       name: "Ubytovna",
-      description: "Ubytuje civilní přeživší, ale potřebuje energii, aby byla obyvatelná.",
+      description: "Ubytuje civilní přeživší, ale potřebuje energii, vodu a jídlo.",
     },
     hydroponics: {
       name: "Hydroponie",
@@ -179,13 +198,13 @@ export const cs: TranslationPack = {
       name: "Dílna",
       description: "Mění šrot na použitelný stavební materiál.",
     },
-    scrapyard: {
-      name: "Smetiště",
-      description: "Třídí zbytky na stavební materiál, ale potřebuje k tomu energii.",
-    },
     generator: {
       name: "Generátor",
       description: "Vyrábí energii, když do něj pošleš přeživší jako obsluhu.",
+    },
+    market: {
+      name: "Tržiště",
+      description: "Umožňuje směňovat zásoby s jinými komunitami přes rádiové dohody.",
     },
     watchtower: {
       name: "Strážní věž",
@@ -201,9 +220,10 @@ export const cs: TranslationPack = {
     },
     clinic: {
       name: "Ošetřovna",
-      description: "Postupně léčí zraněné přeživší a za každého pacienta spotřebuje jídlo.",
+      description: "Postupně léčí zraněné přeživší a při péči spotřebovává jídlo i vodu.",
     },
   },
+  quests: questTranslations.cs,
   tiles: {
     base: "Domovská základna",
     ruins: "Městské ruiny",

@@ -12,9 +12,10 @@ import {
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
 import { buildingVisualDefinitions, getBuildingVisualFrame } from "../data/buildingVisuals";
+import { decisionQuestById, objectiveQuestById } from "../data/quests";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
 import { formatGameClock, GAME_HOUR_REAL_SECONDS, getGameDay } from "../game/time";
-import type { BuildingCategory, BuildingId, GameSpeed, GameState, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
+import type { BuildingCategory, BuildingId, DecisionOptionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
@@ -23,22 +24,48 @@ import {
   getBuildingWorkerLimit,
   getConstructionWorkerRequirement,
   getGeneratorEnergyRate,
+  getGlobalProductionMultiplier,
   getHousingStatus,
+  getMainBuildingLevelRequirement,
+  getMainBuildingMoraleRate,
+  getMainBuildingProductionBonus,
   getResourceBreakdown,
   getResourceProductionRates,
+  getSurvivorAttractionOnCompletedLevel,
   getUpgradeCost,
+  getWorkshopEnergyRate,
+  getWorkshopMaterialRate,
   hasAvailableBuildingSlot,
+  isMainBuildingRequirementMet,
   isBuildingInactiveDueToEnergy,
   MAX_ACTIVE_BUILDINGS,
   type ResourceBreakdownLine,
 } from "../systems/buildings";
-import { getClinicFoodPerTreatment } from "../systems/health";
+import {
+  getClinicFoodPerTreatment,
+  getClinicTreatmentRatePerGameHour,
+} from "../systems/health";
+import { formatLogEntry } from "../systems/log";
+import {
+  canTradeAtMarket,
+  getAvailableMarketTrades,
+  getMarketTradeCapacity,
+  getMarketTradeLimit,
+  getMarketTradeSlots,
+  isMarketResourceId,
+  marketResourceIds,
+} from "../systems/market";
 import {
   getAssignedBuildingWorkerCount,
   getConstructionWorkerCount,
   getPopulation,
 } from "../systems/population";
 import { canAfford } from "../systems/resources";
+import {
+  canAffordDecisionOption,
+  getActiveObjectiveQuests,
+  getObjectiveQuestProgress,
+} from "../systems/quests";
 import { SCOUTING_CARRY_PER_TROOP, SCOUTING_DURATION_SECONDS, getScoutingTroopCount } from "../systems/scouting";
 import villageBackgroundUrl from "../assets/village-bg.webp";
 import { drawBuildingAsset } from "./buildingAssets";
@@ -67,7 +94,11 @@ export type PixiActionDetail = {
   troopCount?: number;
   scoutMode?: ScoutingMode;
   scoutTroops?: number;
+  questOption?: DecisionOptionId;
   resourceId?: ResourceId;
+  marketFromResource?: ResourceId;
+  marketToResource?: ResourceId;
+  marketAmount?: number;
   speed?: GameSpeed;
   continuousShifts?: boolean;
 };
@@ -96,6 +127,7 @@ type BuildingMetric = {
   tooltip?: string;
 };
 
+type ResourceBreakdownTab = "production" | "consumption";
 type BarracksTab = "training" | "scouting";
 
 type RectButtonTone = "primary" | "secondary" | "toolbar";
@@ -206,9 +238,21 @@ export class PixiVillageRenderer {
   private buildChoicesScrollMax = 0;
   private buildChoicesScrollY = 0;
   private buildChoicesScrollPlotId: string | null = null;
+  private logScrollArea: Bounds | null = null;
+  private logScrollMax = 0;
+  private logScrollY = 0;
+  private resourceBreakdownScrollArea: Bounds | null = null;
+  private resourceBreakdownScrollMax = 0;
+  private resourceBreakdownScrollY = 0;
+  private resourceBreakdownScrollResourceId: ResourceId | null = null;
+  private resourceBreakdownScrollTab: ResourceBreakdownTab = "production";
+  private activeResourceBreakdownTab: ResourceBreakdownTab = "production";
   private activeBuildCategory: BuildingCategory = "resource";
   private activeBarracksTab: BarracksTab = "training";
   private barracksTroopCount = 1;
+  private marketFromResource: MarketResourceId = "material";
+  private marketToResource: MarketResourceId = "food";
+  private marketAmount = 10;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
 
@@ -253,9 +297,13 @@ export class PixiVillageRenderer {
     this.hudLayer.removeChildren();
     this.buildChoicesScrollArea = null;
     this.buildChoicesScrollMax = 0;
+    this.logScrollArea = null;
+    this.logScrollMax = 0;
+    this.resourceBreakdownScrollArea = null;
+    this.resourceBreakdownScrollMax = 0;
     this.hudLayer.scale.set(hudScale);
     this.drawBackground(width, height);
-    this.drawPalisade(state, translations?.buildings);
+    this.drawPalisade(state, translations);
 
     for (const plot of villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter")) {
       this.drawPlot(plot, state, translations, visualTime);
@@ -265,6 +313,7 @@ export class PixiVillageRenderer {
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
+    this.drawQuestDecisionModal(state, translations, hudWidth, hudHeight);
   }
 
   hitTest(clientX: number, clientY: number): string | null {
@@ -286,6 +335,24 @@ export class PixiVillageRenderer {
   }
 
   private handleHostWheel(event: WheelEvent): void {
+    if (this.handleScrollableWheel(
+      event,
+      this.resourceBreakdownScrollArea,
+      this.resourceBreakdownScrollMax,
+      this.resourceBreakdownScrollY,
+      (value) => {
+        this.resourceBreakdownScrollY = value;
+      },
+    )) {
+      return;
+    }
+
+    if (this.handleScrollableWheel(event, this.logScrollArea, this.logScrollMax, this.logScrollY, (value) => {
+      this.logScrollY = value;
+    })) {
+      return;
+    }
+
     if (!this.buildChoicesScrollArea || this.buildChoicesScrollMax <= 0) {
       return;
     }
@@ -317,6 +384,43 @@ export class PixiVillageRenderer {
 
     this.buildChoicesScrollY = nextScroll;
     this.requestRender();
+  }
+
+  private handleScrollableWheel(
+    event: WheelEvent,
+    area: Bounds | null,
+    scrollMax: number,
+    scrollY: number,
+    setScrollY: (value: number) => void,
+  ): boolean {
+    if (!area || scrollMax <= 0) {
+      return false;
+    }
+
+    const rect = this.host.getBoundingClientRect();
+    const hudScale = this.hudLayer.scale.x || 1;
+    const x = (event.clientX - rect.left) / hudScale;
+    const y = (event.clientY - rect.top) / hudScale;
+
+    if (
+      x < area.x ||
+      x > area.x + area.width ||
+      y < area.y ||
+      y > area.y + area.height
+    ) {
+      return false;
+    }
+
+    event.preventDefault();
+    const nextScroll = Math.max(0, Math.min(scrollMax, scrollY + event.deltaY));
+
+    if (nextScroll === scrollY) {
+      return true;
+    }
+
+    setScrollY(nextScroll);
+    this.requestRender();
+    return true;
   }
 
   destroy(): void {
@@ -381,7 +485,7 @@ export class PixiVillageRenderer {
 
   private drawPalisade(
     state: GameState,
-    buildingLabels?: TranslationPack["buildings"],
+    translations?: TranslationPack,
   ): void {
     const { scale } = this.layout;
     const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
@@ -420,8 +524,30 @@ export class PixiVillageRenderer {
       selected,
       building?.level ?? 0,
       building?.upgradingRemaining ?? 0,
-      buildingLabels?.palisade.name ?? "Palisade",
+      translations?.buildings.palisade.name ?? "Palisade",
     );
+
+    if (building) {
+      this.drawBuildingLevelBadge(
+        this.worldLayer,
+        Math.max(1, building.level),
+        centerX - 30 * scale,
+        centerY + radiusY - 58 * scale,
+        translations,
+        translations?.buildings.palisade.name ?? "Palisade",
+      );
+    }
+
+    if (building && building.upgradingRemaining > 0) {
+      this.drawConstructionCountdown(
+        this.worldLayer,
+        building.upgradingRemaining,
+        centerX,
+        centerY + radiusY - 92 * scale,
+        Math.max(70, 86 * scale),
+        undefined,
+      );
+    }
   }
 
   private drawPlot(
@@ -480,6 +606,25 @@ export class PixiVillageRenderer {
       this.drawBuildingVisualEffects(plotLayer, buildingId, Math.max(1, building.level), bounds, visualTime);
       if (isBuildingInactiveDueToEnergy(state, buildingId)) {
         this.drawPowerWarning(plotLayer, bounds);
+      }
+      this.drawBuildingLevelBadge(
+        plotLayer,
+        Math.max(1, building.level),
+        -bounds.width * 0.43,
+        -bounds.height * 0.5,
+        translations,
+        name,
+      );
+      this.drawBuildingWorkerBadge(plotLayer, buildingId, building.workers, getBuildingWorkerLimit(state, buildingId), bounds, translations);
+      if (building.upgradingRemaining > 0) {
+        this.drawConstructionCountdown(
+          plotLayer,
+          building.upgradingRemaining,
+          0,
+          -bounds.height * 0.72,
+          Math.max(64, Math.min(92, bounds.width * 0.82)),
+          translations,
+        );
       }
       return;
     }
@@ -564,7 +709,8 @@ export class PixiVillageRenderer {
       width,
     );
     this.drawResourcePills(state, translations, width, rates);
-    this.drawActiveScouting(state, translations, width);
+    const scoutingPanelHeight = this.drawActiveScouting(state, translations, width);
+    this.drawQuestPanel(state, translations, width, 152 + scoutingPanelHeight + 12);
     this.drawEventLog(state, translations, height);
     this.drawQueue(state, translations, height);
     this.drawActionPanel(state, translations, width, height);
@@ -744,7 +890,7 @@ export class PixiVillageRenderer {
     state: GameState,
     translations: TranslationPack | undefined,
     width: number,
-  ): void {
+  ): number {
     const panelWidth = 308;
     const layer = new Container();
     layer.x = Math.max(28, width - panelWidth - 28);
@@ -773,7 +919,7 @@ export class PixiVillageRenderer {
         fontSize: 11,
         fontWeight: "800",
       });
-      return;
+      return panelHeight;
     }
 
     missions.forEach((mission, index) => {
@@ -792,6 +938,78 @@ export class PixiVillageRenderer {
         fontWeight: "800",
       });
       timer.anchor.set(1, 0);
+    });
+
+    return panelHeight;
+  }
+
+  private drawQuestPanel(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    y: number,
+  ): void {
+    if (!translations) {
+      return;
+    }
+
+    const panelWidth = 308;
+    const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
+    const rowHeight = 70;
+    const panelHeight = activeObjectives.length > 0
+      ? 48 + activeObjectives.length * rowHeight
+      : 82;
+    const layer = new Container();
+    layer.x = Math.max(28, width - panelWidth - 28);
+    layer.y = y;
+    this.hudLayer.addChild(layer);
+
+    this.drawPanel(layer, 0, 0, panelWidth, panelHeight);
+    this.drawIcon(layer, "build", 18, 22, 15);
+    this.drawText(layer, translations.quests.ui.activeObjectives, 34, 14, {
+      fill: 0xf3edda,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    this.drawText(layer, `${activeObjectives.length}`, panelWidth - 28, 14, {
+      fill: 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "900",
+    }).anchor.set(1, 0);
+
+    if (activeObjectives.length === 0) {
+      this.drawText(layer, translations.quests.ui.objectivesEmpty, 14, 48, {
+        fill: 0xaeb4b8,
+        fontSize: 11,
+        fontWeight: "800",
+      });
+      return;
+    }
+
+    activeObjectives.forEach((quest, index) => {
+      const definition = objectiveQuestById[quest.definitionId];
+      const copy = translations.quests.objectives[quest.definitionId];
+      const progress = getObjectiveQuestProgress(state, definition);
+      const rowY = 42 + index * rowHeight;
+      this.drawText(layer, copy?.title ?? quest.definitionId, 14, rowY, {
+        fill: 0xf5efdf,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      const progressLabel = this.drawText(layer, `${progress.current}/${progress.required}`, panelWidth - 14, rowY, {
+        fill: 0xf1df9a,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      progressLabel.anchor.set(1, 0);
+      this.drawText(layer, copy?.description ?? "", 14, rowY + 18, {
+        fill: 0xaeb4b8,
+        fontSize: 10,
+        fontWeight: "700",
+        wordWrap: true,
+        wordWrapWidth: panelWidth - 42,
+      });
+      this.drawRewardLine(layer, definition.reward, translations, 14, rowY + 48);
     });
   }
 
@@ -862,11 +1080,13 @@ export class PixiVillageRenderer {
   private drawEventLog(state: GameState, translations: TranslationPack | undefined, height: number): void {
     const layer = new Container();
     layer.x = 28;
-    layer.y = Math.max(282, height - 242);
+    layer.y = Math.max(258, height - 374);
     this.hudLayer.addChild(layer);
 
-    const width = 308;
-    const panelHeight = 128;
+    const width = 366;
+    const panelHeight = Math.max(168, Math.min(248, height - layer.y - 126));
+    const viewportY = 42;
+    const viewportHeight = panelHeight - 54;
     this.drawPanel(layer, 0, 0, width, panelHeight);
     this.drawIcon(layer, "clock", 18, 22, 14);
     this.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
@@ -875,10 +1095,12 @@ export class PixiVillageRenderer {
       fontWeight: "800",
     });
 
-    const entries = state.log.slice(0, 4);
+    const entries = translations
+      ? state.log.map((entry) => formatLogEntry(entry, translations))
+      : state.log.map((entry) => entry.key);
 
     if (entries.length === 0) {
-      this.drawText(layer, "-", 14, 44, {
+      this.drawText(layer, "-", 14, viewportY, {
         fill: 0xaeb4b8,
         fontSize: 11,
         fontWeight: "700",
@@ -886,15 +1108,43 @@ export class PixiVillageRenderer {
       return;
     }
 
+    const contentHeight = entries.length * 38;
+    this.logScrollMax = Math.max(0, contentHeight - viewportHeight);
+    this.logScrollY = Math.max(0, Math.min(this.logScrollY, this.logScrollMax));
+    this.logScrollArea = {
+      x: layer.x + 10,
+      y: layer.y + viewportY - 4,
+      width: width - 20,
+      height: viewportHeight + 8,
+    };
+
     entries.forEach((entry, index) => {
-      this.drawText(layer, entry, 14, 42 + index * 20, {
+      const rowY = viewportY + index * 38 - this.logScrollY;
+
+      if (rowY < viewportY - 38 || rowY > viewportY + viewportHeight) {
+        return;
+      }
+
+      this.drawText(layer, entry, 14, rowY, {
         fill: index === 0 ? 0xf1df9a : 0xc8cabb,
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: index === 0 ? "800" : "700",
         wordWrap: true,
-        wordWrapWidth: width - 28,
+        wordWrapWidth: width - 42,
       });
     });
+
+    if (this.logScrollMax > 0) {
+      const trackHeight = viewportHeight;
+      const thumbHeight = Math.max(28, trackHeight * viewportHeight / contentHeight);
+      const thumbY = viewportY + (trackHeight - thumbHeight) * (this.logScrollY / this.logScrollMax);
+      const track = new Graphics();
+      track.roundRect(width - 18, viewportY, 5, trackHeight, 3)
+        .fill({ color: 0x0b0d0a, alpha: 0.72 });
+      track.roundRect(width - 18, thumbY, 5, thumbHeight, 3)
+        .fill({ color: 0xe0c46f, alpha: 0.6 });
+      layer.addChild(track);
+    }
   }
 
   private drawToolbar(state: GameState, translations: TranslationPack | undefined, width: number, height: number): void {
@@ -983,8 +1233,8 @@ export class PixiVillageRenderer {
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
-    const panelWidth = Math.min(520, width - 48);
-    const panelHeight = 340;
+    const panelWidth = Math.min(620, width - 48);
+    const panelHeight = Math.max(320, Math.min(520, height - 72));
     const panel = new Container();
     panel.x = (width - panelWidth) / 2;
     panel.y = Math.max(36, (height - panelHeight) / 2);
@@ -1026,8 +1276,50 @@ export class PixiVillageRenderer {
       true,
     );
 
-    if (breakdown.length === 0) {
-      this.drawText(panel, translations.ui.resourceNoActiveEffects, 24, 148, {
+    const activeTab = this.activeResourceBreakdownTab;
+    const visibleBreakdown = breakdown.filter((line) =>
+      activeTab === "production"
+        ? line.ratePerSecond > 0
+        : line.ratePerSecond < 0,
+    );
+    this.drawTabs(
+      panel,
+      [
+        { id: "production", label: translations.ui.production },
+        { id: "consumption", label: translations.ui.consumption },
+      ],
+      {
+        activeId: activeTab,
+        x: 24,
+        y: 140,
+        height: 34,
+        minWidth: 116,
+        maxWidth: panelWidth - 48,
+        onSelect: (tab) => {
+          this.activeResourceBreakdownTab = tab;
+          this.resourceBreakdownScrollY = 0;
+          this.requestRender();
+        },
+      },
+    );
+
+    const rowHeight = 34;
+    const viewportY = 190;
+    const viewportHeight = Math.max(88, panelHeight - viewportY - 24);
+
+    if (
+      this.resourceBreakdownScrollResourceId !== resourceId ||
+      this.resourceBreakdownScrollTab !== activeTab
+    ) {
+      this.resourceBreakdownScrollResourceId = resourceId;
+      this.resourceBreakdownScrollTab = activeTab;
+      this.resourceBreakdownScrollY = 0;
+    }
+
+    if (visibleBreakdown.length === 0) {
+      this.resourceBreakdownScrollY = 0;
+      this.resourceBreakdownScrollMax = 0;
+      this.drawText(panel, translations.ui.resourceNoActiveEffects, 24, viewportY, {
         fill: 0xc8cabb,
         fontSize: 13,
         fontWeight: "700",
@@ -1035,16 +1327,54 @@ export class PixiVillageRenderer {
       return;
     }
 
-    breakdown.forEach((line, index) => {
+    const contentHeight = visibleBreakdown.length * rowHeight;
+    this.resourceBreakdownScrollMax = Math.max(0, contentHeight - viewportHeight);
+    this.resourceBreakdownScrollY = Math.max(
+      0,
+      Math.min(this.resourceBreakdownScrollY, this.resourceBreakdownScrollMax),
+    );
+    this.resourceBreakdownScrollArea = {
+      x: panel.x + 18,
+      y: panel.y + viewportY - 8,
+      width: panelWidth - 36,
+      height: viewportHeight + 16,
+    };
+
+    const content = new Container();
+    content.y = viewportY - this.resourceBreakdownScrollY;
+    panel.addChild(content);
+
+    const mask = new Graphics();
+    mask.eventMode = "none";
+    mask.rect(18, viewportY - 8, panelWidth - 36, viewportHeight + 16)
+      .fill({ color: 0xffffff, alpha: 1 });
+    panel.addChild(mask);
+    content.mask = mask;
+
+    visibleBreakdown.forEach((line, index) => {
       this.drawBreakdownRow(
-        panel,
+        content,
         this.getResourceBreakdownLabel(line, translations),
         this.getHourlyRateLabel(line.ratePerSecond),
         line.ratePerSecond,
         panelWidth,
-        148 + index * 34,
+        7 + index * rowHeight,
       );
     });
+
+    if (this.resourceBreakdownScrollMax > 0) {
+      const trackHeight = viewportHeight;
+      const thumbHeight = Math.max(30, trackHeight * viewportHeight / contentHeight);
+      const thumbY = viewportY +
+        (trackHeight - thumbHeight) *
+          (this.resourceBreakdownScrollY / this.resourceBreakdownScrollMax);
+      const scrollbar = new Graphics();
+      scrollbar.roundRect(panelWidth - 20, viewportY, 5, trackHeight, 3)
+        .fill({ color: 0x0b0d0a, alpha: 0.76 });
+      scrollbar.roundRect(panelWidth - 20, thumbY, 5, thumbHeight, 3)
+        .fill({ color: 0xe0c46f, alpha: 0.66 });
+      panel.addChild(scrollbar);
+    }
   }
 
   private drawBreakdownRow(
@@ -1079,6 +1409,14 @@ export class PixiVillageRenderer {
     line: ResourceBreakdownLine,
     translations: TranslationPack,
   ): string {
+    if (line.source === "mainBuildingBonus") {
+      return translations.ui.mainBuildingProductionBonus;
+    }
+
+    if (line.source === "moraleProductionPenalty") {
+      return translations.ui.moraleProductionPenalty;
+    }
+
     if ((line.source === "building" || line.source === "generator") && line.buildingId) {
       return translations.buildings[line.buildingId].name;
     }
@@ -1100,6 +1438,86 @@ export class PixiVillageRenderer {
     }
 
     return translations.ui.moraleWaterShortage;
+  }
+
+  private drawQuestDecisionModal(
+    state: GameState,
+    translations: TranslationPack | undefined,
+    width: number,
+    height: number,
+  ): void {
+    const activeDecision = state.quests.activeDecision;
+
+    if (!activeDecision || !translations) {
+      return;
+    }
+
+    const definition = decisionQuestById[activeDecision.definitionId];
+    const copy = translations.quests.decisions[definition.id];
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
+
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.7 });
+    backdrop.eventMode = "static";
+    backdrop.on("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    overlay.addChild(backdrop);
+
+    const panelWidth = Math.min(560, width - 48);
+    const panelHeight = 348;
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(34, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+
+    this.drawIcon(panel, "people", 30, 38, 24);
+    this.drawText(panel, translations.quests.ui.decisionRequired, 62, 18, {
+      fill: 0xd8c890,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    this.drawText(panel, copy?.title ?? definition.id, 62, 38, {
+      fill: 0xf5efdf,
+      fontSize: 24,
+      fontWeight: "900",
+    });
+    this.drawText(panel, copy?.body ?? "", 28, 86, {
+      fill: 0xd7ddd8,
+      fontSize: 14,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 56,
+    });
+    this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, 170, {
+      fill: 0xffc66d,
+      fontSize: 12,
+      fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 56,
+    });
+
+    const buttonWidth = panelWidth - 56;
+    definition.options.forEach((option, index) => {
+      const affordable = canAffordDecisionOption(state, option);
+      this.createModalButton(
+        panel,
+        copy?.options[option.id] ?? option.id,
+        28,
+        212 + index * 42,
+        buttonWidth,
+        34,
+        {
+          action: "resolve-quest-decision",
+          questOption: option.id,
+        },
+        !affordable,
+        affordable ? undefined : translations.quests.ui.notEnoughSupplies,
+      );
+    });
   }
 
   private drawVillageModal(
@@ -1271,8 +1689,12 @@ export class PixiVillageRenderer {
       const queueAvailable = hasAvailableBuildingSlot(state);
       const requiredWorkers = getConstructionWorkerRequirement(buildingId, 0);
       const workersAvailable = state.survivors.workers >= requiredWorkers;
-      const disabled = !affordable || !queueAvailable || !workersAvailable;
-      const buttonLabel = !queueAvailable
+      const mainBuildingUnlocked = isMainBuildingRequirementMet(state, buildingId, 1);
+      const requiredMainBuildingLevel = getMainBuildingLevelRequirement(buildingId, 1);
+      const disabled = !mainBuildingUnlocked || !affordable || !queueAvailable || !workersAvailable;
+      const buttonLabel = !mainBuildingUnlocked
+        ? this.getMainBuildingRequirementLabel(translations, requiredMainBuildingLevel)
+        : !queueAvailable
         ? translations.ui.queueFull
         : !workersAvailable
           ? translations.ui.notEnoughWorkers
@@ -1492,7 +1914,10 @@ export class PixiVillageRenderer {
     const queueAvailable = hasAvailableBuildingSlot(state);
     const requiredWorkers = getConstructionWorkerRequirement(buildingId, level);
     const workersAvailable = state.survivors.workers >= requiredWorkers;
-    const disabled = locked || upgrading || !affordable || !queueAvailable || !workersAvailable;
+    const requiredMainBuildingLevel = getMainBuildingLevelRequirement(buildingId, level + 1);
+    const mainBuildingUnlocked = locked ||
+      isMainBuildingRequirementMet(state, buildingId, level + 1);
+    const disabled = locked || upgrading || !mainBuildingUnlocked || !affordable || !queueAvailable || !workersAvailable;
 
     const content = new Container();
     parent.addChild(content);
@@ -1536,8 +1961,10 @@ export class PixiVillageRenderer {
       });
 
     const operationsY = contentTop + 166;
-    if (buildingId === "generator") {
-      this.drawGeneratorControls(content, buildingId, state, translations, sideMargin, operationsY, bodyWidth);
+    if (buildingId === "generator" || buildingId === "workshop") {
+      this.drawStaffedProductionControls(content, buildingId, state, translations, sideMargin, operationsY, bodyWidth);
+    } else if (buildingId === "market") {
+      this.drawMarketControls(content, state, translations, sideMargin, operationsY, bodyWidth);
     } else if (buildingId === "barracks") {
       this.drawBarracksControls(content, state, translations, sideMargin, operationsY, bodyWidth);
     } else {
@@ -1563,6 +1990,9 @@ export class PixiVillageRenderer {
     if (!workersAvailable && !upgrading) {
       warnings.push(translations.ui.notEnoughWorkers);
     }
+    if (!mainBuildingUnlocked && !upgrading) {
+      warnings.push(this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel));
+    }
 
     warnings.forEach((warning, index) => {
       this.drawText(content, warning, sideMargin + 28, footerY + 86 + index * 16, { fill: 0xff9aa2, fontSize: 11, fontWeight: "800" });
@@ -1572,10 +2002,24 @@ export class PixiVillageRenderer {
       ? `${Math.ceil(upgradingRemaining)}s`
       : locked
         ? `${level}/${maxLevel}`
-        : queueAvailable
+        : !mainBuildingUnlocked
+          ? this.getMainBuildingRequirementLabel(translations, requiredMainBuildingLevel)
+          : queueAvailable
           ? translations.ui.upgrade
           : translations.ui.queueFull;
-    this.createModalButton(content, buttonLabel, modalWidth - 258, footerY + 24, 210, 44, { action: "upgrade", building: buildingId }, disabled);
+    this.createModalButton(
+      content,
+      buttonLabel,
+      modalWidth - 258,
+      footerY + 24,
+      210,
+      44,
+      { action: "upgrade", building: buildingId },
+      disabled,
+      !mainBuildingUnlocked
+        ? this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel)
+        : undefined,
+    );
     this.drawIcon(content, "clock", modalWidth - 172, footerY + 88, 14);
     this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 154, footerY + 80, {
       fill: 0xaeb4b8,
@@ -1611,8 +2055,8 @@ export class PixiVillageRenderer {
         fill: defense > 0 ? 0xf5efdf : 0xd7ddd8,
         tooltip: `${translations.ui.defense}: ${Math.round(defense)}`,
       },
-      this.getBuildingProductionMetric(buildingId, building, level, translations),
-      this.getBuildingEnergyMetric(buildingId, building, level, translations),
+      this.getBuildingProductionMetric(buildingId, building, level, state, translations),
+      this.getBuildingEnergyMetric(buildingId, building, level, state, translations),
     ];
   }
 
@@ -1620,12 +2064,25 @@ export class PixiVillageRenderer {
     buildingId: BuildingId,
     building: GameState["buildings"][BuildingId],
     level: number,
+    state: GameState,
     translations: TranslationPack,
   ): BuildingMetric {
     const definition = buildingById[buildingId];
+    const productionMultiplier = getGlobalProductionMultiplier(state);
+
+    if (buildingId === "mainBuilding") {
+      const bonus = getMainBuildingProductionBonus(level);
+      return {
+        iconId: "build",
+        label: translations.ui.production,
+        value: this.formatPercentBonus(bonus),
+        fill: bonus > 0 ? 0xf1df9a : 0xd7ddd8,
+        tooltip: `${translations.ui.production}: ${this.formatPercentBonus(bonus)}`,
+      };
+    }
 
     if (buildingId === "generator") {
-      const rate = getGeneratorEnergyRate(level, building.workers);
+      const rate = getGeneratorEnergyRate(level, building.workers) * productionMultiplier;
       return {
         iconId: "energy",
         label: translations.ui.production,
@@ -1635,13 +2092,37 @@ export class PixiVillageRenderer {
       };
     }
 
+    if (buildingId === "workshop") {
+      const rate = getWorkshopMaterialRate(level, building.workers) * productionMultiplier;
+      return {
+        iconId: "material",
+        label: translations.ui.production,
+        value: this.getHourlyRateLabel(rate),
+        fill: this.getRateColor(rate),
+        tooltip: `${translations.resources.material}: ${this.getHourlyRateLabel(rate)}`,
+      };
+    }
+
+    if (buildingId === "market") {
+      const tradeLimit = getMarketTradeLimit(level);
+      return {
+        iconId: "material",
+        label: translations.ui.marketTradeLimit ?? translations.ui.stock,
+        value: `${tradeLimit}`,
+        fill: tradeLimit > 0 ? 0xf1df9a : 0xd7ddd8,
+        tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"}: ${tradeLimit}`,
+      };
+    }
+
     const produced = Object.entries(definition.produces ?? {})
       .find(([, amount]) => (amount ?? 0) > 0);
 
     if (produced) {
       const [resourceId, amount] = produced;
       const typedResourceId = resourceId as ResourceId;
-      const rate = (amount ?? 0) * level;
+      const rate = (amount ?? 0) *
+        level *
+        (typedResourceId === "morale" ? 1 : productionMultiplier);
       return {
         iconId: typedResourceId,
         label: translations.ui.production,
@@ -1691,15 +2172,20 @@ export class PixiVillageRenderer {
     buildingId: BuildingId,
     building: GameState["buildings"][BuildingId],
     level: number,
+    state: GameState,
     translations: TranslationPack,
   ): BuildingMetric {
     const definition = buildingById[buildingId];
     const consumption =
       ((definition.consumes?.energy ?? 0) + (definition.alwaysConsumes?.energy ?? 0)) * level;
     const production = buildingId === "generator"
-      ? getGeneratorEnergyRate(level, building.workers)
+      ? getGeneratorEnergyRate(level, building.workers) *
+        getGlobalProductionMultiplier(state)
       : 0;
-    const netRate = production - consumption;
+    const staffedConsumption = buildingId === "workshop"
+      ? getWorkshopEnergyRate(level, building.workers)
+      : consumption;
+    const netRate = production - staffedConsumption;
 
     return {
       iconId: "energy",
@@ -1805,7 +2291,7 @@ export class PixiVillageRenderer {
     return y + height + 14;
   }
 
-  private drawGeneratorControls(
+  private drawStaffedProductionControls(
     parent: Container,
     buildingId: BuildingId,
     state: GameState,
@@ -1821,20 +2307,263 @@ export class PixiVillageRenderer {
       return y;
     }
 
-    const energyPerHour = getGeneratorEnergyRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS;
+    const productionResourceId: ResourceId = buildingId === "workshop" ? "material" : "energy";
+    const productionPerHour = (
+      buildingId === "workshop"
+        ? getWorkshopMaterialRate(building.level, building.workers)
+        : getGeneratorEnergyRate(building.level, building.workers)
+    ) * GAME_HOUR_REAL_SECONDS;
+    const energyUsePerHour = buildingId === "workshop"
+      ? getWorkshopEnergyRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS
+      : 0;
     this.drawPanel(parent, x, y, width, 104);
     this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
     this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, x + 20, y + 50, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
     this.drawInfoToken(parent, {
-      iconId: "energy",
-      text: `+${this.formatRate(energyPerHour)}/h`,
-      tooltip: `${translations.resources.energy}: +${this.formatRate(energyPerHour)}/h`,
+      iconId: productionResourceId,
+      text: `+${this.formatRate(productionPerHour)}/h`,
+      tooltip: `${translations.resources[productionResourceId]}: +${this.formatRate(productionPerHour)}/h`,
       x: x + 20,
       y: y + 74,
     });
+    if (energyUsePerHour > 0) {
+      this.drawInfoToken(parent, {
+        iconId: "energy",
+        text: `-${this.formatRate(energyUsePerHour)}/h`,
+        tooltip: `${translations.resources.energy}: -${this.formatRate(energyUsePerHour)}/h`,
+        missing: true,
+        x: x + 118,
+        y: y + 74,
+      });
+    }
     this.createModalButton(parent, "-", x + width - 96, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: -1 }, building.workers <= 0);
     this.createModalButton(parent, "+", x + width - 48, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: 1 }, building.workers >= workerLimit || state.survivors.workers <= 0);
     return y + 118;
+  }
+
+  private drawMarketControls(
+    parent: Container,
+    state: GameState,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+  ): number {
+    const marketLevel = state.buildings.market.level;
+
+    if (marketLevel <= 0) {
+      return y;
+    }
+
+    this.normalizeMarketSelection();
+    const tradeLimit = getMarketTradeLimit(marketLevel);
+    const tradeSlots = getMarketTradeSlots(marketLevel);
+    const availableTrades = getAvailableMarketTrades(state);
+    const tradeCapacity = getMarketTradeCapacity(
+      state,
+      this.marketFromResource,
+      this.marketToResource,
+    );
+    const maxAmount = Math.max(1, tradeCapacity);
+    this.marketAmount = Math.max(1, Math.min(this.marketAmount, maxAmount));
+
+    const cooldownRemaining = state.market.cooldownRemainingSeconds;
+    const statusText = cooldownRemaining > 0
+      ? `${translations.ui.marketCooldown ?? "Cooldown"}: ${this.formatScoutingRemaining(cooldownRemaining)}`
+      : `${translations.ui.marketTrades ?? "Trades"}: ${availableTrades}/${tradeSlots}`;
+    const disabled = !canTradeAtMarket(
+      state,
+      this.marketFromResource,
+      this.marketToResource,
+      this.marketAmount,
+    );
+    const disabledTooltip = this.getMarketTradeDisabledTooltip(
+      state,
+      translations,
+      tradeCapacity,
+    );
+
+    this.drawPanel(parent, x, y, width, 170);
+    this.drawSectionTitle(parent, translations.ui.marketExchange ?? "Exchange", x + 20, y + 18);
+    this.drawText(
+      parent,
+      `${translations.ui.marketTradeLimit ?? "Limit"}: ${tradeLimit} / ${statusText}`,
+      x + 20,
+      y + 42,
+      { fill: 0xaeb4b8, fontSize: 12, fontWeight: "800" },
+    );
+
+    this.drawMarketResourceButtons(
+      parent,
+      translations.ui.marketGive ?? "Give",
+      this.marketFromResource,
+      x + 20,
+      y + 72,
+      (resourceId) => {
+        this.marketFromResource = resourceId;
+        if (this.marketToResource === resourceId) {
+          this.marketToResource = this.getNextMarketResource(resourceId);
+        }
+        this.requestRender();
+      },
+      translations,
+    );
+    this.drawMarketResourceButtons(
+      parent,
+      translations.ui.marketReceive ?? "Receive",
+      this.marketToResource,
+      x + 20,
+      y + 116,
+      (resourceId) => {
+        this.marketToResource = resourceId;
+        if (this.marketFromResource === resourceId) {
+          this.marketFromResource = this.getNextMarketResource(resourceId);
+        }
+        this.requestRender();
+      },
+      translations,
+    );
+
+    this.drawMarketAmountStepper(
+      parent,
+      translations,
+      x + width - 238,
+      y + 72,
+      196,
+      tradeCapacity,
+    );
+    this.createModalButton(
+      parent,
+      translations.ui.marketTrade ?? "Trade",
+      x + width - 238,
+      y + 126,
+      196,
+      34,
+      {
+        action: "market-trade",
+        marketFromResource: this.marketFromResource,
+        marketToResource: this.marketToResource,
+        marketAmount: this.marketAmount,
+      },
+      disabled,
+      disabledTooltip,
+    );
+
+    return y + 184;
+  }
+
+  private drawMarketResourceButtons(
+    parent: Container,
+    label: string,
+    activeResourceId: MarketResourceId,
+    x: number,
+    y: number,
+    onSelect: (resourceId: MarketResourceId) => void,
+    translations: TranslationPack,
+  ): void {
+    this.drawText(parent, label, x, y, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+
+    let offsetX = 74;
+    for (const resourceId of marketResourceIds) {
+      this.createRectButton(parent, {
+        label: translations.resources[resourceId],
+        x: x + offsetX,
+        y: y - 8,
+        width: 66,
+        height: 30,
+        onTap: () => onSelect(resourceId),
+        active: resourceId === activeResourceId,
+        tone: "secondary",
+        fontSize: 11,
+        fontWeight: "900",
+      });
+      offsetX += 72;
+    }
+  }
+
+  private drawMarketAmountStepper(
+    parent: Container,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+    tradeCapacity: number,
+  ): void {
+    const stepper = new Container();
+    stepper.x = x;
+    stepper.y = y;
+    parent.addChild(stepper);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, 44, 7)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 })
+      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    stepper.addChild(box);
+
+    this.drawText(stepper, translations.ui.marketAmount ?? "Amount", 12, 7, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "800",
+    });
+    this.createLocalModalButton(stepper, "-10", width - 126, 8, 38, 28, () => {
+      this.marketAmount = Math.max(1, this.marketAmount - 10);
+      this.requestRender();
+    }, this.marketAmount <= 1);
+    this.drawCenteredText(stepper, `${this.marketAmount}`, width - 64, 22, {
+      fill: tradeCapacity > 0 ? 0xf1df9a : 0xff9aa2,
+      fontSize: 17,
+      fontWeight: "900",
+    });
+    this.createLocalModalButton(stepper, "+10", width - 42, 8, 38, 28, () => {
+      this.marketAmount = Math.min(Math.max(1, tradeCapacity), this.marketAmount + 10);
+      this.requestRender();
+    }, tradeCapacity <= 0 || this.marketAmount >= tradeCapacity);
+  }
+
+  private normalizeMarketSelection(): void {
+    if (!isMarketResourceId(this.marketFromResource)) {
+      this.marketFromResource = "material";
+    }
+
+    if (!isMarketResourceId(this.marketToResource)) {
+      this.marketToResource = "food";
+    }
+
+    if (this.marketFromResource === this.marketToResource) {
+      this.marketToResource = this.getNextMarketResource(this.marketFromResource);
+    }
+  }
+
+  private getNextMarketResource(resourceId: MarketResourceId): MarketResourceId {
+    return marketResourceIds.find((candidate) => candidate !== resourceId) ?? "food";
+  }
+
+  private getMarketTradeDisabledTooltip(
+    state: GameState,
+    translations: TranslationPack,
+    tradeCapacity: number,
+  ): string | undefined {
+    if (state.market.cooldownRemainingSeconds > 0) {
+      return `${translations.ui.marketCooldown ?? "Cooldown"}: ${this.formatScoutingRemaining(state.market.cooldownRemainingSeconds)}`;
+    }
+
+    if (getAvailableMarketTrades(state) <= 0) {
+      return translations.ui.marketNoTrades ?? "No trade slot available.";
+    }
+
+    if (this.marketFromResource === this.marketToResource) {
+      return translations.ui.marketSameResource ?? "Choose two different resources.";
+    }
+
+    if (tradeCapacity <= 0) {
+      return translations.ui.marketNoCapacity ?? "Not enough stock or storage capacity.";
+    }
+
+    return undefined;
   }
 
   private drawBarracksControls(parent: Container, state: GameState, translations: TranslationPack, x: number, y: number, width: number): number {
@@ -2099,6 +2828,35 @@ export class PixiVillageRenderer {
     return offset;
   }
 
+  private drawRewardLine(
+    parent: Container,
+    bag: ResourceBag,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+  ): number {
+    let offset = 0;
+
+    for (const [resourceId, amount] of Object.entries(bag)) {
+      if ((amount ?? 0) <= 0) {
+        continue;
+      }
+
+      const typedResourceId = resourceId as ResourceId;
+      const roundedAmount = Math.ceil(amount ?? 0);
+      const item = this.drawInfoToken(parent, {
+        iconId: typedResourceId,
+        text: `+${roundedAmount}`,
+        tooltip: `${translations.resources[typedResourceId]}: ${translations.resourceDescriptions[typedResourceId]}`,
+        x: x + offset,
+        y,
+      });
+      offset += item.width + 8;
+    }
+
+    return offset;
+  }
+
   private drawWorkerRequirement(parent: Container, required: number, available: number, translations: TranslationPack, x: number, y: number): number {
     const missing = available < required;
     const token = this.drawInfoToken(parent, {
@@ -2111,6 +2869,26 @@ export class PixiVillageRenderer {
     });
 
     return token.width;
+  }
+
+  private getMainBuildingRequirementLabel(
+    translations: TranslationPack,
+    requiredLevel: number,
+  ): string {
+    return this.formatTemplate(
+      translations.ui.requiresMainBuildingLevelShort ?? "Main lvl {level}",
+      { level: requiredLevel },
+    );
+  }
+
+  private getMainBuildingRequirementTooltip(
+    translations: TranslationPack,
+    requiredLevel: number,
+  ): string {
+    return this.formatTemplate(
+      translations.ui.requiresMainBuildingLevel ?? "Requires main building level {level}.",
+      { level: requiredLevel },
+    );
   }
 
   private drawInfoToken(
@@ -2153,7 +2931,17 @@ export class PixiVillageRenderer {
     this.drawText(pill, label, 32, 7, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
   }
 
-  private createModalButton(parent: Container, label: string, x: number, y: number, width: number, height: number, detail: PixiActionDetail, disabled = false): Container {
+  private createModalButton(
+    parent: Container,
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    detail: PixiActionDetail,
+    disabled = false,
+    tooltip?: string,
+  ): Container {
     return this.createRectButton(parent, {
       label,
       x,
@@ -2162,6 +2950,7 @@ export class PixiVillageRenderer {
       height,
       detail,
       disabled,
+      tooltip,
       tone: "primary",
       fontSize: 12,
       fontWeight: "900",
@@ -2217,15 +3006,45 @@ export class PixiVillageRenderer {
 
     const effects: EffectLine[] = [];
 
-    if (buildingId === "palisade") {
+    if (buildingId === "mainBuilding") {
+      const nextBonus = getMainBuildingProductionBonus(currentLevel + 1);
+      if (nextBonus > 0) {
+        effects.push({
+          iconId: "build",
+          value: this.formatPercentBonus(nextBonus),
+          tooltip: `${translations.ui.production}: ${this.formatPercentBonus(nextBonus)}`,
+        });
+      }
+
+      const currentMoralePerHour = getMainBuildingMoraleRate(currentLevel) *
+        GAME_HOUR_REAL_SECONDS;
+      const nextMoralePerHour = getMainBuildingMoraleRate(currentLevel + 1) *
+        GAME_HOUR_REAL_SECONDS;
+      const moraleDelta = nextMoralePerHour - currentMoralePerHour;
+
+      if (moraleDelta > 0) {
+        effects.push({
+          iconId: "morale",
+          value: `+${this.formatRate(moraleDelta)}/h`,
+          tooltip: `${translations.resources.morale} +${this.formatRate(moraleDelta)}/h`,
+        });
+      }
+    }
+
+    const attractedSurvivors = getSurvivorAttractionOnCompletedLevel(
+      buildingId,
+      currentLevel + 1,
+    );
+
+    if (attractedSurvivors > 0) {
       effects.push({
         iconId: "people",
-        value: "+1",
-        tooltip: `${translations.ui.population} +1`,
+        value: `+${attractedSurvivors}`,
+        tooltip: `${translations.ui.population} +${attractedSurvivors}`,
       });
     }
     if (buildingId === "clinic") {
-      const treatmentPerHour = (currentLevel + 1) * GAME_HOUR_REAL_SECONDS / 60;
+      const treatmentPerHour = getClinicTreatmentRatePerGameHour(currentLevel + 1);
       const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
       effects.push({
         iconId: "people",
@@ -2265,6 +3084,46 @@ export class PixiVillageRenderer {
         value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
         tooltip: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
       });
+    }
+    if (buildingId === "workshop") {
+      const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
+      const nextLimit = Math.min(4, currentLevel + 2);
+      const currentMaxRate = getWorkshopMaterialRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
+      const nextMaxRate = getWorkshopMaterialRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
+      if (nextLimit > currentLimit) {
+        effects.push({
+          iconId: "people",
+          value: `+${nextLimit - currentLimit}`,
+          tooltip: `${translations.ui.workers} max +${nextLimit - currentLimit}`,
+        });
+      }
+      effects.push({
+        iconId: "material",
+        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
+        tooltip: `${translations.resources.material} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
+      });
+    }
+    if (buildingId === "market") {
+      const currentTradeLimit = getMarketTradeLimit(currentLevel);
+      const nextTradeLimit = getMarketTradeLimit(currentLevel + 1);
+      const currentTradeSlots = getMarketTradeSlots(currentLevel);
+      const nextTradeSlots = getMarketTradeSlots(currentLevel + 1);
+
+      if (nextTradeLimit > currentTradeLimit) {
+        effects.push({
+          iconId: "material",
+          value: `+${nextTradeLimit - currentTradeLimit}`,
+          tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"} +${nextTradeLimit - currentTradeLimit}`,
+        });
+      }
+
+      if (nextTradeSlots > currentTradeSlots) {
+        effects.push({
+          iconId: "build",
+          value: `+${nextTradeSlots - currentTradeSlots}`,
+          tooltip: `${translations.ui.marketTrades ?? "Trades"} +${nextTradeSlots - currentTradeSlots}`,
+        });
+      }
     }
     if (definition.defense) {
       effects.push({
@@ -2320,8 +3179,29 @@ export class PixiVillageRenderer {
 
     const effects: EffectLine[] = [];
 
+    if (buildingId === "mainBuilding") {
+      const bonus = getMainBuildingProductionBonus(level);
+      if (bonus > 0) {
+        effects.push({
+          iconId: "build",
+          value: this.formatPercentBonus(bonus),
+          tooltip: `${translations.ui.production}: ${this.formatPercentBonus(bonus)}`,
+        });
+      }
+
+      const moralePerHour = getMainBuildingMoraleRate(level) * GAME_HOUR_REAL_SECONDS;
+
+      if (moralePerHour > 0) {
+        effects.push({
+          iconId: "morale",
+          value: `+${this.formatRate(moralePerHour)}/h`,
+          tooltip: `${translations.resources.morale} +${this.formatRate(moralePerHour)}/h`,
+        });
+      }
+    }
+
     if (buildingId === "clinic") {
-      const treatmentPerHour = level * GAME_HOUR_REAL_SECONDS / 60;
+      const treatmentPerHour = getClinicTreatmentRatePerGameHour(level);
       const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
       effects.push({
         iconId: "people",
@@ -2336,6 +3216,22 @@ export class PixiVillageRenderer {
         value: `+${definition.housing * level}`,
         tooltip: `${translations.ui.housingCapacity} +${definition.housing * level}`,
       });
+    }
+
+    if (buildingId === "market") {
+      effects.push({
+        iconId: "material",
+        value: `${getMarketTradeLimit(level)}`,
+        tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"} ${getMarketTradeLimit(level)}`,
+      });
+
+      if (getMarketTradeSlots(level) > 1) {
+        effects.push({
+          iconId: "build",
+          value: `${getMarketTradeSlots(level)}x`,
+          tooltip: `${translations.ui.marketTrades ?? "Trades"} ${getMarketTradeSlots(level)}`,
+        });
+      }
     }
 
     if (definition.defense) {
@@ -2867,6 +3763,141 @@ export class PixiVillageRenderer {
     badge.addChild(bolt);
   }
 
+  private drawBuildingLevelBadge(
+    parent: Container,
+    level: number,
+    x: number,
+    y: number,
+    translations?: TranslationPack,
+    buildingName?: string,
+  ): void {
+    const levelLabel = translations?.ui.level ?? "Lvl";
+    const label = `${level}`;
+    const radius = level >= 10 ? 16 : 15;
+    const badge = new Container();
+    badge.x = x;
+    badge.y = y;
+    parent.addChild(badge);
+
+    const shadow = new Graphics();
+    shadow.circle(radius + 2, radius + 3, radius)
+      .fill({ color: 0x000000, alpha: 0.34 });
+    badge.addChild(shadow);
+
+    const box = new Graphics();
+    box.circle(radius, radius, radius)
+      .fill({ color: 0x24494d, alpha: 0.95 })
+      .stroke({ color: 0x8ed7cf, alpha: 0.74, width: 1.4 });
+    box.circle(radius - radius * 0.25, radius - radius * 0.28, radius * 0.42)
+      .fill({ color: 0xffffff, alpha: 0.08 });
+    badge.addChild(box);
+
+    this.drawCenteredText(badge, label, radius, radius, {
+      fill: 0xf3fff6,
+      fontSize: level >= 10 ? 11 : 12,
+      fontWeight: "900",
+    });
+
+    this.bindTooltip(
+      badge,
+      buildingName
+        ? `${buildingName}: ${levelLabel} ${level}`
+        : `${levelLabel} ${level}`,
+    );
+  }
+
+  private drawBuildingWorkerBadge(
+    parent: Container,
+    buildingId: BuildingId,
+    workers: number,
+    workerLimit: number,
+    bounds: Bounds,
+    translations?: TranslationPack,
+  ): void {
+    if (workerLimit <= 0) {
+      return;
+    }
+
+    const asleep = workers <= 0;
+    const label = asleep
+      ? translations?.ui.sleeping ?? "Idle"
+      : `${workers}/${workerLimit}`;
+    const width = asleep ? 68 : 58;
+    const height = 24;
+    const badge = new Container();
+    badge.x = -bounds.width * 0.42;
+    badge.y = bounds.height * 0.16;
+    parent.addChild(badge);
+
+    const shadow = new Graphics();
+    shadow.roundRect(2, 3, width, height, 7)
+      .fill({ color: 0x000000, alpha: 0.32 });
+    badge.addChild(shadow);
+
+    const box = new Graphics();
+    box.roundRect(0, 0, width, height, 7)
+      .fill({ color: asleep ? 0x1a1d18 : 0x10120e, alpha: 0.94 })
+      .stroke({
+        color: asleep ? 0x889089 : 0xe0c46f,
+        alpha: asleep ? 0.32 : 0.44,
+        width: 1,
+      });
+    badge.addChild(box);
+
+    this.drawIcon(badge, asleep ? "clock" : "people", 14, height / 2, 13);
+    this.drawText(badge, label, 28, 5, {
+      fill: asleep ? 0xaeb4b8 : 0xf1df9a,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+
+    const buildingName = translations?.buildings[buildingId].name ?? buildingById[buildingId].name;
+    const workerLabel = translations?.ui.workers ?? "Workers";
+    const sleepLabel = translations?.ui.sleeping ?? "Idle";
+    const tooltip = asleep
+      ? `${buildingName}: ${sleepLabel} (${workerLabel} 0/${workerLimit})`
+      : `${buildingName}: ${workerLabel} ${workers}/${workerLimit}`;
+    this.bindTooltip(badge, tooltip);
+  }
+
+  private drawConstructionCountdown(
+    parent: Container,
+    remainingSeconds: number,
+    x: number,
+    y: number,
+    width: number,
+    translations?: TranslationPack,
+  ): void {
+    const label = `${Math.ceil(remainingSeconds)}s`;
+    const badge = new Container();
+    badge.x = x;
+    badge.y = y;
+    parent.addChild(badge);
+
+    const height = 26;
+    const shadow = new Graphics();
+    shadow.roundRect(-width / 2 + 2, 3, width, height, 7)
+      .fill({ color: 0x000000, alpha: 0.34 });
+    badge.addChild(shadow);
+
+    const box = new Graphics();
+    box.roundRect(-width / 2, 0, width, height, 7)
+      .fill({ color: 0x10120e, alpha: 0.94 })
+      .stroke({ color: 0xe0c46f, alpha: 0.46, width: 1 });
+    badge.addChild(box);
+
+    this.drawIcon(badge, "clock", -width / 2 + 15, height / 2, 13);
+    this.drawText(badge, label, -width / 2 + 29, 5, {
+      fill: 0xf1df9a,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    this.bindTooltip(
+      badge,
+      `${translations?.ui.buildingQueue ?? "Building queue"}: ${label}`,
+    );
+  }
+
   private drawMainBuildingBaseGlow(
     graphics: Graphics,
     phase: number,
@@ -3162,6 +4193,20 @@ export class PixiVillageRenderer {
     }
 
     return value.toFixed(1);
+  }
+
+  private formatPercentBonus(value: number): string {
+    return `+${Math.round(value * 100)}%`;
+  }
+
+  private formatTemplate(
+    template: string,
+    params: Record<string, string | number>,
+  ): string {
+    return Object.entries(params).reduce(
+      (message, [key, value]) => message.split(`{${key}}`).join(String(value)),
+      template,
+    );
   }
 
   private formatScoutingRemaining(seconds: number): string {

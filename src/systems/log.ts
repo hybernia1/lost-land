@@ -1,5 +1,6 @@
-import type { BuildingId, GameState } from "../game/types";
+import type { BuildingId, GameState, LogEntry, ObjectiveQuestId, ResourceId } from "../game/types";
 import { loadLocale, packs } from "../i18n";
+import type { TranslationPack } from "../i18n/types";
 
 type LogParams = Record<string, string | number>;
 
@@ -8,7 +9,11 @@ export function pushLocalizedLog(
   key: string,
   params: LogParams = {},
 ): void {
-  pushLog(state, getLocalizedUiText(key, params));
+  pushLogEntry(state, {
+    source: "ui",
+    key,
+    params,
+  });
 }
 
 export function getLocalizedUiText(
@@ -21,23 +26,47 @@ export function getLocalizedUiText(
   return formatTemplate(template, params);
 }
 
-export function getLocalizedInitialLogEntries(): string[] {
+export function getLocalizedInitialLogEntries(): LogEntry[] {
   return [
-    getLocalizedUiText("logDayOne"),
-    getLocalizedUiText("logPerimeter"),
+    { source: "ui", key: "logDayOne" },
+    { source: "ui", key: "logPerimeter" },
   ];
 }
 
-export function localizeStaticLogEntries(log: string[]): string[] {
-  const current = packs[loadLocale()].ui;
-  const knownStaticEntries = new Map([
-    [packs.en.ui.logDayOne, current.logDayOne],
-    [packs.cs.ui.logDayOne, current.logDayOne],
-    [packs.en.ui.logPerimeter, current.logPerimeter],
-    [packs.cs.ui.logPerimeter, current.logPerimeter],
-  ]);
+export function normalizeLogEntries(log: Array<LogEntry | string> = []): LogEntry[] {
+  return log
+    .map((entry) => {
+      if (typeof entry !== "string") {
+        return normalizeLogEntry(entry);
+      }
 
-  return log.map((entry) => knownStaticEntries.get(entry) ?? entry);
+      return getLegacyLogEntry(entry);
+    })
+    .filter((entry): entry is LogEntry => entry !== null)
+    .slice(0, 32);
+}
+
+export function formatLogEntry(entry: LogEntry, translations: TranslationPack): string {
+  if (entry.source === "questUi") {
+    return formatTemplate(
+      translations.quests.ui[entry.key] ?? entry.key,
+      getLocalizedParams(entry.params ?? {}, translations),
+    );
+  }
+
+  if (entry.source === "questDecisionResult") {
+    const optionId = String(entry.params?.optionId ?? "");
+    return translations.quests.decisions[entry.key]?.results[optionId] ?? entry.key;
+  }
+
+  if (entry.source === "questSuddenResult") {
+    return translations.quests.sudden[entry.key]?.result ?? entry.key;
+  }
+
+  return formatTemplate(
+    translations.ui[entry.key] ?? entry.key,
+    getLocalizedParams(entry.params ?? {}, translations),
+  );
 }
 
 export function getLocalizedBuildingName(buildingId: BuildingId): string {
@@ -53,7 +82,63 @@ function formatTemplate(template: string, params: LogParams): string {
   );
 }
 
-function pushLog(state: GameState, message: string): void {
-  state.log.unshift(message);
-  state.log = state.log.slice(0, 16);
+export function pushLogEntry(state: GameState, entry: LogEntry): void {
+  state.log.unshift(normalizeLogEntry(entry));
+  state.log = state.log.slice(0, 32);
+}
+
+function normalizeLogEntry(entry: LogEntry): LogEntry {
+  return {
+    source: entry.source === "questUi" ||
+      entry.source === "questDecisionResult" ||
+      entry.source === "questSuddenResult"
+      ? entry.source
+      : "ui",
+    key: String(entry.key),
+    params: entry.params,
+  };
+}
+
+function getLegacyLogEntry(entry: string): LogEntry | null {
+  const knownStaticEntries = new Map<string, LogEntry>([
+    [packs.en.ui.logDayOne, { source: "ui", key: "logDayOne" }],
+    [packs.cs.ui.logDayOne, { source: "ui", key: "logDayOne" }],
+    [packs.en.ui.logPerimeter, { source: "ui", key: "logPerimeter" }],
+    [packs.cs.ui.logPerimeter, { source: "ui", key: "logPerimeter" }],
+  ]);
+
+  return knownStaticEntries.get(entry) ?? {
+    source: "ui",
+    key: entry,
+  };
+}
+
+function getLocalizedParams(params: LogParams, translations: TranslationPack): LogParams {
+  const localizedParams: LogParams = { ...params };
+
+  if (typeof params.buildingId === "string" && params.buildingId in translations.buildings) {
+    localizedParams.building = translations.buildings[params.buildingId as BuildingId].name;
+  }
+
+  if (typeof params.modeKey === "string" && params.modeKey in translations.ui) {
+    localizedParams.mode = translations.ui[params.modeKey];
+  }
+
+  if (typeof params.fromResourceId === "string" && params.fromResourceId in translations.resources) {
+    localizedParams.fromResource = translations.resources[params.fromResourceId as ResourceId];
+  }
+
+  if (typeof params.toResourceId === "string" && params.toResourceId in translations.resources) {
+    localizedParams.toResource = translations.resources[params.toResourceId as ResourceId];
+  }
+
+  if (
+    typeof params.questId === "string" &&
+    params.questId in translations.quests.objectives
+  ) {
+    localizedParams.quest =
+      translations.quests.objectives[params.questId as ObjectiveQuestId].title;
+  }
+
+  return localizedParams;
 }

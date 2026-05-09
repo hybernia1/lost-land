@@ -12,8 +12,8 @@ export type BuildingId =
   | "hydroponics"
   | "waterStill"
   | "workshop"
-  | "scrapyard"
   | "generator"
+  | "market"
   | "watchtower"
   | "barracks"
   | "clinic"
@@ -59,6 +59,7 @@ export type BuildingDefinition = {
   storageBonus?: ResourceBag;
   housing?: number;
   defense?: number;
+  requiredMainBuildingLevel?: number;
 };
 
 export type BuildingState = {
@@ -98,6 +99,13 @@ export type ScoutingState = {
   missions: ScoutingMission[];
 };
 
+export type MarketResourceId = Exclude<ResourceId, "morale">;
+
+export type MarketState = {
+  cooldownRemainingSeconds: number;
+  tradesUsed: number;
+};
+
 export type HealthState = {
   injured: number;
   treatmentProgress: number;
@@ -121,6 +129,54 @@ export type GameSpeed = 1 | 24;
 
 export type WorkMode = "day" | "continuous";
 
+export type ObjectiveQuestId =
+  | "buildStorage"
+  | "buildGenerator"
+  | "buildDormitory"
+  | "buildWaterStill"
+  | "buildHydroponics"
+  | "buildPalisade";
+
+export type DecisionQuestId =
+  | "survivorsAtGate"
+  | "rationDispute"
+  | "radioCall";
+
+export type SuddenQuestId =
+  | "cropSpoilage";
+
+export type DecisionOptionId = string;
+
+export type ObjectiveQuestState = {
+  definitionId: ObjectiveQuestId;
+  completedAt: number | null;
+};
+
+export type ActiveDecisionQuestState = {
+  id: string;
+  definitionId: DecisionQuestId;
+  startedAt: number;
+  wasPaused: boolean;
+};
+
+export type QuestState = {
+  objectives: ObjectiveQuestState[];
+  activeDecision: ActiveDecisionQuestState | null;
+  resolvedDecisionCount: number;
+  resolvedSuddenCount: number;
+  nextDecisionAt: number;
+  recentDecisionIds: DecisionQuestId[];
+  recentSuddenIds: SuddenQuestId[];
+};
+
+export type LogEntrySource = "ui" | "questUi" | "questDecisionResult" | "questSuddenResult";
+
+export type LogEntry = {
+  source: LogEntrySource;
+  key: string;
+  params?: Record<string, string | number>;
+};
+
 export type GameState = {
   saveVersion: number;
   saveId: string;
@@ -133,7 +189,9 @@ export type GameState = {
   resources: Record<ResourceId, number>;
   capacities: Record<ResourceId, number>;
   survivors: SurvivorRoles;
+  quests: QuestState;
   scouting: ScoutingState;
+  market: MarketState;
   health: HealthState;
   buildings: Record<BuildingId, BuildingState>;
   village: {
@@ -145,7 +203,7 @@ export type GameState = {
     height: number;
     sectors: MapSector[];
   };
-  log: string[];
+  log: LogEntry[];
 };
 
 export type GameListener = (state: GameState) => void;

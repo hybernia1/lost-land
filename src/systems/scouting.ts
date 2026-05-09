@@ -1,6 +1,6 @@
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type { GameState, ResourceBag, ScoutingMode, ScoutingMission } from "../game/types";
-import { getLocalizedUiText, pushLocalizedLog } from "./log";
+import { pushLocalizedLog } from "./log";
 import { addResources } from "./resources";
 
 export const SCOUTING_DURATION_SECONDS = GAME_HOUR_REAL_SECONDS * 12;
@@ -36,7 +36,7 @@ export function startScoutingMission(
 
   pushLocalizedLog(state, "logScoutingStarted", {
     count: troops,
-    mode: getLocalizedUiText(getLocalizedModeKey(mode)),
+    modeKey: getLocalizedModeKey(mode),
   });
   return true;
 }

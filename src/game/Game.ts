@@ -7,12 +7,14 @@ import {
   tickBuildings,
 } from "../systems/buildings";
 import { tickHealth } from "../systems/health";
-import { localizeStaticLogEntries } from "../systems/log";
+import { normalizeLogEntries } from "../systems/log";
+import { normalizeMarketState, tickMarket, tradeAtMarket as executeMarketTrade } from "../systems/market";
+import { normalizeQuestState, resolveDecisionQuest, tickQuests } from "../systems/quests";
 import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
 import { startScoutingMission, tickScouting } from "../systems/scouting";
 import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
 import { createInitialState } from "./createInitialState";
-import type { BuildingId, GameListener, GameSpeed, GameState, ScoutingMode } from "./types";
+import type { BuildingId, DecisionOptionId, GameListener, GameSpeed, GameState, ResourceId, ScoutingMode } from "./types";
 
 const TICK_SECONDS = 1;
 const AUTOSAVE_REAL_SECONDS = 10;
@@ -68,10 +70,13 @@ export class Game {
     this.commit();
   }
 
-  buildAtPlot(plotId: string, buildingId: BuildingId): void {
+  buildAtPlot(plotId: string, buildingId: BuildingId): boolean {
     if (startBuildingConstruction(this.state, plotId, buildingId)) {
       this.commit();
+      return true;
     }
+
+    return false;
   }
 
   upgradeBuilding(buildingId: BuildingId): void {
@@ -100,6 +105,18 @@ export class Game {
 
   startScouting(mode: ScoutingMode, troopCount: number): void {
     if (startScoutingMission(this.state, mode, troopCount)) {
+      this.commit();
+    }
+  }
+
+  tradeAtMarket(fromResourceId: ResourceId, toResourceId: ResourceId, amount: number): void {
+    if (executeMarketTrade(this.state, fromResourceId, toResourceId, amount)) {
+      this.commit();
+    }
+  }
+
+  resolveQuestDecision(optionId: DecisionOptionId): void {
+    if (resolveDecisionQuest(this.state, optionId)) {
       this.commit();
     }
   }
@@ -149,6 +166,8 @@ export class Game {
     const scaledDelta = deltaSeconds * this.state.speed;
     this.state.elapsedSeconds += scaledDelta;
     tickBuildings(this.state, scaledDelta);
+    tickMarket(this.state, scaledDelta);
+    tickQuests(this.state);
     tickScouting(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
     tickHealth(this.state, scaledDelta);
@@ -188,7 +207,9 @@ function normalizeGameState(state: GameState): void {
   state.saveId = state.saveId?.trim() || `community-${Date.now().toString(36)}`;
   state.saveVersion = SAVE_VERSION;
   state.workMode = state.workMode === "continuous" ? "continuous" : "day";
-  state.log = localizeStaticLogEntries(state.log ?? []);
+  state.log = normalizeLogEntries(state.log ?? []);
+  normalizeQuestState(state);
+  normalizeMarketState(state);
   state.scouting = {
     missions: Array.isArray(state.scouting?.missions)
       ? state.scouting.missions

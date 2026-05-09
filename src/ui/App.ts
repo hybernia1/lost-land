@@ -272,7 +272,7 @@ export class App {
   }
 
   private handleGameAction(detail: PixiActionDetail): void {
-    const { action, building, continuousShifts, delta, plot, resourceId, scoutMode, scoutTroops, speed, troopCount } = detail;
+    const { action, building, continuousShifts, delta, marketAmount, marketFromResource, marketToResource, plot, questOption, resourceId, scoutMode, scoutTroops, speed, troopCount } = detail;
 
     if (action === "consume-pointer") {
       return;
@@ -312,6 +312,11 @@ export class App {
       return;
     }
 
+    if (action === "resolve-quest-decision" && questOption) {
+      this.game.resolveQuestDecision(questOption);
+      return;
+    }
+
     if (action === "close-village-modal") {
       this.villageModalPlotId = null;
       this.villageInfoPanel = null;
@@ -326,7 +331,11 @@ export class App {
     }
 
     if (action === "build" && building && plot) {
-      this.game.buildAtPlot(plot, building);
+      if (this.game.buildAtPlot(plot, building)) {
+        this.villageModalPlotId = null;
+        this.villageInfoPanel = null;
+        this.requestRender();
+      }
       return;
     }
 
@@ -338,6 +347,11 @@ export class App {
     if (action === "building-workers" && building && this.state) {
       const currentWorkers = this.state.buildings[building].workers;
       this.game.setBuildingWorkers(building, currentWorkers + (delta ?? 0));
+      return;
+    }
+
+    if (action === "market-trade" && marketFromResource && marketToResource && marketAmount) {
+      this.game.tradeAtMarket(marketFromResource, marketToResource, marketAmount);
       return;
     }
 

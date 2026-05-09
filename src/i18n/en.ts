@@ -1,4 +1,5 @@
 import type { TranslationPack } from "./types";
+import { questTranslations } from "./quests";
 
 export const en: TranslationPack = {
   locale: "en",
@@ -42,6 +43,8 @@ export const en: TranslationPack = {
     moraleFoodShortage: "Food shortage",
     moraleWaterShortage: "Water shortage",
     moraleContinuousShifts: "24h shifts",
+    mainBuildingProductionBonus: "Main building bonus",
+    moraleProductionPenalty: "Low morale",
     activeBuilds: "Active builds",
     villageBuildings: "Village Buildings",
     level: "Lvl",
@@ -80,6 +83,7 @@ export const en: TranslationPack = {
     population: "Population",
     globalStatus: "Global status",
     production: "Production",
+    consumption: "Consumption",
     productionTooltip: "Net resource change per game hour after buildings and survivor consumption.",
     resource: "Resource",
     stock: "Stock",
@@ -89,6 +93,7 @@ export const en: TranslationPack = {
     maxLevelReached: "Maximum level reached.",
     treatment: "Treatment",
     workers: "Workers",
+    sleeping: "Idle",
     operations: "Operations",
     training: "Training",
     squadSize: "Squad size",
@@ -134,7 +139,21 @@ export const en: TranslationPack = {
     continuousShifts: "24h shifts",
     dayShiftActive: "Production runs until 22:00.",
     nightProductionPaused: "Production is paused until 08:00.",
-    continuousShiftsMorale: "Night production continues, but morale falls.",
+    continuousShiftsMorale: "Production runs all day, but fatigue drains morale and hits hard at night.",
+    requiresMainBuildingLevel: "Requires main building level {level}.",
+    requiresMainBuildingLevelShort: "Main lvl {level}",
+    marketExchange: "Exchange",
+    marketGive: "Give",
+    marketReceive: "Receive",
+    marketAmount: "Amount",
+    marketTrade: "Trade",
+    marketTradeLimit: "Trade limit",
+    marketTrades: "Trades",
+    marketCooldown: "Cooldown",
+    marketNoTrades: "The market is waiting for the next trade window.",
+    marketSameResource: "Choose two different resources.",
+    marketNoCapacity: "Not enough stock or free storage capacity.",
+    logMarketTrade: "The market traded {amount} {fromResource} for {toResource}.",
   },
   resources: {
     food: "Food",
@@ -148,12 +167,12 @@ export const en: TranslationPack = {
     water: "Consumed every tick by survivors. Produced by water systems and found in safe locations.",
     material: "Main construction resource for buildings, upgrades and perimeter work.",
     energy: "Power reserve produced by staffed generators and used by technical buildings.",
-    morale: "Overall community stability. Low morale will make survival events harsher.",
+    morale: "Overall community stability. Low morale makes survival events harsher and lowers production.",
   },
   buildings: {
     mainBuilding: {
       name: "Main Building",
-      description: "Coordinates construction, housing, and camp decisions.",
+      description: "Coordinates construction, decisions, and attracts survivors at key levels.",
     },
     storage: {
       name: "Storage Depot",
@@ -161,7 +180,7 @@ export const en: TranslationPack = {
     },
     dormitory: {
       name: "Dormitory",
-      description: "Houses civilian survivors, but needs power to stay livable.",
+      description: "Houses civilian survivors, but needs power, water, and food.",
     },
     hydroponics: {
       name: "Hydroponics",
@@ -175,13 +194,13 @@ export const en: TranslationPack = {
       name: "Workshop",
       description: "Turns scrap into useful construction material.",
     },
-    scrapyard: {
-      name: "Scrapyard",
-      description: "Sorts salvage into construction material, but needs power to run.",
-    },
     generator: {
       name: "Generator",
       description: "Produces energy when survivors are assigned to operate it.",
+    },
+    market: {
+      name: "Marketplace",
+      description: "Trades stored supplies with other communities through radio deals.",
     },
     watchtower: {
       name: "Watchtower",
@@ -197,9 +216,10 @@ export const en: TranslationPack = {
     },
     clinic: {
       name: "Clinic",
-      description: "Treats injured survivors over time and consumes food for each patient.",
+      description: "Treats injured survivors over time and consumes food and water for care.",
     },
   },
+  quests: questTranslations.en,
   tiles: {
     base: "Home Base",
     ruins: "City Ruins",
