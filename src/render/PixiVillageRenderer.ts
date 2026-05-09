@@ -236,7 +236,12 @@ const resourceColors: Record<ResourceId, number> = {
   morale: 0xe9a0a0,
 };
 
-const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
+const VILLAGE_BUILDING_RENDER_SCALE = 2;
+const BUILDING_PREVIEW_BASE_RENDER_SCALE = 1.3;
+const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
+  1,
+  VILLAGE_BUILDING_RENDER_SCALE / BUILDING_PREVIEW_BASE_RENDER_SCALE,
+);
 const villagePlotDefinitions = defaultVillageLayout.plots;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 const HUD_MAX_PIXEL_SCALE = 1.2;
@@ -2742,7 +2747,11 @@ export class PixiVillageRenderer {
     asset.anchor.set(0.5);
     asset.x = 72;
     asset.y = options.height / 2;
-    this.fitSprite(asset, Math.min(104, options.height * 1.42), Math.min(78, options.height * 0.96));
+    this.fitSprite(
+      asset,
+      Math.min(104 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 1.42),
+      Math.min(78 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 0.96),
+    );
     row.addChild(asset);
 
     const textX = 150;
@@ -2832,7 +2841,11 @@ export class PixiVillageRenderer {
     asset.anchor.set(0.5);
     asset.x = sideMargin + 54;
     asset.y = contentTop + 50;
-    this.fitSprite(asset, 96, 72);
+    this.fitSprite(
+      asset,
+      96 * BUILDING_PREVIEW_RENDER_SCALE,
+      72 * BUILDING_PREVIEW_RENDER_SCALE,
+    );
     content.addChild(asset);
 
     this.drawText(content, translated.name, titleX, contentTop + 6, { fill: 0xf5efdf, fontSize: 30, fontWeight: "900" });
