@@ -292,6 +292,7 @@ export class PixiVillageRenderer {
   private resourceBreakdownScrollArea: Bounds | null = null;
   private resourceBreakdownScrollMax = 0;
   private resourceBreakdownScrollY = 0;
+  private hudInteractionAreas: Bounds[] = [];
   private resourceBreakdownScrollResourceId: ResourceId | null = null;
   private resourceBreakdownScrollTab: ResourceBreakdownTab = "production";
   private decisionHistoryScrollArea: Bounds | null = null;
@@ -371,6 +372,7 @@ export class PixiVillageRenderer {
     this.resourceBreakdownScrollMax = 0;
     this.decisionHistoryScrollArea = null;
     this.decisionHistoryScrollMax = 0;
+    this.hudInteractionAreas = [];
     this.hudLayer.scale.set(1);
     this.clampCamera(width, height);
     this.cameraLayer.x = this.cameraOffsetX;
@@ -607,7 +609,12 @@ export class PixiVillageRenderer {
     const x = clientX - rect.left;
     const y = clientY - rect.top;
 
-    return y < 88 || x < 360 || x > this.host.clientWidth - 360;
+    return this.hudInteractionAreas.some((area) =>
+      x >= area.x &&
+      x <= area.x + area.width &&
+      y >= area.y &&
+      y <= area.y + area.height
+    );
   }
 
   destroy(): void {
@@ -1206,6 +1213,7 @@ export class PixiVillageRenderer {
     }
 
     group.x = Math.max(390, (width - x) / 2);
+    this.registerHudInteractionForContainer(group, 6);
   }
 
   private drawResourcePills(
@@ -1244,6 +1252,7 @@ export class PixiVillageRenderer {
     }
 
     group.x = Math.max(28, width - x - 28);
+    this.registerHudInteractionForContainer(group, 6);
   }
 
   private drawSurvivorOverviewPanel(
@@ -1713,6 +1722,7 @@ export class PixiVillageRenderer {
         fontSize: 11,
         fontWeight: "800",
       });
+      this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
       return panelHeight;
     }
 
@@ -1734,6 +1744,7 @@ export class PixiVillageRenderer {
       timer.anchor.set(1, 0);
     });
 
+    this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
     return panelHeight;
   }
 
@@ -1777,6 +1788,7 @@ export class PixiVillageRenderer {
         fontSize: 11,
         fontWeight: "800",
       });
+      this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
       return;
     }
 
@@ -1805,6 +1817,8 @@ export class PixiVillageRenderer {
       });
       this.drawRewardLine(layer, definition.reward, translations, 14, rowY + 48);
     });
+
+    this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
   }
 
   private drawWorkforceRow(
@@ -1855,6 +1869,7 @@ export class PixiVillageRenderer {
 
     if (queue.length === 0) {
       this.drawText(layer, translations?.ui.queueEmpty ?? "No active construction.", 14, 44, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "700" });
+      this.registerHudInteractionArea(layer.x, layer.y, 308, 78, 6);
       return;
     }
 
@@ -1867,6 +1882,8 @@ export class PixiVillageRenderer {
         fontWeight: "700",
       });
     });
+
+    this.registerHudInteractionArea(layer.x, layer.y, 308, 78, 6);
   }
 
   private drawEventLog(state: GameState, translations: TranslationPack | undefined, height: number): void {
@@ -1897,6 +1914,7 @@ export class PixiVillageRenderer {
         fontSize: 11,
         fontWeight: "700",
       });
+      this.registerHudInteractionArea(layer.x, layer.y, width, panelHeight, 6);
       return;
     }
 
@@ -1937,6 +1955,8 @@ export class PixiVillageRenderer {
         .fill({ color: 0xe0c46f, alpha: 0.6 });
       layer.addChild(track);
     }
+
+    this.registerHudInteractionArea(layer.x, layer.y, width, panelHeight, 6);
   }
 
   private drawToolbar(state: GameState, translations: TranslationPack | undefined, width: number, height: number): void {
@@ -1950,6 +1970,7 @@ export class PixiVillageRenderer {
     this.createHudButton(group, translations?.ui.speedNormal ?? "1x", 56, 8, 44, 32, { speed: 1 }, state.speed === 1);
     this.createHudButton(group, translations?.ui.speedFast ?? "24x", 108, 8, 52, 32, { speed: 24 }, state.speed === 24);
     this.createIconButton(group, "home", 168, 8, 40, 32, { action: "home" }, translations?.ui.home);
+    this.registerHudInteractionArea(group.x, group.y, 216, 48, 6);
   }
 
   private drawActionPanel(
@@ -2001,6 +2022,7 @@ export class PixiVillageRenderer {
       archiveTooltip,
       false,
     );
+    this.registerHudInteractionArea(group.x, group.y, panelWidth, panelHeight, 6);
   }
 
   private drawInfoPanel(
@@ -4897,6 +4919,7 @@ export class PixiVillageRenderer {
     this.scaleBounds(this.logScrollArea, scale);
     this.scaleBounds(this.resourceBreakdownScrollArea, scale);
     this.scaleBounds(this.decisionHistoryScrollArea, scale);
+    this.hudInteractionAreas.forEach((area) => this.scaleBounds(area, scale));
   }
 
   private scaleBounds(bounds: Bounds | null, scale: number): void {
@@ -4908,6 +4931,31 @@ export class PixiVillageRenderer {
     bounds.y *= scale;
     bounds.width *= scale;
     bounds.height *= scale;
+  }
+
+  private registerHudInteractionArea(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    padding = 0,
+  ): void {
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    this.hudInteractionAreas.push({
+      x: x - padding,
+      y: y - padding,
+      width: width + padding * 2,
+      height: height + padding * 2,
+    });
+  }
+
+  private registerHudInteractionForContainer(container: Container, padding = 0): void {
+    const bounds = container.getBounds();
+
+    this.registerHudInteractionArea(bounds.x, bounds.y, bounds.width, bounds.height, padding);
   }
 
   private scaleHitArea(target: Container, scale: number): void {
