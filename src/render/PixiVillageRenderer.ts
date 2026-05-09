@@ -752,7 +752,6 @@ export class PixiVillageRenderer {
 
     this.drawBrand(
       state.communityName,
-      `${t?.ui.day ?? "Day"} ${day} / ${clock}`,
       decisionProfileIconByKind[profileKind],
       profileTooltip,
       this.getBrandAlerts(state, t),
@@ -795,7 +794,6 @@ export class PixiVillageRenderer {
 
   private drawBrand(
     title: string,
-    subtitle: string,
     iconId: string,
     tooltip?: string,
     alerts: BrandAlert[] = [],
@@ -817,11 +815,6 @@ export class PixiVillageRenderer {
       fill: 0xf5efdf,
       fontSize: 33,
       fontWeight: "900",
-    });
-    this.drawText(layer, subtitle, 64, 40, {
-      fill: 0xd8c890,
-      fontSize: 12,
-      fontWeight: "700",
     });
 
     this.drawBrandAlerts(layer, alerts, 0, 62);
@@ -1108,15 +1101,15 @@ export class PixiVillageRenderer {
       { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
       { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
       { iconId: "scout", value: `${scoutingTroops}`, label: translations.ui.scoutingTroops, tooltip: translations.ui.scoutingTroops },
-      { iconId: "morale", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
+      { iconId: "crisis-injured", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
       {
-        iconId: "home",
+        iconId: "crisis-shelter",
         value: `${housing.housed}/${housing.civilianCapacity + this.getTroopHousingCapacity(state)}`,
         label: translations.ui.housed,
         tooltip: translations.ui.housingTooltip,
       },
       {
-        iconId: "home",
+        iconId: "crisis-homeless",
         value: `${housing.homeless}`,
         label: translations.ui.homeless,
         tooltip: translations.ui.housingTooltip,
@@ -1419,7 +1412,7 @@ export class PixiVillageRenderer {
 
     if (option.injured) {
       impacts.push({
-        iconId: "people",
+        iconId: "crisis-injured",
         value: this.formatSignedInteger(option.injured),
         tooltip: `${translations.roles.injured} ${this.formatSignedInteger(option.injured)}`,
         negative: option.injured > 0,
@@ -1794,7 +1787,7 @@ export class PixiVillageRenderer {
 
     this.createCircularActionButton(
       group,
-      "fist",
+      "continuous-shifts",
       panelWidth / 2 - 36,
       40,
       27,
