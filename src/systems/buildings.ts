@@ -1,7 +1,7 @@
 import { buildingById, buildingDefinitions } from "../data/buildings";
 import { getEnvironmentMoralePenaltyPerHour } from "../data/environment";
 import { resourceIds } from "../data/resources";
-import { villagePlotDefinitions } from "../data/villagePlots";
+import { defaultVillageLayout } from "../data/villageLayouts";
 import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "../game/time";
 import type {
   BuildingId,
@@ -33,6 +33,7 @@ const MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS = 0.05;
 const MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS = 0.07;
 const MAIN_BUILDING_MAX_PRODUCTION_BONUS = 0.5;
 const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
+const villagePlotDefinitions = defaultVillageLayout.plots;
 const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.45;
 const WORKSHOP_BASE_MATERIAL_RATE = 0.22;
 const WORKSHOP_BASE_COAL_RATE = 0.025;

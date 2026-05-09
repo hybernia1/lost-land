@@ -103,7 +103,7 @@ src/
   render/
     PixiVillageRenderer.ts
     pixiIcons.ts
-    buildingAssets.ts
+    villageAssets.ts
   ui/
     App.ts
     panels/
@@ -215,11 +215,11 @@ cleanly instead of carrying compatibility branches.
 - Do not use an ammo resource. Troops are currently a dummy/simple role until
   future random outside expeditions are designed.
 - Use a minimal 2D/2.5D visual style before investing in detailed art.
-- Building visuals load through `src/render/villageAssets.ts`. Real atlas
-  definitions live in `src/data/buildingVisuals.ts`; buildings without atlas
-  art still fall back to canvas vector assets in `src/render/buildingAssets.ts`.
-  Keep individual building silhouettes readable at small slot sizes and avoid
-  moving game rules into visual asset code.
+- Building visuals load through `src/render/villageAssets.ts`. Atlas
+  definitions live in `src/data/buildingVisuals.ts`; production buildings
+  should use explicit pixel-art atlas assets instead of canvas/vector fallback
+  renderers. Keep individual building silhouettes readable at small slot sizes
+  and avoid moving game rules into visual asset code.
 - The Main Building currently uses `src/assets/buildings/main-building-atlas.png`
   as a `5x4` static atlas with 20 level frames at `256x256`. Do not animate the
   building by cycling atlas frames; use Pixi effects for smoke, lights, weather,

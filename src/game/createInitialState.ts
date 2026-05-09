@@ -1,7 +1,7 @@
 import { buildingDefinitions } from "../data/buildings";
 import { ENVIRONMENT_INITIAL_DELAY_SECONDS } from "../data/environment";
 import { emptyResourceRecord } from "../data/resources";
-import { villagePlotDefinitions } from "../data/villagePlots";
+import { defaultVillageLayout } from "../data/villageLayouts";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialQuestState } from "../systems/quests";
@@ -72,7 +72,7 @@ export function createInitialState(
     buildings,
     village: {
       selectedPlotId: "plot-main",
-      plots: villagePlotDefinitions.map((plot) => ({
+      plots: defaultVillageLayout.plots.map((plot) => ({
         id: plot.id,
         buildingId: plot.id === "plot-main" ? "mainBuilding" : null,
       })),

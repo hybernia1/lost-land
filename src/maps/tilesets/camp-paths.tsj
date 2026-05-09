@@ -1,0 +1,33 @@
+{
+  "columns": 4,
+  "image": "../../assets/tiles/camp-paths.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "camp-paths",
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.11.2",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "pathNone" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "pathN" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "pathE" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "pathNE" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "pathS" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "pathNS" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "pathES" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "pathNES" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "pathW" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "pathNW" }] },
+    { "id": 10, "properties": [{ "name": "tileId", "type": "string", "value": "pathEW" }] },
+    { "id": 11, "properties": [{ "name": "tileId", "type": "string", "value": "pathNEW" }] },
+    { "id": 12, "properties": [{ "name": "tileId", "type": "string", "value": "pathSW" }] },
+    { "id": 13, "properties": [{ "name": "tileId", "type": "string", "value": "pathNSW" }] },
+    { "id": 14, "properties": [{ "name": "tileId", "type": "string", "value": "pathESW" }] },
+    { "id": 15, "properties": [{ "name": "tileId", "type": "string", "value": "pathNESW" }] }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}

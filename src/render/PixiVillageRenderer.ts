@@ -14,7 +14,7 @@ import { getEnvironmentDefinition } from "../data/environment";
 import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
 import { objectiveQuestById } from "../data/quests";
 import { defaultVillageLayout } from "../data/villageLayouts";
-import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
+import type { VillagePlotDefinition } from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
 import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, EnvironmentConditionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
@@ -236,16 +236,6 @@ type MainBuildingEffect = {
   smoke: Graphics;
 };
 
-type PalisadeGeometry = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  gateX: number;
-  gateY: number;
-  points: Array<{ x: number; y: number }>;
-};
-
 const resourceColors: Record<ResourceId, number> = {
   food: 0xd8b66a,
   water: 0x66bde8,
@@ -255,6 +245,7 @@ const resourceColors: Record<ResourceId, number> = {
 };
 
 const VILLAGE_BUILDING_RENDER_SCALE = 1.3;
+const villagePlotDefinitions = defaultVillageLayout.plots;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 const HUD_MAX_PIXEL_SCALE = 1.2;
 const CAMERA_MIN_ZOOM = 0.75;
@@ -400,7 +391,6 @@ export class PixiVillageRenderer {
       this.drawPlot(plot, state, translations, visualTime);
     }
 
-    this.drawGate(state);
     this.drawDaylightOverlay(state, width, height);
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
@@ -656,30 +646,11 @@ export class PixiVillageRenderer {
     this.requestRender();
   }
 
-  private drawBackground(state: GameState, width: number, height: number): void {
+  private drawBackground(_state: GameState, width: number, height: number): void {
     const base = new Graphics();
     base.rect(0, 0, width, height).fill({ color: 0x151812, alpha: 1 });
     this.worldLayer.addChild(base);
-    this.drawTerrain(state, width, height);
-
-    const backgroundTexture = this.assets.getBackgroundTexture(state.environment.condition);
-
-    if (!backgroundTexture || defaultVillageLayout.tileLayers.some((layer) => layer.tiles.length > 0)) {
-      const overlay = new Graphics();
-      overlay.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.08 });
-      this.worldLayer.addChild(overlay);
-      return;
-    }
-
-    if (backgroundTexture) {
-      const sprite = new Sprite(backgroundTexture);
-      const scale = Math.max(width / sprite.texture.width, height / sprite.texture.height);
-      sprite.width = sprite.texture.width * scale;
-      sprite.height = sprite.texture.height * scale;
-      sprite.x = (width - sprite.width) / 2;
-      sprite.y = (height - sprite.height) / 2;
-      this.worldLayer.addChild(sprite);
-    }
+    this.drawTerrain(_state, width, height);
 
     const overlay = new Graphics();
     overlay.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.08 });
@@ -773,41 +744,18 @@ export class PixiVillageRenderer {
     state: GameState,
     translations?: TranslationPack,
   ): void {
-    const { scale } = this.layout;
     const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
+    const plotDefinition = villagePlotDefinitions.find((candidate) => candidate.id === "plot-palisade");
     const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
-    const hasStarted = plot?.buildingId === "palisade";
-    const built = (building?.level ?? 0) > 0;
     const selected = state.village.selectedPlotId === "plot-palisade";
-    const geometry = this.getPalisadeGeometry();
-    const alpha = built ? 1 : hasStarted ? 0.58 : 0.25;
 
-    const palisade = new Graphics();
-    const innerInset = 18 * scale;
-    palisade
-      .poly([
-        geometry.left + innerInset, geometry.top + innerInset,
-        geometry.right - innerInset, geometry.top + innerInset,
-        geometry.right - innerInset, geometry.bottom - innerInset,
-        geometry.left + innerInset, geometry.bottom - innerInset,
-      ])
-      .fill({ color: 0x4f4a2d, alpha: 0.26 });
-    this.drawPalisadeLine(palisade, geometry.points, 0x2c2119, alpha, 18 + (building?.level ?? 0) * 1.2);
-    this.drawPalisadeLine(palisade, geometry.points, 0x8f6842, alpha, 7 + (building?.level ?? 0) * 0.7);
-    this.cameraLayer.addChild(palisade);
-
-    const posts = new Container();
-    const postSpacing = 22 * scale;
-    const postPoints = this.getPalisadePostPoints(geometry.points, postSpacing);
-    for (const postPoint of postPoints) {
-      const post = new Graphics();
-      post.rect(-2.5 * scale, -14 * scale, 5 * scale, 28 * scale).fill({ color: 0xa77a4d, alpha });
-      post.x = postPoint.x;
-      post.y = postPoint.y;
-      post.rotation = postPoint.angle;
-      posts.addChild(post);
+    if (!plotDefinition) {
+      return;
     }
-    this.cameraLayer.addChild(posts);
+
+    const bounds = this.getPlotBounds(plotDefinition);
+    const badgeX = bounds.x + bounds.width / 2;
+    const badgeY = bounds.y - 18 * this.layout.scale;
 
     this.addPalisadeTooltip(
       selected,
@@ -820,8 +768,8 @@ export class PixiVillageRenderer {
       this.drawBuildingLevelBadge(
         this.cameraLayer,
         Math.max(1, building.level),
-        geometry.gateX - 30 * scale,
-        geometry.gateY - 58 * scale,
+        badgeX,
+        badgeY,
         translations,
         translations?.buildings.palisade.name ?? "Palisade",
       );
@@ -831,55 +779,12 @@ export class PixiVillageRenderer {
       this.drawConstructionCountdown(
         this.cameraLayer,
         building.upgradingRemaining,
-        geometry.gateX,
-        geometry.gateY - 92 * scale,
-        Math.max(70, 86 * scale),
+        bounds.x + bounds.width / 2,
+        bounds.y - 52 * this.layout.scale,
+        Math.max(70, 86 * this.layout.scale),
         undefined,
       );
     }
-  }
-
-  private drawPalisadeLine(
-    graphics: Graphics,
-    points: Array<{ x: number; y: number }>,
-    color: number,
-    alpha: number,
-    width: number,
-  ): void {
-    if (points.length === 0) {
-      return;
-    }
-
-    graphics.moveTo(points[0].x, points[0].y);
-
-    for (const point of points.slice(1)) {
-      graphics.lineTo(point.x, point.y);
-    }
-
-    graphics.closePath().stroke({ color, alpha, width });
-  }
-
-  private getPalisadePostPoints(
-    points: Array<{ x: number; y: number }>,
-    spacing: number,
-  ): Array<{ x: number; y: number; angle: number }> {
-    return points.flatMap((point, index) => {
-      const nextPoint = points[(index + 1) % points.length];
-      const deltaX = nextPoint.x - point.x;
-      const deltaY = nextPoint.y - point.y;
-      const length = Math.hypot(deltaX, deltaY);
-      const steps = Math.max(1, Math.floor(length / spacing));
-      const angle = Math.atan2(deltaY, deltaX) + Math.PI / 2;
-
-      return Array.from({ length: steps }, (_, step) => {
-        const progress = step / steps;
-        return {
-          x: point.x + deltaX * progress,
-          y: point.y + deltaY * progress,
-          angle,
-        };
-      });
-    });
   }
 
   private drawPlot(
@@ -919,12 +824,6 @@ export class PixiVillageRenderer {
         translations?.ui.level ?? "Lvl",
       );
       this.bindTooltip(plotLayer, tooltip);
-
-      const shadow = new Graphics();
-      shadow
-        .ellipse(0, bounds.height * 0.36, bounds.width * 0.58, bounds.height * 0.33)
-        .fill({ color: 0x000000, alpha: 0.36 });
-      plotLayer.addChild(shadow);
 
       const asset = new Sprite(this.assets.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
       asset.anchor.set(0.5);
@@ -984,20 +883,6 @@ export class PixiVillageRenderer {
         width: Math.max(3, 5 * this.layout.scale),
       });
     plotLayer.addChild(empty);
-  }
-
-  private drawGate(state: GameState): void {
-    const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
-    const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
-    const alpha = (building?.level ?? 0) > 0 ? 1 : plot?.buildingId ? 0.58 : 0.3;
-    const { gateX, gateY } = this.getPalisadeGeometry();
-    const scale = this.layout.scale;
-    const gate = new Graphics();
-
-    gate.rect(gateX - 46 * scale, gateY - 64 * scale, 92 * scale, 74 * scale).fill({ color: 0x4d3629, alpha });
-    gate.rect(gateX - 25 * scale, gateY - 42 * scale, 50 * scale, 52 * scale).fill({ color: 0x161916, alpha });
-    gate.rect(gateX - 58 * scale, gateY - 72 * scale, 116 * scale, 13 * scale).fill({ color: 0xb0834d, alpha });
-    this.cameraLayer.addChild(gate);
   }
 
   private drawHud(
@@ -4891,18 +4776,11 @@ export class PixiVillageRenderer {
 
   private drawMainBuildingBaseGlow(
     graphics: Graphics,
-    phase: number,
-    bounds: Bounds,
-    visualTime: number,
+    _phase: number,
+    _bounds: Bounds,
+    _visualTime: number,
   ): void {
-    const baseGlowAlpha = 0.08 + phase * 0.025;
-    const lightPulse = 0.75 + Math.sin(visualTime * 4.4 + phase) * 0.18;
-    const centerX = bounds.x + bounds.width / 2;
-    const baseY = bounds.y + bounds.height * 0.9;
-
-    graphics.clear()
-      .ellipse(centerX, baseY, bounds.width * (0.26 + phase * 0.025), bounds.height * 0.085)
-      .fill({ color: 0xf0c766, alpha: baseGlowAlpha * lightPulse });
+    graphics.clear();
   }
 
   private drawMainBuildingLights(
@@ -5181,65 +5059,17 @@ export class PixiVillageRenderer {
     return Math.min(HUD_MAX_PIXEL_SCALE, Math.max(1, Math.min(width / 1120, height / 640)));
   }
 
-  private getPalisadeGeometry(): PalisadeGeometry {
-    const { originX, originY, width, height } = this.layout;
-    const left = originX + width * 0.11;
-    const top = originY + height * 0.16;
-    const right = originX + width * 0.89;
-    const bottom = originY + height * 0.86;
-    const corner = Math.min(width, height) * 0.065;
-    const gateWidth = width * 0.1;
-    const gateX = originX + width * 0.5;
-    const gateY = bottom;
-
-    return {
-      left,
-      top,
-      right,
-      bottom,
-      gateX,
-      gateY,
-      points: [
-        { x: left + corner, y: top },
-        { x: right - corner, y: top },
-        { x: right, y: top + corner },
-        { x: right, y: bottom - corner },
-        { x: right - corner, y: bottom },
-        { x: gateX + gateWidth / 2, y: bottom },
-        { x: gateX + gateWidth / 2, y: bottom - corner * 0.42 },
-        { x: gateX - gateWidth / 2, y: bottom - corner * 0.42 },
-        { x: gateX - gateWidth / 2, y: bottom },
-        { x: left + corner, y: bottom },
-        { x: left, y: bottom - corner },
-        { x: left, y: top + corner },
-      ],
-    };
-  }
-
   private getPlotBounds(plot: VillagePlotDefinition): Bounds {
-    if (plot.id === "plot-palisade") {
-      return this.getPalisadePlotBounds(plot);
-    }
-
     const width = plot.width * this.layout.scale;
     const height = plot.height * this.layout.scale;
+    const terrainWidth = defaultVillageLayout.width * this.layout.scale;
+    const terrainHeight = defaultVillageLayout.height * this.layout.scale;
+    const terrainOriginX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
+    const terrainOriginY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
 
     return {
-      x: this.layout.originX + plot.x * this.layout.width - width / 2,
-      y: this.layout.originY + plot.y * this.layout.height - height / 2,
-      width,
-      height,
-    };
-  }
-
-  private getPalisadePlotBounds(plot: VillagePlotDefinition): Bounds {
-    const width = plot.width * this.layout.scale;
-    const height = plot.height * this.layout.scale;
-    const { gateX, gateY } = this.getPalisadeGeometry();
-
-    return {
-      x: gateX - width / 2,
-      y: gateY - height * 0.72,
+      x: terrainOriginX + plot.x * this.layout.scale,
+      y: terrainOriginY + plot.y * this.layout.scale,
       width,
       height,
     };

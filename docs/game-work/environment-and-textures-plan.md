@@ -22,9 +22,9 @@ Spojujeme proto dve vrstvy:
   hry, ne obracene.
 - Aktualni implementovane condition jsou `stable`, `rain`, `snowFront` a
   `radiation`.
-- Vliv environmentu na mapu zatim delaji Pixi overlaye/tinty nad sdilenym
-  backgroundem. Samostatne backgroundy podle condition jsou pripraveny v
-  `src/render/villageAssets.ts`, ale zatim pouzivaji stejny placeholder obrazek.
+- Vliv environmentu na mapu zatim delaji Pixi overlaye/tinty nad Tiled
+  tilemapou. Samostatne backgroundy podle condition ted nejsou soucasti in-game
+  renderu.
 - Day/night je vizualni rezim odvozeny z herniho clocku. Den zacina v 08:00,
   noc zacina ve 22:00, svitani bezi 06:00-08:00 a soumrak 20:00-22:00.
 - Budovy nepouzivaji atlasove animacni smycky. Atlas drzi staticke stavebni
@@ -116,13 +116,14 @@ Soucasny stav:
 - frame order je level 1 az 20 zleva doprava, shora dolu
 - level 1 je chuda chatrc, level 20 je velka low-tech plechova zakladna
 - `src/data/buildingVisuals.ts` mapuje herni level primo na staticky frame
-- `src/render/villageAssets.ts` nacita atlasy a drzi canvas fallbacky pro budovy
-  bez hotoveho spritu
+- `src/render/villageAssets.ts` nacita explicitni atlasove assety pro budovy a
+  samostatny pixel-art asset pro rozestavenou stavbu
 - `src/render/PixiVillageRenderer.ts` kresli adaptivni Pixi efekty nad hlavni
   budovou podle levelu
 
 Palisade je specialni pripad. Je to perimeter building, ne bezny plot sprite.
-Muze zustat kreslena samostatne nebo mit vlastni sirsi asset.
+Je kreslena jako Tiled vrstva, zatimco herni interakce zustava na dedikovanem
+perimeter plotu.
 
 ## Day/Night
 

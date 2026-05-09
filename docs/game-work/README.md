@@ -17,9 +17,9 @@ ktere nechceme ztratit mezi jednotlivymi implementacnimi tahy.
 - Radiace zvysuje zdravotni incidenty a tlaci na moralku.
 - Day/night overlay je napojeny na herni clock: den 08:00-22:00, soumrak
   20:00-22:00, svitani 06:00-08:00.
-- Hlavni budova ma prvni realny atlas: `5x4` statickych levelu, kazdy `256x256`.
+- Budovy pouzivaji explicitni pixel-art atlasove assety.
 - Animace budov nejsou atlasove smycky. Zivot sceni delaji Pixi efekty nad statickym spritem.
-- Ostatni budovy zatim pouzivaji canvas fallback.
+- Palisada, cesty a pozemek vesnice jsou rizene pres Tiled vrstvy.
 
 ## Pravidla pro pouzivani
 

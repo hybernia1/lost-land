@@ -7,7 +7,7 @@ import type {
   VillageMapObjectDefinition,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
-import { villagePlotDefinitions } from "./villagePlots";
+import { villagePlotRulesById, type VillagePlotDefinition } from "./villagePlots";
 
 type TiledProperty = {
   name: string;
@@ -113,7 +113,7 @@ export function createVillageLayoutFromTiled(
     tileTextures: registry.tileTextures,
     tileLayers: getTileLayers(map, registry.gidToTile),
     objectLayers: getObjectLayers(map, registry.gidToTile),
-    plots: villagePlotDefinitions,
+    plots: getVillagePlots(map),
   };
 }
 
@@ -246,6 +246,42 @@ function getMapObjects(
         textureKey: tile?.textureKey ?? null,
       };
     });
+}
+
+function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
+  const layer = map.layers.find((candidate): candidate is TiledObjectLayer =>
+    candidate.type === "objectgroup" && candidate.name === "plots" && candidate.visible !== false,
+  );
+
+  if (!layer) {
+    throw new Error("Tiled map is missing object layer \"plots\".");
+  }
+
+  const plots = (layer.objects ?? [])
+    .filter((object) => object.visible !== false)
+    .map((object) => {
+      const id = getStringProperty(object.properties, "plotId") ?? object.name;
+
+      if (!id) {
+        throw new Error("Tiled plot object is missing a plotId property or name.");
+      }
+
+      return {
+        id,
+        x: object.x,
+        y: object.y,
+        width: object.width ?? 0,
+        height: object.height ?? 0,
+        ...villagePlotRulesById[id],
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
+
+  if (plots.length === 0) {
+    throw new Error("Tiled object layer \"plots\" does not contain any plot objects.");
+  }
+
+  return plots;
 }
 
 function getTileReference(rawGid: number, gidToTile: Map<number, GidTileReference>): GidTileReference | null {
