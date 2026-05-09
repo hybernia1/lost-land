@@ -4,8 +4,12 @@ import { villagePlotDefinitions } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialMap } from "../systems/map";
+import { createInitialQuestState } from "../systems/quests";
 import { SAVE_VERSION } from "../systems/save";
-import type { BuildingId, BuildingState, GameState } from "./types";
+import type { BuildingId, BuildingState, GameState, ResourceId } from "./types";
+
+const STARTING_STOCK_RATIO = 0.9;
+const startingStockResources: ResourceId[] = ["food", "water", "material", "energy"];
 
 export function createInitialState(
   communityName = "Lost Land",
@@ -35,10 +39,6 @@ export function createInitialState(
     workMode: "day",
     resources: {
       ...emptyResourceRecord(),
-      food: 105,
-      water: 112,
-      material: 150,
-      energy: 42,
       morale: 72,
     },
     capacities: emptyResourceRecord(),
@@ -46,8 +46,13 @@ export function createInitialState(
       workers: 3,
       troops: 0,
     },
+    quests: createInitialQuestState(),
     scouting: {
       missions: [],
+    },
+    market: {
+      cooldownRemainingSeconds: 0,
+      tradesUsed: 0,
     },
     health: {
       injured: 0,
@@ -69,7 +74,16 @@ export function createInitialState(
   };
 
   recalculateCapacities(state);
+  fillStartingStocks(state);
   return state;
+}
+
+function fillStartingStocks(state: GameState): void {
+  for (const resourceId of startingStockResources) {
+    state.resources[resourceId] = Math.floor(
+      state.capacities[resourceId] * STARTING_STOCK_RATIO,
+    );
+  }
 }
 
 function getStartingLevel(buildingId: BuildingId): number {

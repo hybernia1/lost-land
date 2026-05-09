@@ -9,7 +9,7 @@ import type {
   ResourceId,
 } from "../game/types";
 import { maybeInjureFromConstruction } from "./health";
-import { getLocalizedBuildingName, pushLocalizedLog } from "./log";
+import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
 import { addResources, canAfford, spendResources } from "./resources";
 
@@ -22,9 +22,21 @@ const BASE_CAPACITY: Record<ResourceId, number> = {
 };
 
 export const MAX_ACTIVE_BUILDINGS = 2;
+const BUILDING_LEVEL_GATE_LEVELS = [3, 5, 7, 10, 15] as const;
+const MAIN_BUILDING_SURVIVOR_ATTRACTION_LEVELS = new Set([2, 3, 5, 7, 10, 15, 20]);
 const GENERATOR_BASE_ENERGY_RATE = 0.28;
 const HOMELESS_MORALE_PENALTY_PER_HOUR = 1;
-const CONTINUOUS_SHIFT_MORALE_PENALTY_PER_HOUR = 2;
+const CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR = 1.25;
+const CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR = 6;
+const MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS = 0.05;
+const MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS = 0.07;
+const MAIN_BUILDING_MAX_PRODUCTION_BONUS = 0.5;
+const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
+const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.45;
+const WORKSHOP_BASE_MATERIAL_RATE = 0.22;
+const WORKSHOP_BASE_ENERGY_RATE = 0.025;
+const FOOD_CONSUMPTION_PER_SURVIVOR_PER_SECOND = 0.017;
+const WATER_CONSUMPTION_PER_SURVIVOR_PER_SECOND = 0.023;
 
 export type ResourceBreakdownLine = {
   source:
@@ -34,7 +46,9 @@ export type ResourceBreakdownLine = {
     | "homeless"
     | "foodShortage"
     | "waterShortage"
-    | "continuousShifts";
+    | "continuousShifts"
+    | "mainBuildingBonus"
+    | "moraleProductionPenalty";
   resourceId: ResourceId;
   ratePerSecond: number;
   buildingId?: BuildingId;
@@ -66,10 +80,78 @@ export function getConstructionWorkerRequirement(
   return getNextBuildingLevelRequirement(buildingId, currentLevel).constructionWorkers;
 }
 
+export function getSurvivorAttractionOnCompletedLevel(
+  buildingId: BuildingId,
+  completedLevel: number,
+): number {
+  if (buildingId === "mainBuilding") {
+    return MAIN_BUILDING_SURVIVOR_ATTRACTION_LEVELS.has(completedLevel) ? 1 : 0;
+  }
+
+  if (
+    buildingId === "palisade" ||
+    buildingId === "dormitory" ||
+    buildingId === "clinic"
+  ) {
+    return 1;
+  }
+
+  return 0;
+}
+
+export function getSurvivorAttractionMoraleReward(
+  buildingId: BuildingId,
+  attractedSurvivors: number,
+): number {
+  if (attractedSurvivors <= 0) {
+    return 0;
+  }
+
+  return attractedSurvivors * (buildingId === "mainBuilding" ? 1 : 2);
+}
+
+export function getMainBuildingLevelRequirement(
+  buildingId: BuildingId,
+  targetLevel: number,
+): number {
+  if (buildingId === "mainBuilding") {
+    return 1;
+  }
+
+  return Math.max(
+    buildingById[buildingId].requiredMainBuildingLevel ?? 1,
+    getMainBuildingLevelRequirementForTargetLevel(targetLevel),
+  );
+}
+
+export function isMainBuildingRequirementMet(
+  state: GameState,
+  buildingId: BuildingId,
+  targetLevel: number,
+): boolean {
+  return state.buildings.mainBuilding.level >=
+    getMainBuildingLevelRequirement(buildingId, targetLevel);
+}
+
+export function getMainBuildingLevelRequirementForTargetLevel(targetLevel: number): number {
+  let requiredLevel = 1;
+
+  for (const gateLevel of BUILDING_LEVEL_GATE_LEVELS) {
+    if (targetLevel > gateLevel) {
+      requiredLevel = gateLevel;
+    }
+  }
+
+  return requiredLevel;
+}
+
 export function getBuildingWorkerLimit(state: GameState, buildingId: BuildingId): number {
   const building = state.buildings[buildingId];
 
-  if (buildingId !== "generator" || building.level <= 0) {
+  if (
+    (buildingId !== "generator" && buildingId !== "workshop") ||
+    building.level <= 0
+  ) {
     return 0;
   }
 
@@ -109,6 +191,76 @@ export function getGeneratorEnergyRate(level: number, workers: number): number {
   return maxOutput * Math.min(workers, workerLimit) / workerLimit;
 }
 
+export function getWorkshopMaterialRate(level: number, workers: number): number {
+  if (level <= 0 || workers <= 0) {
+    return 0;
+  }
+
+  return WORKSHOP_BASE_MATERIAL_RATE * level * getStaffedBuildingWorkerRatio(level, workers);
+}
+
+export function getWorkshopEnergyRate(level: number, workers: number): number {
+  if (level <= 0 || workers <= 0) {
+    return 0;
+  }
+
+  return WORKSHOP_BASE_ENERGY_RATE * level * getStaffedBuildingWorkerRatio(level, workers);
+}
+
+function getStaffedBuildingWorkerRatio(level: number, workers: number): number {
+  const workerLimit = Math.min(4, level + 1);
+
+  return Math.min(workers, workerLimit) / workerLimit;
+}
+
+export function getMainBuildingProductionBonus(level: number): number {
+  if (level <= 1) {
+    return 0;
+  }
+
+  if (level === 2) {
+    return MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS;
+  }
+
+  if (level >= 20) {
+    return MAIN_BUILDING_MAX_PRODUCTION_BONUS;
+  }
+
+  return MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS +
+    (level - 3) *
+      ((MAIN_BUILDING_MAX_PRODUCTION_BONUS - MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS) / 17);
+}
+
+export function getMainBuildingMoraleRate(level: number): number {
+  if (level <= 0) {
+    return 0;
+  }
+
+  const clampedLevel = Math.min(20, Math.max(1, level));
+  const moralePerHour = MAIN_BUILDING_BASE_MORALE_PER_HOUR +
+    (clampedLevel - 1) *
+      ((MAIN_BUILDING_MAX_MORALE_PER_HOUR - MAIN_BUILDING_BASE_MORALE_PER_HOUR) / 19);
+
+  return moralePerHour / GAME_HOUR_REAL_SECONDS;
+}
+
+export function getGlobalProductionMultiplier(state: GameState): number {
+  return (1 + getMainBuildingProductionBonus(state.buildings.mainBuilding.level)) *
+    getMoraleProductionMultiplier(state.resources.morale);
+}
+
+export function getMoraleProductionMultiplier(morale: number): number {
+  if (morale >= 75) {
+    return 1;
+  }
+
+  if (morale >= 50) {
+    return 0.8;
+  }
+
+  return 0.6;
+}
+
 export function isBuildingInactiveDueToEnergy(
   state: GameState,
   buildingId: BuildingId,
@@ -136,6 +288,10 @@ export function isProductionShiftActive(state: GameState): boolean {
 
 export function isContinuousNightShiftActive(state: GameState): boolean {
   return state.workMode === "continuous" && !isDayShiftHour(state);
+}
+
+export function isContinuousShiftFatigueActive(state: GameState): boolean {
+  return state.workMode === "continuous";
 }
 
 export function getDormitoryHousingCapacity(state: GameState): number {
@@ -174,6 +330,8 @@ export function getResourceBreakdown(
 ): ResourceBreakdownLine[] {
   const lines: ResourceBreakdownLine[] = [];
   const productionActive = isProductionShiftActive(state);
+  const productionBonus = getMainBuildingProductionBonus(state.buildings.mainBuilding.level);
+  const moraleMultiplier = getMoraleProductionMultiplier(state.resources.morale);
 
   for (const definition of buildingDefinitions) {
     const building = state.buildings[definition.id];
@@ -201,18 +359,58 @@ export function getResourceBreakdown(
     }
 
     if (definition.id === "generator") {
-      const ratePerSecond = resourceId === "energy"
+      const baseRatePerSecond = resourceId === "energy"
         ? getGeneratorEnergyRate(building.level, building.workers)
         : 0;
 
-      if (ratePerSecond !== 0) {
+      if (baseRatePerSecond !== 0) {
         lines.push({
           source: "generator",
+          resourceId,
+          buildingId: definition.id,
+          ratePerSecond: baseRatePerSecond,
+        });
+        pushMainBuildingBonusLine(lines, resourceId, baseRatePerSecond, productionBonus);
+        pushMoraleProductionPenaltyLine(
+          lines,
+          resourceId,
+          baseRatePerSecond,
+          productionBonus,
+          moraleMultiplier,
+        );
+      }
+      continue;
+    }
+
+    if (definition.id === "workshop") {
+      if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+        continue;
+      }
+
+      const productionRatePerSecond = resourceId === "material"
+        ? getWorkshopMaterialRate(building.level, building.workers)
+        : 0;
+      const consumptionRatePerSecond = resourceId === "energy"
+        ? getWorkshopEnergyRate(building.level, building.workers)
+        : 0;
+      const ratePerSecond = productionRatePerSecond - consumptionRatePerSecond;
+
+      if (ratePerSecond !== 0) {
+        lines.push({
+          source: "building",
           resourceId,
           buildingId: definition.id,
           ratePerSecond,
         });
       }
+      pushMainBuildingBonusLine(lines, resourceId, productionRatePerSecond, productionBonus);
+      pushMoraleProductionPenaltyLine(
+        lines,
+        resourceId,
+        productionRatePerSecond,
+        productionBonus,
+        moraleMultiplier,
+      );
       continue;
     }
 
@@ -220,17 +418,62 @@ export function getResourceBreakdown(
       continue;
     }
 
-    const ratePerSecond =
-      ((definition.produces?.[resourceId] ?? 0) - (definition.consumes?.[resourceId] ?? 0)) *
-      building.level;
+    if (definition.id === "mainBuilding") {
+      const productionRatePerSecond = resourceId === "morale"
+        ? getMainBuildingMoraleRate(building.level)
+        : 0;
+      const consumptionRatePerSecond = (definition.consumes?.[resourceId] ?? 0) * building.level;
 
-    if (ratePerSecond !== 0) {
+      if (productionRatePerSecond !== 0) {
+        lines.push({
+          source: "building",
+          resourceId,
+          buildingId: definition.id,
+          ratePerSecond: productionRatePerSecond,
+        });
+      }
+
+      if (consumptionRatePerSecond !== 0) {
+        lines.push({
+          source: "building",
+          resourceId,
+          buildingId: definition.id,
+          ratePerSecond: -consumptionRatePerSecond,
+        });
+      }
+      continue;
+    }
+
+    const productionRatePerSecond = (definition.produces?.[resourceId] ?? 0) * building.level;
+    const consumptionRatePerSecond = (definition.consumes?.[resourceId] ?? 0) * building.level;
+
+    if (productionRatePerSecond !== 0) {
       lines.push({
         source: "building",
         resourceId,
         buildingId: definition.id,
-        ratePerSecond,
+        ratePerSecond: productionRatePerSecond,
       });
+    }
+
+    if (consumptionRatePerSecond !== 0) {
+      lines.push({
+        source: "building",
+        resourceId,
+        buildingId: definition.id,
+        ratePerSecond: -consumptionRatePerSecond,
+      });
+    }
+
+    if (resourceId !== "morale") {
+      pushMainBuildingBonusLine(lines, resourceId, productionRatePerSecond, productionBonus);
+      pushMoraleProductionPenaltyLine(
+        lines,
+        resourceId,
+        productionRatePerSecond,
+        productionBonus,
+        moraleMultiplier,
+      );
     }
   }
 
@@ -244,11 +487,12 @@ export function getResourceBreakdown(
     });
   }
 
-  if (resourceId === "morale" && isContinuousNightShiftActive(state)) {
+  if (resourceId === "morale" && isContinuousShiftFatigueActive(state)) {
     lines.push({
       source: "continuousShifts",
       resourceId,
-      ratePerSecond: -CONTINUOUS_SHIFT_MORALE_PENALTY_PER_HOUR / GAME_HOUR_REAL_SECONDS,
+      ratePerSecond: -getContinuousShiftMoralePenaltyPerHour(state) /
+        GAME_HOUR_REAL_SECONDS,
     });
   }
 
@@ -258,7 +502,7 @@ export function getResourceBreakdown(
       source: "survivorConsumption",
       resourceId,
       count: population,
-      ratePerSecond: -population * 0.012,
+      ratePerSecond: -population * FOOD_CONSUMPTION_PER_SURVIVOR_PER_SECOND,
     });
   }
 
@@ -267,7 +511,7 @@ export function getResourceBreakdown(
       source: "survivorConsumption",
       resourceId,
       count: population,
-      ratePerSecond: -population * 0.014,
+      ratePerSecond: -population * WATER_CONSUMPTION_PER_SURVIVOR_PER_SECOND,
     });
   }
 
@@ -360,6 +604,10 @@ export function startBuildingConstruction(
     return false;
   }
 
+  if (!isMainBuildingRequirementMet(state, buildingId, 1)) {
+    return false;
+  }
+
   const cost = getUpgradeCost(buildingId, 0);
   const constructionWorkers = getConstructionWorkerRequirement(buildingId, 0);
 
@@ -373,7 +621,7 @@ export function startBuildingConstruction(
   building.constructionWorkers = constructionWorkers;
   building.upgradingRemaining = getBuildingBuildSeconds(buildingId, 0);
   pushLocalizedLog(state, "logConstructionStarted", {
-    building: getLocalizedBuildingName(definition.id),
+    buildingId: definition.id,
   });
   return true;
 }
@@ -387,7 +635,8 @@ export function startBuildingUpgrade(state: GameState, buildingId: BuildingId): 
     !getPlacedBuildingIds(state).has(buildingId) ||
     building.level <= 0 ||
     building.level >= definition.maxLevel ||
-    building.upgradingRemaining > 0
+    building.upgradingRemaining > 0 ||
+    !isMainBuildingRequirementMet(state, buildingId, building.level + 1)
   ) {
     return false;
   }
@@ -404,7 +653,7 @@ export function startBuildingUpgrade(state: GameState, buildingId: BuildingId): 
   building.constructionWorkers = constructionWorkers;
   building.upgradingRemaining = getBuildingBuildSeconds(buildingId, building.level);
   pushLocalizedLog(state, "logUpgradeStarted", {
-    building: getLocalizedBuildingName(definition.id),
+    buildingId: definition.id,
   });
   return true;
 }
@@ -426,14 +675,31 @@ export function tickBuildings(state: GameState, deltaSeconds: number): void {
       building.level += 1;
       recalculateCapacities(state);
       pushLocalizedLog(state, "logReachedLevel", {
-        building: getLocalizedBuildingName(definition.id),
+        buildingId: definition.id,
         level: building.level,
       });
 
-      if (definition.id === "palisade") {
-        state.survivors.workers += 1;
-        state.resources.morale = Math.min(100, state.resources.morale + 2);
-        pushLocalizedLog(state, "logSurvivorJoined");
+      const attractedSurvivors = getSurvivorAttractionOnCompletedLevel(
+        definition.id,
+        building.level,
+      );
+
+      if (attractedSurvivors > 0) {
+        const moraleReward = getSurvivorAttractionMoraleReward(
+          definition.id,
+          attractedSurvivors,
+        );
+
+        state.survivors.workers += attractedSurvivors;
+        state.resources.morale = Math.min(
+          100,
+          state.resources.morale + moraleReward,
+        );
+        pushLocalizedLog(
+          state,
+          attractedSurvivors === 1 ? "logSurvivorJoined" : "logSurvivorsJoined",
+          { count: attractedSurvivors },
+        );
       }
 
       building.workers = Math.min(
@@ -464,6 +730,7 @@ function getProductionDelta(
 ): Record<ResourceId, number> {
   const delta = createEmptyResourceDelta();
   const productionActive = isProductionShiftActive(state);
+  const productionMultiplier = getGlobalProductionMultiplier(state);
 
   for (const definition of buildingDefinitions) {
     const building = state.buildings[definition.id];
@@ -479,7 +746,23 @@ function getProductionDelta(
     }
 
     if (definition.id === "generator") {
-      delta.energy += getGeneratorEnergyRate(building.level, building.workers) * deltaSeconds;
+      delta.energy +=
+        getGeneratorEnergyRate(building.level, building.workers) *
+        productionMultiplier *
+        deltaSeconds;
+      continue;
+    }
+
+    if (definition.id === "workshop") {
+      if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+        continue;
+      }
+
+      delta.material +=
+        getWorkshopMaterialRate(building.level, building.workers) *
+        productionMultiplier *
+        deltaSeconds;
+      delta.energy -= getWorkshopEnergyRate(building.level, building.workers) * deltaSeconds;
       continue;
     }
 
@@ -487,21 +770,31 @@ function getProductionDelta(
       continue;
     }
 
-    applyRate(delta, definition.produces, building.level, deltaSeconds, 1);
+    if (definition.id === "mainBuilding") {
+      delta.morale += getMainBuildingMoraleRate(building.level) * deltaSeconds;
+      applyRate(delta, definition.consumes, building.level, deltaSeconds, -1);
+      continue;
+    }
+
+    applyProductionRate(delta, definition.produces, building.level, productionMultiplier, deltaSeconds);
     applyRate(delta, definition.consumes, building.level, deltaSeconds, -1);
   }
 
   const population = getPopulation(state);
-  delta.food = (delta.food ?? 0) - population * 0.012 * deltaSeconds;
-  delta.water = (delta.water ?? 0) - population * 0.014 * deltaSeconds;
+  delta.food = (delta.food ?? 0) -
+    population * FOOD_CONSUMPTION_PER_SURVIVOR_PER_SECOND * deltaSeconds;
+  delta.water = (delta.water ?? 0) -
+    population * WATER_CONSUMPTION_PER_SURVIVOR_PER_SECOND * deltaSeconds;
 
   const homeless = getHousingStatus(state).homeless;
   delta.morale = (delta.morale ?? 0) -
     homeless * HOMELESS_MORALE_PENALTY_PER_HOUR * deltaSeconds / GAME_HOUR_REAL_SECONDS;
 
-  if (isContinuousNightShiftActive(state)) {
+  if (isContinuousShiftFatigueActive(state)) {
     delta.morale = (delta.morale ?? 0) -
-      CONTINUOUS_SHIFT_MORALE_PENALTY_PER_HOUR * deltaSeconds / GAME_HOUR_REAL_SECONDS;
+      getContinuousShiftMoralePenaltyPerHour(state) *
+        deltaSeconds /
+        GAME_HOUR_REAL_SECONDS;
   }
 
   if ((delta.food ?? 0) < 0 && state.resources.food <= 0) {
@@ -570,11 +863,70 @@ function applyRate(
   }
 }
 
+function applyProductionRate(
+  delta: ResourceBag,
+  bag: ResourceBag | undefined,
+  level: number,
+  productionMultiplier: number,
+  deltaSeconds: number,
+): void {
+  if (!bag) {
+    return;
+  }
+
+  for (const resourceId of resourceIds) {
+    const rate = bag[resourceId];
+
+    if (rate === undefined) {
+      continue;
+    }
+
+    const multiplier = resourceId === "morale" ? level : level * productionMultiplier;
+    delta[resourceId] = (delta[resourceId] ?? 0) + rate * multiplier * deltaSeconds;
+  }
+}
+
 function createEmptyResourceDelta(): Record<ResourceId, number> {
   return Object.fromEntries(resourceIds.map((resourceId) => [resourceId, 0])) as Record<
     ResourceId,
     number
   >;
+}
+
+function getContinuousShiftMoralePenaltyPerHour(state: GameState): number {
+  const positiveMoralePerHour =
+    getPositiveMoraleProductionRate(state) * GAME_HOUR_REAL_SECONDS;
+  const forcedNetLoss = isContinuousNightShiftActive(state)
+    ? CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR
+    : CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR;
+
+  return positiveMoralePerHour + forcedNetLoss;
+}
+
+function getPositiveMoraleProductionRate(state: GameState): number {
+  if (!isProductionShiftActive(state)) {
+    return 0;
+  }
+
+  return buildingDefinitions.reduce((total, definition) => {
+    const building = state.buildings[definition.id];
+
+    if (
+      building.level <= 0 ||
+      building.upgradingRemaining > 0 ||
+      definition.id === "generator" ||
+      definition.id === "workshop" ||
+      isBuildingInactiveDueToEnergy(state, definition.id)
+    ) {
+      return total;
+    }
+
+    if (definition.id === "mainBuilding") {
+      return total + getMainBuildingMoraleRate(building.level);
+    }
+
+    return total + (definition.produces?.morale ?? 0) * building.level;
+  }, 0);
 }
 
 function releaseConstructionWorkers(
@@ -583,6 +935,70 @@ function releaseConstructionWorkers(
 ): void {
   state.survivors.workers += building.constructionWorkers;
   building.constructionWorkers = 0;
+}
+
+function pushMainBuildingBonusLine(
+  lines: ResourceBreakdownLine[],
+  resourceId: ResourceId,
+  baseProductionRatePerSecond: number,
+  productionBonus: number,
+): void {
+  const bonusRatePerSecond = baseProductionRatePerSecond * productionBonus;
+
+  if (bonusRatePerSecond <= 0) {
+    return;
+  }
+
+  const existingLine = lines.find(
+    (line) => line.source === "mainBuildingBonus" && line.resourceId === resourceId,
+  );
+
+  if (existingLine) {
+    existingLine.ratePerSecond += bonusRatePerSecond;
+    return;
+  }
+
+  lines.push({
+    source: "mainBuildingBonus",
+    resourceId,
+    buildingId: "mainBuilding",
+    ratePerSecond: bonusRatePerSecond,
+  });
+}
+
+function pushMoraleProductionPenaltyLine(
+  lines: ResourceBreakdownLine[],
+  resourceId: ResourceId,
+  baseProductionRatePerSecond: number,
+  productionBonus: number,
+  moraleMultiplier: number,
+): void {
+  if (resourceId === "morale" || moraleMultiplier >= 1) {
+    return;
+  }
+
+  const penaltyRatePerSecond =
+    baseProductionRatePerSecond * (1 + productionBonus) * (1 - moraleMultiplier);
+
+  if (penaltyRatePerSecond <= 0) {
+    return;
+  }
+
+  const existingLine = lines.find(
+    (line) => line.source === "moraleProductionPenalty" && line.resourceId === resourceId,
+  );
+
+  if (existingLine) {
+    existingLine.ratePerSecond -= penaltyRatePerSecond;
+    return;
+  }
+
+  lines.push({
+    source: "moraleProductionPenalty",
+    resourceId,
+    buildingId: "mainBuilding",
+    ratePerSecond: -penaltyRatePerSecond,
+  });
 }
 
 function getNextBuildingLevelRequirement(

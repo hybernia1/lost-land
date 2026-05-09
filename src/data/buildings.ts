@@ -4,7 +4,9 @@ import { createBuildingLevelRequirements, MAX_BUILDING_LEVEL } from "./buildingP
 type BuildingDefinitionInput = Omit<
   BuildingDefinition,
   "maxLevel" | "levelRequirements"
->;
+> & {
+  maxLevel?: number;
+};
 
 const buildingDefinitionInputs: BuildingDefinitionInput[] = [
   {
@@ -15,7 +17,6 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     buildSeconds: 24,
     baseConstructionWorkers: 2,
     baseCost: { material: 45 },
-    produces: { morale: 0.03 },
     consumes: { energy: 0.01 },
   },
   {
@@ -37,11 +38,11 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     id: "dormitory",
     category: "housing",
     name: "Dormitory",
-    description: "Houses civilian survivors, but needs power to stay livable.",
+    description: "Houses civilian survivors, but needs power, water, and food to stay livable.",
     buildSeconds: 34,
     baseConstructionWorkers: 2,
-    baseCost: { material: 85, energy: 6 },
-    alwaysConsumes: { energy: 0.02 },
+    baseCost: { material: 85, energy: 6, food: 10, water: 14 },
+    alwaysConsumes: { energy: 0.02, food: 0.003, water: 0.006 },
     housing: 10,
   },
   {
@@ -51,7 +52,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     description: "Grows food indoors, but needs water and power.",
     buildSeconds: 32,
     baseConstructionWorkers: 2,
-    baseCost: { material: 70, energy: 8 },
+    baseCost: { material: 70, energy: 8, water: 16 },
     produces: { food: 0.24 },
     consumes: { water: 0.08, energy: 0.03 },
   },
@@ -74,19 +75,8 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     buildSeconds: 34,
     baseConstructionWorkers: 3,
     baseCost: { material: 80 },
-    produces: { material: 0.14 },
-    consumes: { energy: 0.025 },
-  },
-  {
-    id: "scrapyard",
-    category: "resource",
-    name: "Scrapyard",
-    description: "Sorts salvage into usable construction material.",
-    buildSeconds: 36,
-    baseConstructionWorkers: 3,
-    baseCost: { material: 100, energy: 8 },
     produces: { material: 0.22 },
-    consumes: { energy: 0.04 },
+    consumes: { energy: 0.025 },
   },
   {
     id: "generator",
@@ -96,6 +86,20 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     buildSeconds: 36,
     baseConstructionWorkers: 3,
     baseCost: { material: 90 },
+    storageBonus: {
+      energy: 60,
+    },
+  },
+  {
+    id: "market",
+    category: "support",
+    name: "Marketplace",
+    description: "Trades stored supplies with distant communities over radio deals.",
+    maxLevel: 5,
+    buildSeconds: 42,
+    baseConstructionWorkers: 3,
+    baseCost: { material: 120 },
+    requiredMainBuildingLevel: 5,
   },
   {
     id: "watchtower",
@@ -115,8 +119,8 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     description: "Trains workers into troops and keeps the militia organized.",
     buildSeconds: 40,
     baseConstructionWorkers: 2,
-    baseCost: { material: 95, food: 18 },
-    consumes: { energy: 0.015 },
+    baseCost: { material: 95, food: 22, water: 10 },
+    consumes: { energy: 0.015, food: 0.004, water: 0.006 },
   },
   {
     id: "palisade",
@@ -134,24 +138,28 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     id: "clinic",
     category: "support",
     name: "Clinic",
-    description: "Trains workers into troops for future outside missions and camp defense.",
+    description: "Treats injured survivors over time and consumes food and water for care.",
     buildSeconds: 42,
     baseConstructionWorkers: 2,
-    baseCost: { material: 85, food: 20 },
-    consumes: { energy: 0.025 },
+    baseCost: { material: 85, food: 24, water: 18 },
+    consumes: { energy: 0.025, food: 0.006, water: 0.012 },
   },
 ];
 
 export const buildingDefinitions: BuildingDefinition[] = buildingDefinitionInputs.map(
-  (definition) => ({
-    ...definition,
-    maxLevel: MAX_BUILDING_LEVEL,
-    levelRequirements: createBuildingLevelRequirements({
-      baseCost: definition.baseCost,
-      baseBuildSeconds: definition.buildSeconds,
-      baseConstructionWorkers: definition.baseConstructionWorkers,
-    }),
-  }),
+  (definition) => {
+    const maxLevel = definition.maxLevel ?? MAX_BUILDING_LEVEL;
+
+    return {
+      ...definition,
+      maxLevel,
+      levelRequirements: createBuildingLevelRequirements({
+        baseCost: definition.baseCost,
+        baseBuildSeconds: definition.buildSeconds,
+        baseConstructionWorkers: definition.baseConstructionWorkers,
+      }).slice(0, maxLevel),
+    };
+  },
 );
 
 export const buildingIds = buildingDefinitions.map((building) => building.id);

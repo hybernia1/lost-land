@@ -1,4 +1,5 @@
 import type { BuildingId, GameState } from "../game/types";
+import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
 
@@ -58,7 +59,11 @@ export function maybeInjureFromConstruction(
 }
 
 export function getClinicTreatmentRate(state: GameState): number {
-  return state.buildings.clinic.level;
+  return getClinicTreatmentRatePerGameHour(state.buildings.clinic.level);
+}
+
+export function getClinicTreatmentRatePerGameHour(level: number): number {
+  return Math.max(0, level);
 }
 
 export function getClinicFoodPerTreatment(): number {
@@ -73,7 +78,8 @@ function tickClinicTreatment(state: GameState, deltaSeconds: number): void {
     return;
   }
 
-  state.health.treatmentProgress += (treatmentRate * deltaSeconds) / 60;
+  state.health.treatmentProgress +=
+    (treatmentRate * deltaSeconds) / GAME_HOUR_REAL_SECONDS;
 
   while (
     state.health.treatmentProgress >= 1 &&
