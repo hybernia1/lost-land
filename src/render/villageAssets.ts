@@ -3,7 +3,7 @@ import {
   Rectangle,
   Texture,
 } from "pixi.js";
-import villageBackgroundUrl from "../assets/village-bg.webp";
+import constructionSiteAtlasUrl from "../assets/buildings/construction-site-atlas.png";
 import {
   buildingVisualDefinitions,
   getBuildingVisualFrameKey,
@@ -11,22 +11,14 @@ import {
   type BuildingAtlasVisualDefinition,
 } from "../data/buildingVisuals";
 import { villageLayoutDefinitions } from "../data/villageLayouts";
-import type { BuildingId, EnvironmentConditionId } from "../game/types";
-import { drawBuildingAsset } from "./buildingAssets";
-
-const fallbackBackgroundUrls: Record<EnvironmentConditionId, string> = {
-  stable: villageBackgroundUrl,
-  rain: villageBackgroundUrl,
-  snowFront: villageBackgroundUrl,
-  radiation: villageBackgroundUrl,
-};
+import type { BuildingId } from "../game/types";
 
 const buildingTextureCache = new Map<string, Texture>();
 const terrainTextureCache = new Map<string, Texture>();
 
 export class VillageAssets {
-  private readonly backgroundTextures = new Map<EnvironmentConditionId, Texture>();
   private readonly buildingAtlases = new Map<string, Texture>();
+  private constructionSiteTexture: Texture | null = null;
   private readonly terrainAtlases = new Map<string, Texture>();
   private loadPromise: Promise<void> | null = null;
 
@@ -38,12 +30,6 @@ export class VillageAssets {
     return this.loadPromise;
   }
 
-  getBackgroundTexture(condition: EnvironmentConditionId): Texture | null {
-    return this.backgroundTextures.get(condition) ??
-      this.backgroundTextures.get("stable") ??
-      null;
-  }
-
   getBuildingTexture(buildingId: BuildingId, level: number, built: boolean): Texture {
     const atlasTexture = this.getAtlasBuildingTexture(buildingId, level, built);
 
@@ -51,35 +37,7 @@ export class VillageAssets {
       return atlasTexture;
     }
 
-    const key = `${buildingId}:${level}:${built ? "built" : "ghost"}`;
-    const cached = buildingTextureCache.get(key);
-
-    if (cached) {
-      return cached;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 160;
-    canvas.height = 120;
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      return Texture.WHITE;
-    }
-
-    context.translate(canvas.width / 2, canvas.height * 0.52);
-    drawBuildingAsset(context, {
-      id: buildingId,
-      width: 130,
-      height: 92,
-      level,
-      built,
-      scale: 1.25,
-    });
-
-    const texture = Texture.from(canvas);
-    buildingTextureCache.set(key, texture);
-    return texture;
+    return built ? Texture.WHITE : this.constructionSiteTexture ?? Texture.WHITE;
   }
 
   getTerrainTileTexture(textureKey: string): Texture | null {
@@ -113,19 +71,9 @@ export class VillageAssets {
 
   private async loadTextures(): Promise<void> {
     await Promise.all([
-      this.loadBackgroundTextures(),
       this.loadBuildingAtlases(),
       this.loadTerrainAtlases(),
     ]);
-  }
-
-  private async loadBackgroundTextures(): Promise<void> {
-    await Promise.all(
-      Object.entries(fallbackBackgroundUrls).map(async ([condition, url]) => {
-        const texture = await Assets.load<Texture>(url);
-        this.backgroundTextures.set(condition as EnvironmentConditionId, texture);
-      }),
-    );
   }
 
   private async loadBuildingAtlases(): Promise<void> {
@@ -137,12 +85,15 @@ export class VillageAssets {
       uniqueAtlasUrls.set(visual.atlasId, visual.atlasUrl);
     }
 
-    await Promise.all(
-      Array.from(uniqueAtlasUrls).map(async ([atlasId, atlasUrl]) => {
+    await Promise.all([
+      ...Array.from(uniqueAtlasUrls).map(async ([atlasId, atlasUrl]) => {
         const texture = await Assets.load<Texture>(atlasUrl);
         this.buildingAtlases.set(atlasId, texture);
       }),
-    );
+      Assets.load<Texture>(constructionSiteAtlasUrl).then((texture) => {
+        this.constructionSiteTexture = texture;
+      }),
+    ]);
   }
 
   private async loadTerrainAtlases(): Promise<void> {

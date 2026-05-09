@@ -25,10 +25,10 @@ Legenda:
 | done | Dev Tools | Pridat dev-only god mode panel. | `npm run build` prosel; grep v `dist` nenasel god mode texty. | Dostupne jen ve Vite DEV, toggle `DEV` nebo F10/Ctrl+`. |
 | done | Dev Tools | Zamknout god mode mimo produkcni hru. | Produkcni `dist` neobsahuje panel texty/CSS; `Game` dev metody maji DEV guard. | Dev panel je dynamicky importovany jen v DEV. |
 | done | Backgroundy | Pripravit vyber backgroundu podle environment condition. | `npm run build` prosel. | Zatim vsechny condition pouzivaji stejny placeholder background. |
-| done | Asset Pipeline | Vytvorit `src/render/villageAssets.ts`. | `npm run build` prosel. | Centralizuje backgroundy, atlasy a canvas fallback cache. |
+| done | Asset Pipeline | Vytvorit `src/render/villageAssets.ts`. | `npm run build` prosel. | Centralizuje atlasove assety budov a terenni tilesety. |
 | done | Asset Pipeline | Zobecnit `buildingVisuals.ts` pro atlasove budovy. | `npm run build` prosel. | Manifest mapuje herni level na staticky atlas frame; atlasova animacni logika byla odstranena. |
 | done | Asset Pipeline | Pripravit prvni atlas strukturu. | `npm run build` prosel; produkcni bundle pouziva `main-building-atlas`. | Main Building ma 20 statickych levelu v atlasu `5x4`, kazdy frame `256x256`; pohyb zustava v Pixi efektech. |
 | done | Rendering | Doladit Pixi efekty hlavni budovy pro 20-level atlas. | `npm run build` prosel. | Efekty pouzivaji adaptivni effect bounds podle levelu, ne plnou atlas bunku. |
-| done | Cleanup | Odstranit legacy spritesheet/fps kod kolem budov. | `npm run build` prosel. | `villageAssets` zustava atlas + canvas fallback. |
-| done | Asset Pipeline | Ponechat canvas fallbacky pro chybejici sprity. | Budovy bez atlas frame se porad kresli. | Bez velkeho prepinaciho rizika. |
+| done | Cleanup | Odstranit legacy spritesheet/fps kod kolem budov. | `npm run build` prosel. | `villageAssets` zustava atlas-only; rozestavena budova ma vlastni pixel-art asset. |
+| done | Asset Pipeline | Odstranit canvas fallbacky pro chybejici sprity. | `npm run build` prosel. | Produkcni budovy maji explicitni atlasove assety. |
 | todo | Verification | Pridat rychly manualni test scenare. | Lze projit nova hra, snezeni, shelter crisis, radiace. | Pozdeji automatizovat, pokud se stabilizuje UI. |
