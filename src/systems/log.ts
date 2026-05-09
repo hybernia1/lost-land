@@ -60,7 +60,10 @@ export function formatLogEntry(entry: LogEntry, translations: TranslationPack): 
   }
 
   if (entry.source === "questSuddenResult") {
-    return translations.quests.sudden[entry.key]?.result ?? entry.key;
+    return formatTemplate(
+      translations.quests.sudden[entry.key]?.result ?? entry.key,
+      getLocalizedParams(entry.params ?? {}, translations),
+    );
   }
 
   return formatTemplate(
@@ -130,6 +133,10 @@ function getLocalizedParams(params: LogParams, translations: TranslationPack): L
 
   if (typeof params.toResourceId === "string" && params.toResourceId in translations.resources) {
     localizedParams.toResource = translations.resources[params.toResourceId as ResourceId];
+  }
+
+  if (typeof params.resourceId === "string" && params.resourceId in translations.resources) {
+    localizedParams.resource = translations.resources[params.resourceId as ResourceId];
   }
 
   if (

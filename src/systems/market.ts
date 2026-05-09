@@ -3,7 +3,7 @@ import type { GameState, MarketResourceId, ResourceId } from "../game/types";
 import { pushLocalizedLog } from "./log";
 
 export const MARKET_TRADE_COOLDOWN_SECONDS = 4 * GAME_HOUR_REAL_SECONDS;
-export const marketResourceIds: MarketResourceId[] = ["food", "water", "material", "energy"];
+export const marketResourceIds: MarketResourceId[] = ["food", "water", "material", "coal"];
 
 const MARKET_TRADE_LIMIT_BY_LEVEL = [0, 100, 120, 150, 180, 200];
 const MARKET_EXTRA_TRADE_LEVEL = 5;

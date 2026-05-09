@@ -1,18 +1,22 @@
 import {
   decisionQuestById,
   decisionQuestDefinitions,
+  type DecisionQuestOptionDefinition,
+} from "../data/decisions";
+import {
   objectiveQuestById,
   objectiveQuestDefinitions,
   suddenQuestById,
   suddenQuestDefinitions,
-  type DecisionQuestOptionDefinition,
   type ObjectiveQuestDefinition,
   type SuddenQuestDefinition,
 } from "../data/quests";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type {
   DecisionOptionId,
+  DecisionProfileAxisId,
   DecisionQuestId,
+  DecisionHistoryEntry,
   GameState,
   ResourceBag,
   ResourceId,
@@ -28,6 +32,33 @@ const NEXT_DECISION_RANGE_SECONDS = GAME_HOUR_REAL_SECONDS * 7;
 const RECENT_DECISION_MEMORY = 2;
 const RECENT_SUDDEN_MEMORY = 2;
 const SUDDEN_QUEST_CHANCE = 0.35;
+const DECISION_PROFILE_SCORE_RANGE = 2;
+const SCARCITY_THEFT_RESOURCE_IDS: ResourceId[] = ["food", "water", "material"];
+const SCARCITY_THEFT_THRESHOLD = 0.22;
+const SCARCITY_THEFT_BASE_CHANCE = 0.18;
+const SCARCITY_THEFT_PRESSURE_CHANCE = 0.42;
+
+export const decisionProfileAxes: {
+  id: DecisionProfileAxisId;
+  leftLabelKey: string;
+  rightLabelKey: string;
+}[] = [
+  {
+    id: "philanthropyPrinciple",
+    leftLabelKey: "profilePhilanthropist",
+    rightLabelKey: "profilePrincipled",
+  },
+  {
+    id: "mercySecurity",
+    leftLabelKey: "profileMerciful",
+    rightLabelKey: "profileSecurity",
+  },
+  {
+    id: "opennessCaution",
+    leftLabelKey: "profileOpen",
+    rightLabelKey: "profileCautious",
+  },
+];
 
 export function createInitialQuestState(): QuestState {
   return {
@@ -39,6 +70,8 @@ export function createInitialQuestState(): QuestState {
     resolvedDecisionCount: 0,
     resolvedSuddenCount: 0,
     nextDecisionAt: FIRST_DECISION_DELAY_SECONDS,
+    resolvedDecisionIds: [],
+    decisionHistory: [],
     recentDecisionIds: [],
     recentSuddenIds: [],
   };
@@ -61,6 +94,9 @@ export function normalizeQuestState(state: GameState): void {
       FIRST_DECISION_DELAY_SECONDS,
       state.quests?.nextDecisionAt ?? FIRST_DECISION_DELAY_SECONDS,
     ),
+    resolvedDecisionIds: (state.quests?.resolvedDecisionIds ?? [])
+      .filter((id): id is DecisionQuestId => id in decisionQuestById),
+    decisionHistory: normalizeDecisionHistory(state.quests?.decisionHistory ?? []),
     recentDecisionIds: (state.quests?.recentDecisionIds ?? [])
       .filter((id): id is DecisionQuestId => id in decisionQuestById)
       .slice(0, RECENT_DECISION_MEMORY),
@@ -108,6 +144,18 @@ export function resolveDecisionQuest(
   state.health.injured += option.injured ?? 0;
   state.quests.activeDecision = null;
   state.quests.resolvedDecisionCount += 1;
+  state.quests.decisionHistory = [
+    ...state.quests.decisionHistory,
+    {
+      definitionId: definition.id,
+      optionId: option.id,
+      resolvedAt: state.elapsedSeconds,
+    },
+  ];
+  state.quests.resolvedDecisionIds = [
+    ...state.quests.resolvedDecisionIds.filter((id) => id !== definition.id),
+    definition.id,
+  ];
   state.quests.recentDecisionIds = [
     definition.id,
     ...state.quests.recentDecisionIds.filter((id) => id !== definition.id),
@@ -159,7 +207,39 @@ export function canAffordDecisionOption(
   state: GameState,
   option: DecisionQuestOptionDefinition,
 ): boolean {
-  return canAfford(state.resources, getDecisionOptionCost(option));
+  return canAfford(state.resources, getDecisionOptionCost(option)) &&
+    state.survivors.workers >= Math.abs(Math.min(0, option.workers ?? 0));
+}
+
+export function getDecisionProfileScores(state: GameState): Record<DecisionProfileAxisId, number> {
+  const scores = createEmptyDecisionProfileScores();
+
+  for (const entry of state.quests.decisionHistory) {
+    const option = getDecisionHistoryOption(entry);
+
+    if (!option) {
+      continue;
+    }
+
+    for (const axis of decisionProfileAxes) {
+      scores[axis.id] += option.profileScores?.[axis.id] ?? 0;
+    }
+  }
+
+  return scores;
+}
+
+export function getDecisionProfileAxisValue(
+  state: GameState,
+  axisId: DecisionProfileAxisId,
+): number {
+  const score = getDecisionProfileScores(state)[axisId];
+  const maxMagnitude = Math.max(
+    DECISION_PROFILE_SCORE_RANGE,
+    state.quests.decisionHistory.length * DECISION_PROFILE_SCORE_RANGE,
+  );
+
+  return Math.max(-100, Math.min(100, (score / maxMagnitude) * 100));
 }
 
 export function getDecisionOptionCost(option: DecisionQuestOptionDefinition): ResourceBag {
@@ -172,6 +252,39 @@ export function getDecisionOptionCost(option: DecisionQuestOptionDefinition): Re
   }
 
   return cost;
+}
+
+function normalizeDecisionHistory(history: DecisionHistoryEntry[]): DecisionHistoryEntry[] {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  return history.filter((entry): entry is DecisionHistoryEntry => {
+    if (!entry || !(entry.definitionId in decisionQuestById)) {
+      return false;
+    }
+
+    const definition = decisionQuestById[entry.definitionId];
+    return definition.options.some((option) => option.id === entry.optionId);
+  }).map((entry) => ({
+    definitionId: entry.definitionId,
+    optionId: entry.optionId,
+    resolvedAt: Math.max(0, Math.floor(entry.resolvedAt ?? 0)),
+  }));
+}
+
+function createEmptyDecisionProfileScores(): Record<DecisionProfileAxisId, number> {
+  return {
+    philanthropyPrinciple: 0,
+    mercySecurity: 0,
+    opennessCaution: 0,
+  };
+}
+
+function getDecisionHistoryOption(entry: DecisionHistoryEntry): DecisionQuestOptionDefinition | null {
+  return decisionQuestById[entry.definitionId]?.options.find(
+    (option) => option.id === entry.optionId,
+  ) ?? null;
 }
 
 function completeObjectiveQuests(state: GameState): void {
@@ -215,12 +328,27 @@ function maybeStartDecisionQuest(state: GameState): void {
     return;
   }
 
+  const theftResourceId = pickScarcityTheftResource(state);
+
+  if (
+    theftResourceId &&
+    Math.random() < getScarcityTheftChance(state, theftResourceId)
+  ) {
+    applyScarcityTheft(state, theftResourceId);
+    return;
+  }
+
   if (Math.random() < SUDDEN_QUEST_CHANCE) {
     applySuddenQuest(state, pickSuddenQuest(state));
     return;
   }
 
   const definition = pickDecisionQuest(state);
+
+  if (!definition) {
+    scheduleNextDecision(state);
+    return;
+  }
 
   state.quests.activeDecision = {
     id: `decision-${Math.floor(state.elapsedSeconds)}-${state.quests.resolvedDecisionCount}`,
@@ -260,13 +388,42 @@ function applySuddenQuest(state: GameState, definition: SuddenQuestDefinition): 
   });
 }
 
+function applyScarcityTheft(state: GameState, resourceId: ResourceId): void {
+  const stock = state.resources[resourceId];
+  const capacity = Math.max(1, state.capacities[resourceId]);
+  const loss = Math.max(1, Math.min(
+    Math.floor(stock),
+    Math.ceil(capacity * 0.06),
+  ));
+
+  if (loss <= 0) {
+    scheduleNextDecision(state);
+    return;
+  }
+
+  const losses: ResourceBag = { [resourceId]: -loss };
+  addResources(state.resources, losses, state.capacities);
+  state.quests.resolvedSuddenCount += 1;
+  scheduleNextDecision(state);
+  pushLogEntry(state, {
+    source: "questSuddenResult",
+    key: "scarcityTheft",
+    params: { resourceId, amount: loss },
+  });
+}
+
 function pickDecisionQuest(state: GameState) {
   const candidates = decisionQuestDefinitions.filter(
     (definition) =>
       state.elapsedSeconds >= definition.minElapsedSeconds &&
-      !state.quests.recentDecisionIds.includes(definition.id),
+      !state.quests.resolvedDecisionIds.includes(definition.id),
   );
-  const pool = candidates.length > 0 ? candidates : decisionQuestDefinitions;
+  const pool = candidates;
+
+  if (pool.length === 0) {
+    return null;
+  }
+
   const totalWeight = pool.reduce((total, definition) => total + definition.weight, 0);
   let roll = Math.random() * totalWeight;
 
@@ -279,6 +436,31 @@ function pickDecisionQuest(state: GameState) {
   }
 
   return pool[pool.length - 1];
+}
+
+function pickScarcityTheftResource(state: GameState): ResourceId | null {
+  const candidates = SCARCITY_THEFT_RESOURCE_IDS
+    .map((resourceId) => {
+      const capacity = Math.max(1, state.capacities[resourceId]);
+      const ratio = state.resources[resourceId] / capacity;
+
+      return { resourceId, ratio };
+    })
+    .filter((candidate) =>
+      candidate.ratio > 0 &&
+      candidate.ratio < SCARCITY_THEFT_THRESHOLD
+    )
+    .sort((left, right) => left.ratio - right.ratio);
+
+  return candidates[0]?.resourceId ?? null;
+}
+
+function getScarcityTheftChance(state: GameState, resourceId: ResourceId): number {
+  const capacity = Math.max(1, state.capacities[resourceId]);
+  const ratio = Math.max(0, Math.min(SCARCITY_THEFT_THRESHOLD, state.resources[resourceId] / capacity));
+  const pressure = 1 - ratio / SCARCITY_THEFT_THRESHOLD;
+
+  return SCARCITY_THEFT_BASE_CHANCE + pressure * SCARCITY_THEFT_PRESSURE_CHANCE;
 }
 
 function pickSuddenQuest(state: GameState) {

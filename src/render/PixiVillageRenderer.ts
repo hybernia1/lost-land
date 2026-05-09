@@ -12,10 +12,11 @@ import {
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
 import { buildingVisualDefinitions, getBuildingVisualFrame } from "../data/buildingVisuals";
-import { decisionQuestById, objectiveQuestById } from "../data/quests";
+import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
+import { objectiveQuestById } from "../data/quests";
 import { villagePlotDefinitions, type VillagePlotDefinition } from "../data/villagePlots";
 import { formatGameClock, GAME_HOUR_REAL_SECONDS, getGameDay } from "../game/time";
-import type { BuildingCategory, BuildingId, DecisionOptionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
+import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId, ScoutingMode } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
@@ -23,7 +24,7 @@ import {
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
   getConstructionWorkerRequirement,
-  getGeneratorEnergyRate,
+  getCoalMineCoalRate,
   getGlobalProductionMultiplier,
   getHousingStatus,
   getMainBuildingLevelRequirement,
@@ -33,11 +34,11 @@ import {
   getResourceProductionRates,
   getSurvivorAttractionOnCompletedLevel,
   getUpgradeCost,
-  getWorkshopEnergyRate,
+  getWorkshopCoalRate,
   getWorkshopMaterialRate,
   hasAvailableBuildingSlot,
   isMainBuildingRequirementMet,
-  isBuildingInactiveDueToEnergy,
+  isBuildingInactiveDueToCoal,
   MAX_ACTIVE_BUILDINGS,
   type ResourceBreakdownLine,
 } from "../systems/buildings";
@@ -63,7 +64,9 @@ import {
 import { canAfford } from "../systems/resources";
 import {
   canAffordDecisionOption,
+  decisionProfileAxes,
   getActiveObjectiveQuests,
+  getDecisionProfileAxisValue,
   getObjectiveQuestProgress,
 } from "../systems/quests";
 import { SCOUTING_CARRY_PER_TROOP, SCOUTING_DURATION_SECONDS, getScoutingTroopCount } from "../systems/scouting";
@@ -103,13 +106,18 @@ export type PixiActionDetail = {
   continuousShifts?: boolean;
 };
 
-export type VillageInfoPanel = ResourceId | "survivors";
+export type VillageInfoPanel = ResourceId | "survivors" | "decisionArchive";
 
 type EffectLine = {
   iconId: string;
   value: string;
   tooltip: string;
   negative?: boolean;
+};
+
+type DecisionHistoryRow = {
+  entry: DecisionHistoryEntry;
+  originalIndex: number;
 };
 
 type CostLinePart = {
@@ -195,7 +203,7 @@ const resourceColors: Record<ResourceId, number> = {
   food: 0xd8b66a,
   water: 0x66bde8,
   material: 0xc7c9bd,
-  energy: 0xf0ce55,
+  coal: 0x8f9589,
   morale: 0xe9a0a0,
 };
 
@@ -246,7 +254,11 @@ export class PixiVillageRenderer {
   private resourceBreakdownScrollY = 0;
   private resourceBreakdownScrollResourceId: ResourceId | null = null;
   private resourceBreakdownScrollTab: ResourceBreakdownTab = "production";
+  private decisionHistoryScrollArea: Bounds | null = null;
+  private decisionHistoryScrollMax = 0;
+  private decisionHistoryScrollY = 0;
   private activeResourceBreakdownTab: ResourceBreakdownTab = "production";
+  private selectedDecisionHistoryIndex: number | null = null;
   private activeBuildCategory: BuildingCategory = "resource";
   private activeBarracksTab: BarracksTab = "training";
   private barracksTroopCount = 1;
@@ -301,6 +313,8 @@ export class PixiVillageRenderer {
     this.logScrollMax = 0;
     this.resourceBreakdownScrollArea = null;
     this.resourceBreakdownScrollMax = 0;
+    this.decisionHistoryScrollArea = null;
+    this.decisionHistoryScrollMax = 0;
     this.hudLayer.scale.set(hudScale);
     this.drawBackground(width, height);
     this.drawPalisade(state, translations);
@@ -350,6 +364,18 @@ export class PixiVillageRenderer {
     if (this.handleScrollableWheel(event, this.logScrollArea, this.logScrollMax, this.logScrollY, (value) => {
       this.logScrollY = value;
     })) {
+      return;
+    }
+
+    if (this.handleScrollableWheel(
+      event,
+      this.decisionHistoryScrollArea,
+      this.decisionHistoryScrollMax,
+      this.decisionHistoryScrollY,
+      (value) => {
+        this.decisionHistoryScrollY = value;
+      },
+    )) {
       return;
     }
 
@@ -604,7 +630,7 @@ export class PixiVillageRenderer {
       asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
       plotLayer.addChild(asset);
       this.drawBuildingVisualEffects(plotLayer, buildingId, Math.max(1, building.level), bounds, visualTime);
-      if (isBuildingInactiveDueToEnergy(state, buildingId)) {
+      if (isBuildingInactiveDueToCoal(state, buildingId)) {
         this.drawPowerWarning(plotLayer, bounds);
       }
       this.drawBuildingLevelBadge(
@@ -884,6 +910,381 @@ export class PixiVillageRenderer {
       });
     });
 
+  }
+
+  private drawDecisionArchivePanel(
+    state: GameState,
+    translations: TranslationPack,
+    width: number,
+    height: number,
+  ): void {
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
+
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    overlay.addChild(backdrop);
+    this.bindAction(backdrop, { action: "close-village-modal" });
+
+    const panelWidth = Math.min(720, width - 48);
+    const panelHeight = Math.max(420, Math.min(620, height - 72));
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(36, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
+    this.drawIcon(panel, "archive", 28, 34, 22);
+    this.drawText(panel, translations.ui.decisionArchive ?? "Decision archive", 58, 19, {
+      fill: 0xf3edda,
+      fontSize: 22,
+      fontWeight: "900",
+    });
+
+    this.drawText(panel, translations.ui.leadershipProfile ?? "Leadership profile", 28, 72, {
+      fill: 0xd8c890,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 28, 94, {
+      fill: 0xf1df9a,
+      fontSize: 20,
+      fontWeight: "900",
+    });
+
+    decisionProfileAxes.forEach((axis, index) => {
+      this.drawDecisionProfileAxis(
+        panel,
+        translations.ui[axis.leftLabelKey] ?? axis.leftLabelKey,
+        translations.ui[axis.rightLabelKey] ?? axis.rightLabelKey,
+        getDecisionProfileAxisValue(state, axis.id),
+        28,
+        138 + index * 48,
+        panelWidth - 56,
+      );
+    });
+
+    const historyY = 306;
+    this.drawText(panel, translations.ui.decisionHistory ?? "Decision history", 28, historyY, {
+      fill: 0xd8c890,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+    const viewportY = historyY + 28;
+    const viewportHeight = Math.max(84, panelHeight - viewportY - 20);
+    const content = new Container();
+    const mask = new Graphics();
+    mask.rect(28, viewportY, panelWidth - 56, viewportHeight).fill({ color: 0xffffff, alpha: 1 });
+    panel.addChild(mask);
+    content.mask = mask;
+    panel.addChild(content);
+    this.decisionHistoryScrollArea = {
+      x: panel.x + 28,
+      y: panel.y + viewportY,
+      width: panelWidth - 56,
+      height: viewportHeight,
+    };
+
+    if (
+      this.selectedDecisionHistoryIndex !== null &&
+      !state.quests.decisionHistory[this.selectedDecisionHistoryIndex]
+    ) {
+      this.selectedDecisionHistoryIndex = null;
+    }
+
+    const history = state.quests.decisionHistory
+      .map((entry, originalIndex) => ({ entry, originalIndex }))
+      .reverse();
+
+    if (history.length === 0) {
+      this.drawText(panel, translations.ui.noDecisionHistory ?? "No decisions recorded yet.", 28, historyY + 30, {
+        fill: 0xbfc7be,
+        fontSize: 14,
+      });
+      return;
+    }
+
+    const rowHeights = history.map((row) =>
+      row.originalIndex === this.selectedDecisionHistoryIndex ? 156 : 42,
+    );
+    const contentHeight = rowHeights.reduce(
+      (total, rowHeight) => total + rowHeight + 8,
+      0,
+    );
+    this.decisionHistoryScrollMax = Math.max(0, contentHeight - viewportHeight);
+    this.decisionHistoryScrollY = Math.max(
+      0,
+      Math.min(this.decisionHistoryScrollY, this.decisionHistoryScrollMax),
+    );
+    content.y = viewportY - this.decisionHistoryScrollY;
+
+    let rowY = 0;
+
+    history.forEach((row, index) => {
+      const expanded = row.originalIndex === this.selectedDecisionHistoryIndex;
+      const rowHeight = rowHeights[index];
+      this.drawDecisionHistoryRow(
+        content,
+        row,
+        translations,
+        28,
+        rowY,
+        panelWidth - 56,
+        rowHeight,
+        expanded,
+      );
+      rowY += rowHeight + 8;
+    });
+
+    if (this.decisionHistoryScrollMax > 0) {
+      const trackHeight = viewportHeight;
+      const thumbHeight = Math.max(32, trackHeight * (viewportHeight / contentHeight));
+      const thumbY = viewportY +
+        (trackHeight - thumbHeight) *
+          (this.decisionHistoryScrollY / this.decisionHistoryScrollMax);
+      const track = new Graphics();
+      track.roundRect(panelWidth - 18, viewportY, 5, trackHeight, 3)
+        .fill({ color: 0x0b0d0a, alpha: 0.72 });
+      track.roundRect(panelWidth - 18, thumbY, 5, thumbHeight, 3)
+        .fill({ color: 0xe0c46f, alpha: 0.6 });
+      panel.addChild(track);
+    }
+  }
+
+  private drawDecisionHistoryRow(
+    parent: Container,
+    row: DecisionHistoryRow,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    expanded: boolean,
+  ): void {
+    const { entry } = row;
+    const definitionCopy = translations.quests.decisions[entry.definitionId];
+    const option = this.getDecisionHistoryOption(entry);
+    const optionLabel = definitionCopy?.options[entry.optionId] ?? entry.optionId;
+    const result = definitionCopy?.results[entry.optionId] ?? "";
+    const day = `${translations.ui.day ?? "Day"} ${getGameDay(entry.resolvedAt)}`;
+    const time = formatGameClock(entry.resolvedAt);
+    const rowLayer = new Container();
+    rowLayer.x = x;
+    rowLayer.y = y;
+    parent.addChild(rowLayer);
+
+    const background = new Graphics();
+    background.roundRect(0, 0, width, height, 6)
+      .fill({ color: expanded ? 0x1b1f18 : 0x171a14, alpha: 0.76 })
+      .stroke({ color: 0xe0c46f, alpha: expanded ? 0.34 : 0.12, width: 1 });
+    rowLayer.addChild(background);
+
+    this.bindLocalAction(rowLayer, () => {
+      this.selectedDecisionHistoryIndex = expanded ? null : row.originalIndex;
+      this.requestRender();
+    });
+    rowLayer.hitArea = new Rectangle(0, 0, width, height);
+
+    this.drawText(rowLayer, `${day} ${time}`, 14, 11, {
+      fill: 0xaeb6ad,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+    this.drawText(rowLayer, definitionCopy?.title ?? entry.definitionId, 104, 7, {
+      fill: 0xf5efdf,
+      fontSize: 13,
+      fontWeight: "900",
+    });
+    this.drawText(rowLayer, optionLabel, 104, 23, {
+      fill: 0xd7ddd8,
+      fontSize: 12,
+      fontWeight: "700",
+    });
+
+    if (option) {
+      this.drawDecisionImpactChips(
+        rowLayer,
+        this.getDecisionImpactLines(option, translations).slice(0, expanded ? 8 : 4),
+        width - 14,
+        10,
+      );
+    }
+
+    if (!expanded) {
+      return;
+    }
+
+    this.drawText(rowLayer, definitionCopy?.body ?? "", 14, 52, {
+      fill: 0xc9d0ca,
+      fontSize: 12,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: width - 28,
+    });
+    this.drawText(rowLayer, result, 14, 106, {
+      fill: 0xf1df9a,
+      fontSize: 12,
+      fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: width - 28,
+    });
+  }
+
+  private drawDecisionImpactChips(
+    parent: Container,
+    impacts: EffectLine[],
+    rightX: number,
+    y: number,
+  ): void {
+    let cursorX = rightX;
+
+    for (const impact of [...impacts].reverse()) {
+      const chip = new Container();
+      const value = this.drawText(chip, impact.value, 24, 4, {
+        fill: impact.negative ? 0xff9c8f : 0x9ed99b,
+        fontSize: 11,
+        fontWeight: "900",
+      });
+      const chipWidth = Math.max(42, 32 + value.width);
+      const background = new Graphics();
+      background.roundRect(0, 0, chipWidth, 22, 6)
+        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 })
+        .stroke({ color: impact.negative ? 0xd26858 : 0x9ed99b, alpha: 0.24, width: 1 });
+      chip.addChildAt(background, 0);
+      this.drawIcon(chip, impact.iconId, 13, 11, 13);
+      chip.x = cursorX - chipWidth;
+      chip.y = y;
+      parent.addChild(chip);
+      this.bindTooltip(chip, impact.tooltip);
+      cursorX -= chipWidth + 5;
+    }
+  }
+
+  private getDecisionImpactLines(
+    option: DecisionQuestOptionDefinition,
+    translations: TranslationPack,
+  ): EffectLine[] {
+    const impacts: EffectLine[] = [];
+
+    for (const [resourceId, amount] of Object.entries(option.resources ?? {})) {
+      const typedResourceId = resourceId as ResourceId;
+      const value = amount ?? 0;
+
+      if (value === 0) {
+        continue;
+      }
+
+      impacts.push({
+        iconId: typedResourceId,
+        value: this.formatSignedInteger(value),
+        tooltip: `${translations.resources[typedResourceId]} ${this.formatSignedInteger(value)}`,
+        negative: value < 0,
+      });
+    }
+
+    if (option.workers) {
+      impacts.push({
+        iconId: "people",
+        value: this.formatSignedInteger(option.workers),
+        tooltip: `${translations.ui.workers} ${this.formatSignedInteger(option.workers)}`,
+        negative: option.workers < 0,
+      });
+    }
+
+    if (option.injured) {
+      impacts.push({
+        iconId: "people",
+        value: this.formatSignedInteger(option.injured),
+        tooltip: `${translations.roles.injured} ${this.formatSignedInteger(option.injured)}`,
+        negative: option.injured > 0,
+      });
+    }
+
+    if (option.morale) {
+      impacts.push({
+        iconId: "morale",
+        value: this.formatSignedInteger(option.morale),
+        tooltip: `${translations.resources.morale} ${this.formatSignedInteger(option.morale)}`,
+        negative: option.morale < 0,
+      });
+    }
+
+    return impacts;
+  }
+
+  private getDecisionHistoryOption(entry: DecisionHistoryEntry): DecisionQuestOptionDefinition | null {
+    return decisionQuestById[entry.definitionId]?.options.find(
+      (option) => option.id === entry.optionId,
+    ) ?? null;
+  }
+
+  private formatSignedInteger(value: number): string {
+    return value > 0 ? `+${value}` : `${value}`;
+  }
+
+  private drawDecisionProfileAxis(
+    parent: Container,
+    leftLabel: string,
+    rightLabel: string,
+    value: number,
+    x: number,
+    y: number,
+    width: number,
+  ): void {
+    this.drawText(parent, leftLabel, x, y, {
+      fill: value < -15 ? 0xf1df9a : 0xbfc7be,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    const right = this.drawText(parent, rightLabel, x + width, y, {
+      fill: value > 15 ? 0xf1df9a : 0xbfc7be,
+      fontSize: 12,
+      fontWeight: "900",
+      align: "right",
+    });
+    right.anchor.x = 1;
+
+    const trackY = y + 22;
+    const track = new Graphics();
+    track.roundRect(x, trackY, width, 8, 4)
+      .fill({ color: 0x0b0d0a, alpha: 0.78 })
+      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+    const centerX = x + width / 2;
+    track.rect(centerX - 1, trackY - 4, 2, 16)
+      .fill({ color: 0xd8c890, alpha: 0.42 });
+    parent.addChild(track);
+
+    const knobX = x + ((value + 100) / 200) * width;
+    const knob = new Graphics();
+    knob.circle(knobX, trackY + 4, 7)
+      .fill({ color: 0xe0c46f, alpha: 0.95 })
+      .stroke({ color: 0x3b331d, alpha: 0.8, width: 2 });
+    parent.addChild(knob);
+  }
+
+  private getDecisionProfileOverallLabel(state: GameState, translations: TranslationPack): string {
+    if (state.quests.decisionHistory.length === 0) {
+      return translations.ui.profileNoData ?? "No profile yet";
+    }
+
+    const strongest = decisionProfileAxes
+      .map((axis) => ({
+        axis,
+        value: getDecisionProfileAxisValue(state, axis.id),
+      }))
+      .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))[0];
+
+    if (!strongest || Math.abs(strongest.value) < 18) {
+      return translations.ui.profileBalanced ?? "Balanced leadership";
+    }
+
+    const key = strongest.value < 0
+      ? strongest.axis.leftLabelKey
+      : strongest.axis.rightLabelKey;
+
+    return translations.ui[key] ?? key;
   }
 
   private drawActiveScouting(
@@ -1166,7 +1567,7 @@ export class PixiVillageRenderer {
     width: number,
     height: number,
   ): void {
-    const panelWidth = 92;
+    const panelWidth = 158;
     const panelHeight = 82;
     const group = new Container();
     group.x = (width - panelWidth) / 2;
@@ -1190,12 +1591,24 @@ export class PixiVillageRenderer {
     this.createCircularActionButton(
       group,
       "fist",
-      panelWidth / 2,
+      panelWidth / 2 - 36,
       40,
       27,
       { action: "set-continuous-shifts", continuousShifts: !continuousShifts },
       tooltip,
       continuousShifts,
+    );
+
+    const archiveTooltip = `${translations?.ui.decisionArchive ?? "Decision archive"}\n${translations?.ui.decisionArchiveTooltip ?? "Review past decisions and leadership profile."}`;
+    this.createCircularActionButton(
+      group,
+      "archive",
+      panelWidth / 2 + 36,
+      40,
+      27,
+      { action: "open-decision-archive" },
+      archiveTooltip,
+      false,
     );
   }
 
@@ -1212,6 +1625,11 @@ export class PixiVillageRenderer {
 
     if (infoPanel === "survivors") {
       this.drawSurvivorOverviewPanel(state, translations, width, height);
+      return;
+    }
+
+    if (infoPanel === "decisionArchive") {
+      this.drawDecisionArchivePanel(state, translations, width, height);
       return;
     }
 
@@ -1417,7 +1835,7 @@ export class PixiVillageRenderer {
       return translations.ui.moraleProductionPenalty;
     }
 
-    if ((line.source === "building" || line.source === "generator") && line.buildingId) {
+    if ((line.source === "building" || line.source === "coalMine") && line.buildingId) {
       return translations.buildings[line.buildingId].name;
     }
 
@@ -2056,7 +2474,7 @@ export class PixiVillageRenderer {
         tooltip: `${translations.ui.defense}: ${Math.round(defense)}`,
       },
       this.getBuildingProductionMetric(buildingId, building, level, state, translations),
-      this.getBuildingEnergyMetric(buildingId, building, level, state, translations),
+      this.getBuildingCoalMetric(buildingId, building, level, state, translations),
     ];
   }
 
@@ -2082,13 +2500,13 @@ export class PixiVillageRenderer {
     }
 
     if (buildingId === "generator") {
-      const rate = getGeneratorEnergyRate(level, building.workers) * productionMultiplier;
+      const rate = getCoalMineCoalRate(level, building.workers) * productionMultiplier;
       return {
-        iconId: "energy",
+        iconId: "coal",
         label: translations.ui.production,
         value: this.getHourlyRateLabel(rate),
         fill: this.getRateColor(rate),
-        tooltip: `${translations.resources.energy}: ${this.getHourlyRateLabel(rate)}`,
+        tooltip: `${translations.resources.coal}: ${this.getHourlyRateLabel(rate)}`,
       };
     }
 
@@ -2168,7 +2586,7 @@ export class PixiVillageRenderer {
     };
   }
 
-  private getBuildingEnergyMetric(
+  private getBuildingCoalMetric(
     buildingId: BuildingId,
     building: GameState["buildings"][BuildingId],
     level: number,
@@ -2177,22 +2595,22 @@ export class PixiVillageRenderer {
   ): BuildingMetric {
     const definition = buildingById[buildingId];
     const consumption =
-      ((definition.consumes?.energy ?? 0) + (definition.alwaysConsumes?.energy ?? 0)) * level;
+      ((definition.consumes?.coal ?? 0) + (definition.alwaysConsumes?.coal ?? 0)) * level;
     const production = buildingId === "generator"
-      ? getGeneratorEnergyRate(level, building.workers) *
+      ? getCoalMineCoalRate(level, building.workers) *
         getGlobalProductionMultiplier(state)
       : 0;
     const staffedConsumption = buildingId === "workshop"
-      ? getWorkshopEnergyRate(level, building.workers)
+      ? getWorkshopCoalRate(level, building.workers)
       : consumption;
     const netRate = production - staffedConsumption;
 
     return {
-      iconId: "energy",
-      label: translations.resources.energy,
+      iconId: "coal",
+      label: translations.resources.coal,
       value: this.getHourlyRateLabel(netRate),
       fill: this.getRateColor(netRate),
-      tooltip: `${translations.resources.energy}: ${this.getHourlyRateLabel(netRate)}`,
+      tooltip: `${translations.resources.coal}: ${this.getHourlyRateLabel(netRate)}`,
     };
   }
 
@@ -2307,14 +2725,14 @@ export class PixiVillageRenderer {
       return y;
     }
 
-    const productionResourceId: ResourceId = buildingId === "workshop" ? "material" : "energy";
+    const productionResourceId: ResourceId = buildingId === "workshop" ? "material" : "coal";
     const productionPerHour = (
       buildingId === "workshop"
         ? getWorkshopMaterialRate(building.level, building.workers)
-        : getGeneratorEnergyRate(building.level, building.workers)
+        : getCoalMineCoalRate(building.level, building.workers)
     ) * GAME_HOUR_REAL_SECONDS;
-    const energyUsePerHour = buildingId === "workshop"
-      ? getWorkshopEnergyRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS
+    const coalUsePerHour = buildingId === "workshop"
+      ? getWorkshopCoalRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS
       : 0;
     this.drawPanel(parent, x, y, width, 104);
     this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
@@ -2326,11 +2744,11 @@ export class PixiVillageRenderer {
       x: x + 20,
       y: y + 74,
     });
-    if (energyUsePerHour > 0) {
+    if (coalUsePerHour > 0) {
       this.drawInfoToken(parent, {
-        iconId: "energy",
-        text: `-${this.formatRate(energyUsePerHour)}/h`,
-        tooltip: `${translations.resources.energy}: -${this.formatRate(energyUsePerHour)}/h`,
+        iconId: "coal",
+        text: `-${this.formatRate(coalUsePerHour)}/h`,
+        tooltip: `${translations.resources.coal}: -${this.formatRate(coalUsePerHour)}/h`,
         missing: true,
         x: x + 118,
         y: y + 74,
@@ -3070,8 +3488,8 @@ export class PixiVillageRenderer {
     if (buildingId === "generator") {
       const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
       const nextLimit = Math.min(4, currentLevel + 2);
-      const currentMaxRate = getGeneratorEnergyRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
-      const nextMaxRate = getGeneratorEnergyRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
+      const currentMaxRate = getCoalMineCoalRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
+      const nextMaxRate = getCoalMineCoalRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
       if (nextLimit > currentLimit) {
         effects.push({
           iconId: "people",
@@ -3080,9 +3498,9 @@ export class PixiVillageRenderer {
         });
       }
       effects.push({
-        iconId: "energy",
+        iconId: "coal",
         value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
-        tooltip: `${translations.resources.energy} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
+        tooltip: `${translations.resources.coal} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
       });
     }
     if (buildingId === "workshop") {

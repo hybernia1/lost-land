@@ -307,6 +307,13 @@ export class App {
       return;
     }
 
+    if (action === "open-decision-archive") {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = "decisionArchive";
+      this.requestRender();
+      return;
+    }
+
     if (action === "set-continuous-shifts") {
       this.game.setContinuousShifts(continuousShifts ?? false);
       return;

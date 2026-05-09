@@ -17,14 +17,14 @@ const BASE_CAPACITY: Record<ResourceId, number> = {
   food: 180,
   water: 180,
   material: 260,
-  energy: 120,
+  coal: 120,
   morale: 100,
 };
 
 export const MAX_ACTIVE_BUILDINGS = 2;
 const BUILDING_LEVEL_GATE_LEVELS = [3, 5, 7, 10, 15] as const;
 const MAIN_BUILDING_SURVIVOR_ATTRACTION_LEVELS = new Set([2, 3, 5, 7, 10, 15, 20]);
-const GENERATOR_BASE_ENERGY_RATE = 0.28;
+const COAL_MINE_BASE_COAL_RATE = 0.28;
 const HOMELESS_MORALE_PENALTY_PER_HOUR = 1;
 const CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR = 1.25;
 const CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR = 6;
@@ -34,14 +34,14 @@ const MAIN_BUILDING_MAX_PRODUCTION_BONUS = 0.5;
 const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
 const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.45;
 const WORKSHOP_BASE_MATERIAL_RATE = 0.22;
-const WORKSHOP_BASE_ENERGY_RATE = 0.025;
+const WORKSHOP_BASE_COAL_RATE = 0.025;
 const FOOD_CONSUMPTION_PER_SURVIVOR_PER_SECOND = 0.017;
 const WATER_CONSUMPTION_PER_SURVIVOR_PER_SECOND = 0.023;
 
 export type ResourceBreakdownLine = {
   source:
     | "building"
-    | "generator"
+    | "coalMine"
     | "survivorConsumption"
     | "homeless"
     | "foodShortage"
@@ -181,13 +181,13 @@ export function setBuildingWorkers(
   return true;
 }
 
-export function getGeneratorEnergyRate(level: number, workers: number): number {
+export function getCoalMineCoalRate(level: number, workers: number): number {
   if (level <= 0 || workers <= 0) {
     return 0;
   }
 
   const workerLimit = Math.min(4, level + 1);
-  const maxOutput = GENERATOR_BASE_ENERGY_RATE * (1 + (level - 1) * 0.42);
+  const maxOutput = COAL_MINE_BASE_COAL_RATE * (1 + (level - 1) * 0.42);
   return maxOutput * Math.min(workers, workerLimit) / workerLimit;
 }
 
@@ -199,12 +199,12 @@ export function getWorkshopMaterialRate(level: number, workers: number): number 
   return WORKSHOP_BASE_MATERIAL_RATE * level * getStaffedBuildingWorkerRatio(level, workers);
 }
 
-export function getWorkshopEnergyRate(level: number, workers: number): number {
+export function getWorkshopCoalRate(level: number, workers: number): number {
   if (level <= 0 || workers <= 0) {
     return 0;
   }
 
-  return WORKSHOP_BASE_ENERGY_RATE * level * getStaffedBuildingWorkerRatio(level, workers);
+  return WORKSHOP_BASE_COAL_RATE * level * getStaffedBuildingWorkerRatio(level, workers);
 }
 
 function getStaffedBuildingWorkerRatio(level: number, workers: number): number {
@@ -261,19 +261,19 @@ export function getMoraleProductionMultiplier(morale: number): number {
   return 0.6;
 }
 
-export function isBuildingInactiveDueToEnergy(
+export function isBuildingInactiveDueToCoal(
   state: GameState,
   buildingId: BuildingId,
 ): boolean {
   const definition = buildingById[buildingId];
   const building = state.buildings[buildingId];
-  const energyNeeded =
-    (definition.consumes?.energy ?? 0) + (definition.alwaysConsumes?.energy ?? 0);
+  const coalNeeded =
+    (definition.consumes?.coal ?? 0) + (definition.alwaysConsumes?.coal ?? 0);
 
   return building.level > 0 &&
     building.upgradingRemaining <= 0 &&
-    energyNeeded > 0 &&
-    state.resources.energy <= 0;
+    coalNeeded > 0 &&
+    state.resources.coal <= 0;
 }
 
 export function isDayShiftHour(state: GameState): boolean {
@@ -298,7 +298,7 @@ export function getDormitoryHousingCapacity(state: GameState): number {
   const building = state.buildings.dormitory;
   const definition = buildingById.dormitory;
 
-  if (building.level <= 0 || isBuildingInactiveDueToEnergy(state, "dormitory")) {
+  if (building.level <= 0 || isBuildingInactiveDueToCoal(state, "dormitory")) {
     return 0;
   }
 
@@ -359,13 +359,13 @@ export function getResourceBreakdown(
     }
 
     if (definition.id === "generator") {
-      const baseRatePerSecond = resourceId === "energy"
-        ? getGeneratorEnergyRate(building.level, building.workers)
+      const baseRatePerSecond = resourceId === "coal"
+        ? getCoalMineCoalRate(building.level, building.workers)
         : 0;
 
       if (baseRatePerSecond !== 0) {
         lines.push({
-          source: "generator",
+          source: "coalMine",
           resourceId,
           buildingId: definition.id,
           ratePerSecond: baseRatePerSecond,
@@ -383,15 +383,15 @@ export function getResourceBreakdown(
     }
 
     if (definition.id === "workshop") {
-      if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+      if (isBuildingInactiveDueToCoal(state, definition.id)) {
         continue;
       }
 
       const productionRatePerSecond = resourceId === "material"
         ? getWorkshopMaterialRate(building.level, building.workers)
         : 0;
-      const consumptionRatePerSecond = resourceId === "energy"
-        ? getWorkshopEnergyRate(building.level, building.workers)
+      const consumptionRatePerSecond = resourceId === "coal"
+        ? getWorkshopCoalRate(building.level, building.workers)
         : 0;
       const ratePerSecond = productionRatePerSecond - consumptionRatePerSecond;
 
@@ -414,7 +414,7 @@ export function getResourceBreakdown(
       continue;
     }
 
-    if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+    if (isBuildingInactiveDueToCoal(state, definition.id)) {
       continue;
     }
 
@@ -746,15 +746,15 @@ function getProductionDelta(
     }
 
     if (definition.id === "generator") {
-      delta.energy +=
-        getGeneratorEnergyRate(building.level, building.workers) *
+      delta.coal +=
+        getCoalMineCoalRate(building.level, building.workers) *
         productionMultiplier *
         deltaSeconds;
       continue;
     }
 
     if (definition.id === "workshop") {
-      if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+      if (isBuildingInactiveDueToCoal(state, definition.id)) {
         continue;
       }
 
@@ -762,11 +762,11 @@ function getProductionDelta(
         getWorkshopMaterialRate(building.level, building.workers) *
         productionMultiplier *
         deltaSeconds;
-      delta.energy -= getWorkshopEnergyRate(building.level, building.workers) * deltaSeconds;
+      delta.coal -= getWorkshopCoalRate(building.level, building.workers) * deltaSeconds;
       continue;
     }
 
-    if (isBuildingInactiveDueToEnergy(state, definition.id)) {
+    if (isBuildingInactiveDueToCoal(state, definition.id)) {
       continue;
     }
 
@@ -916,7 +916,7 @@ function getPositiveMoraleProductionRate(state: GameState): number {
       building.upgradingRemaining > 0 ||
       definition.id === "generator" ||
       definition.id === "workshop" ||
-      isBuildingInactiveDueToEnergy(state, definition.id)
+      isBuildingInactiveDueToCoal(state, definition.id)
     ) {
       return total;
     }

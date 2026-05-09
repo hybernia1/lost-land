@@ -4,7 +4,7 @@ export const resourceDefinitions: ResourceDefinition[] = [
   { id: "food", name: "Food" },
   { id: "water", name: "Water" },
   { id: "material", name: "Material" },
-  { id: "energy", name: "Energy" },
+  { id: "coal", name: "Coal" },
   { id: "morale", name: "Morale", softCap: 100 },
 ];
 

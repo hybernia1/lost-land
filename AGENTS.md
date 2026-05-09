@@ -199,9 +199,10 @@ cleanly instead of carrying compatibility branches.
 - Do not use a medicine resource or a medic role. Health is tracked through
   injured survivors; the Clinic treats injured people over time and consumes
   food per treatment.
-- Do not use a fuel resource. The Generator produces energy from assigned
-  workers instead: level 1 supports 2 workers, level 2 supports 3 workers, and
-  level 3+ supports 4 workers.
+- Use coal as the stored burnable fuel resource. The former Generator slot is
+  now a Coal Mine: assigned workers extract coal, and technical/heated
+  buildings consume coal. Level 1 supports 2 workers, level 2 supports 3
+  workers, and level 3+ supports 4 workers.
 - Do not use an ammo resource. Troops are currently a dummy/simple role until
   future random outside expeditions are designed.
 - Use a minimal 2D/2.5D visual style before investing in detailed art.

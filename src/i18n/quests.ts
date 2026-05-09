@@ -30,7 +30,7 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
       hiddenConsequences: "Následky možností nejsou předem známé.",
       notEnoughSupplies: "Nedostatek zásob",
       logObjectiveCompleted: "Úkol splněn: {quest}.",
-      logDecisionAppeared: "U brány nastala situace, která vyžaduje rozhodnutí.",
+      logDecisionAppeared: "Nastala situace, která vyžaduje rozhodnutí.",
     },
     objectives: {
       buildStorage: {
@@ -39,9 +39,9 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
         reward: "+45 materiál, +10 jídlo",
       },
       buildGenerator: {
-        title: "Postav generátor",
-        description: "Zajisti vlastní energii dřív, než ji spolknou provozní budovy.",
-        reward: "+50 materiál, +20 energie",
+        title: "Postav uhelný důl",
+        description: "Zajisti palivo dřív, než ho spolknou vytápěné a technické budovy.",
+        reward: "+50 materiál, +20 uhlí",
       },
       buildWaterStill: {
         title: "Postav čističku vody",
@@ -105,9 +105,129 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
           silence: "Rádio vypnout",
         },
         results: {
-          answer: "Odpověď spálila energii, ale podařilo se zachytit souřadnice malého skladu materiálu.",
-          listen: "Posádka poslouchala do tmy. Stálo to trochu energie, ale lidé získali pocit, že venku nejsou sami.",
+          answer: "Odpověď spálila uhlí v nouzovém napájení rádia, ale podařilo se zachytit souřadnice malého skladu materiálu.",
+          listen: "Posádka poslouchala do tmy. Stálo to trochu uhlí, ale lidé získali pocit, že venku nejsou sami.",
           silence: "Rádio umlklo. Tábor zůstal skrytý a noc pokračovala bez dalších změn.",
+        },
+      },
+      bittenStranger: {
+        title: "Pokousaný cizinec",
+        body:
+          "Hlídka přivedla ke vchodu muže s obvázaným předloktím. Tvrdí, že ho poranilo sklo, ale jeden z obvazů prosakuje tmavou krví.",
+        options: {
+          isolate: "Izolovat a ošetřit",
+          turnAway: "Vyhnat ho od brány",
+          execute: "Zastřelit ho",
+        },
+        results: {
+          isolate: "Cizinec skončil v izolaci mezi zraněnými. Lidé viděli opatrnost i špetku slitování.",
+          turnAway: "Muž zmizel ve tmě. Osada je bezpečnější, ale někteří si budou pamatovat jeho prosby.",
+          execute: "Výstřel ukončil spor okamžitě. Ticho po něm bylo těžší než samotné riziko.",
+        },
+      },
+      traderAtDusk: {
+        title: "Obchodník za soumraku",
+        body:
+          "K bráně dorazil samotář s taškou náhradních dílů a baterií. Chce rychle směnit zásoby a odejít dřív, než se setmí úplně.",
+        options: {
+          tradeFood: "Vyměnit jídlo za materiál",
+          tradeWater: "Vyměnit vodu za uhlí",
+          refuse: "Obchod odmítnout",
+        },
+        results: {
+          tradeFood: "Jídlo změnilo majitele a sklad získal slušnou hromádku použitelného materiálu.",
+          tradeWater: "Část vody padla na výměnu za nabité články. Generátor má na chvíli z čeho brát.",
+          refuse: "Obchodník pokrčil rameny a zmizel v šeru. Zásoby zůstaly přesně tam, kde byly.",
+        },
+      },
+      nightScreams: {
+        title: "Křik v noci",
+        body:
+          "Z ruin za palisádou se ozval dlouhý křik. Někdo venku možná ještě žije, nebo vás něco chce vytáhnout z bezpečí.",
+        options: {
+          sendPatrol: "Poslat opatrnou hlídku",
+          signal: "Zablikat světly",
+          stayQuiet: "Zůstat potichu",
+        },
+        results: {
+          sendPatrol: "Hlídka se nevrátila. Křik utichl a ráno zůstala u brány jen tři prázdná místa ve směnách.",
+          signal: "Světla krátce prořízla tmu. Nikdo nepřišel, ale lidé ocenili, že osada neignoruje volání o pomoc.",
+          stayQuiet: "Křik po chvíli utichl. Nikdo nezemřel za branou, ale ráno se o rozhodnutí mluvilo šeptem.",
+        },
+      },
+      waterTheft: {
+        title: "Ukradená voda",
+        body:
+          "U nádrží chybí několik kanistrů. Stráž našla viníka: mladou ženu, která tvrdí, že brala vodu pro nemocné dítě.",
+        options: {
+          amnesty: "Vyhlásit amnestii",
+          punish: "Tvrdě potrestat",
+          rationLock: "Zabezpečit příděly",
+        },
+        results: {
+          amnesty: "Část vody je pryč, ale otevřená amnestie uklidnila lidi, kteří se báli trestu za zoufalství.",
+          punish: "Trest odradil další krádeže. Stejně rychle ale ochladil náladu v osadě.",
+          rationLock: "Nové zámky a značení spotřebovaly materiál, ale další výdej půjde lépe hlídat.",
+        },
+      },
+      generatorSpareParts: {
+        title: "Díly pro důl",
+        body:
+          "Mechanik našel krabici součástek z rozebrané čerpací stanice. Mohou okamžitě pomoct důlní technice, nebo skončit ve skladu.",
+        options: {
+          install: "Namontovat díly",
+          store: "Rozebrat na materiál",
+          trade: "Dobít články a směnit je za jídlo",
+        },
+        results: {
+          install: "Díly sedly lépe, než kdo čekal. Důl vydal krátký, ale užitečný přebytek uhlí.",
+          store: "Mechanik všechno roztřídil. Ze šuplíků a cívek zbyl praktický materiál pro stavby.",
+          trade: "Část uhlí padla na nouzovou výměnu za jídlo.",
+        },
+      },
+      provenTheft: {
+        title: "Prokázaná krádež",
+        body:
+          "Stráž přivedla zloděje i s ukradenými zásobami. Nejde o pomluvu ani omyl: svědci i nález mluví jasně. Okradený žádá spravedlnost.",
+        options: {
+          exile: "Vyhostit zloděje",
+          maim: "Zmrzačit ho",
+          forgive: "Odpustit a odškodnit okradeného",
+        },
+        results: {
+          exile: "Zloděj byl vyveden za bránu a už se nevrátí. Osada přišla o jednoho člověka.",
+          maim: "Trest byl vykonán. Zloděj přežil, ale skončil mezi zraněnými a tábor ztichl.",
+          forgive: "Okradený dostal náhradu ze společných zásob. Rozhodnutí uklidnilo část lidí a rozzuřilo jinou.",
+        },
+      },
+      collapsedUnderpass: {
+        title: "Zavalený podchod",
+        body:
+          "Průzkumník hlásí čerstvě zavalený podchod. Zpod betonu se ozývá klepání, ale místo je nestabilní a přitahuje hluk.",
+        options: {
+          digOut: "Pokusit se je vyprostit",
+          markDanger: "Označit místo a odejít",
+          leaveIt: "Nechat to být",
+        },
+        results: {
+          digOut: "Záchrana stála síly a jídlo, ale pod sutinami byl i batoh s použitelným materiálem.",
+          markDanger: "Hlídka místo označila pro příště. Nikdo neriskoval život, ale klepání utichlo až po chvíli.",
+          leaveIt: "Rozkaz byl jasný: nezastavovat. Někteří lidé se mu od té chvíle vyhýbají pohledem.",
+        },
+      },
+      brokenWaterFilter: {
+        title: "Prasklý vodní filtr",
+        body:
+          "Jeden z filtrů praskl a část vody smrdí kovem a řasou. Dá se opravit, přídělovat, nebo risknout nouzové použití.",
+        options: {
+          repair: "Opravit filtr materiálem",
+          ration: "Zavést příděly vody",
+          riskDirtyWater: "Risknout špinavou vodu",
+        },
+        results: {
+          repair: "Materiál padl na rychlou opravu a filtr vrátil část vody do bezpečných zásob.",
+          ration: "Příděly udržely kontrolu, ale nálada u nádrží prudce zhoustla.",
+          riskDirtyWater: "Voda prošla jen provizorně. Jeden člověk skončil nemocný a lidé začali o velení pochybovat.",
         },
       },
     },
@@ -115,6 +235,10 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
       cropSpoilage: {
         title: "Zkažení úrody",
         result: "Část úrody se zkazila ve vlhkém skladu. Zásoby jídla klesly.",
+      },
+      scarcityTheft: {
+        title: "Krádež ze zoufalství",
+        result: "Nedostatek rozkládá disciplínu. Ze skladu zmizelo {amount} {resource}.",
       },
     },
   },
@@ -128,7 +252,7 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
       hiddenConsequences: "The consequences are not shown in advance.",
       notEnoughSupplies: "Not enough supplies",
       logObjectiveCompleted: "Task completed: {quest}.",
-      logDecisionAppeared: "A situation at the gate requires a decision.",
+      logDecisionAppeared: "A situation requires a decision.",
     },
     objectives: {
       buildStorage: {
@@ -137,9 +261,9 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
         reward: "+45 material, +10 food",
       },
       buildGenerator: {
-        title: "Build a generator",
-        description: "Secure your own power before operating buildings drain the reserve.",
-        reward: "+50 material, +20 energy",
+        title: "Build a coal mine",
+        description: "Secure fuel before heated and technical buildings drain the reserve.",
+        reward: "+50 material, +20 coal",
       },
       buildWaterStill: {
         title: "Build a water still",
@@ -203,9 +327,129 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
           silence: "Shut the radio off",
         },
         results: {
-          answer: "The answer burned power, but the camp caught coordinates for a small material cache.",
-          listen: "The crew listened into the dark. It cost some power, but people felt less alone outside.",
+          answer: "The answer burned coal in the emergency radio rig, but the camp caught coordinates for a small material cache.",
+          listen: "The crew listened into the dark. It cost some coal, but people felt less alone outside.",
           silence: "The radio went quiet. The camp stayed hidden and the night moved on.",
+        },
+      },
+      bittenStranger: {
+        title: "Bitten stranger",
+        body:
+          "The watch brings a man to the entrance with a bandaged forearm. He says it was broken glass, but one wrap is leaking dark blood.",
+        options: {
+          isolate: "Isolate and treat him",
+          turnAway: "Drive him from the gate",
+          execute: "Shoot him",
+        },
+        results: {
+          isolate: "The stranger was isolated with the injured. People saw caution, and a little mercy.",
+          turnAway: "The man vanished into the dark. The settlement is safer, but some will remember his pleading.",
+          execute: "The shot ended the argument at once. The silence after it felt heavier than the risk.",
+        },
+      },
+      traderAtDusk: {
+        title: "Trader at dusk",
+        body:
+          "A lone trader reaches the gate with spare parts and batteries. He wants a quick exchange before the light is gone.",
+        options: {
+          tradeFood: "Trade food for material",
+          tradeWater: "Trade water for coal",
+          refuse: "Refuse the trade",
+        },
+        results: {
+          tradeFood: "Food changed hands and storage gained a useful pile of workable material.",
+          tradeWater: "Some water was exchanged for charged cells. The generator has a little more to draw from.",
+          refuse: "The trader shrugged and disappeared into the dusk. The stockpiles stayed exactly where they were.",
+        },
+      },
+      nightScreams: {
+        title: "Screams in the night",
+        body:
+          "A long scream rises from the ruins beyond the palisade. Someone may still be alive, or something may be trying to pull you out.",
+        options: {
+          sendPatrol: "Send a careful patrol",
+          signal: "Flash the lights",
+          stayQuiet: "Stay quiet",
+        },
+        results: {
+          sendPatrol: "The patrol did not return. The screaming stopped, and morning left three empty places in the work shifts.",
+          signal: "The lights cut through the dark. No one came, but people valued that the settlement did not ignore a call for help.",
+          stayQuiet: "The screaming stopped after a while. No one died beyond the gate, but people spoke of the decision in whispers.",
+        },
+      },
+      waterTheft: {
+        title: "Stolen water",
+        body:
+          "Several canisters are missing from the tanks. The guard found the thief: a young woman who says she took water for a sick child.",
+        options: {
+          amnesty: "Declare an amnesty",
+          punish: "Punish her hard",
+          rationLock: "Secure the ration stores",
+        },
+        results: {
+          amnesty: "Some water is gone, but an open amnesty calmed people who feared punishment for desperation.",
+          punish: "The punishment discouraged more theft. It also chilled the settlement's mood just as quickly.",
+          rationLock: "New locks and markings cost material, but future rationing will be easier to watch.",
+        },
+      },
+      generatorSpareParts: {
+        title: "Mine spare parts",
+        body:
+          "The mechanic found a box of parts from a stripped fuel station. They could help the mine gear now, or be broken down for storage.",
+        options: {
+          install: "Install the parts",
+          store: "Break them into material",
+          trade: "Charge cells and trade for food",
+        },
+        results: {
+          install: "The parts fit better than expected. The mine produced a short but useful coal surplus.",
+          store: "The mechanic sorted everything. Coils, brackets, and scraps became practical building material.",
+          trade: "Some coal was pushed through a quick emergency trade for food.",
+        },
+      },
+      provenTheft: {
+        title: "Proven theft",
+        body:
+          "The guard brings in the thief with the stolen supplies. This is not rumor or one word against another: witnesses and evidence are clear. The victim demands justice.",
+        options: {
+          exile: "Exile the thief",
+          maim: "Maim him",
+          forgive: "Forgive and compensate the victim",
+        },
+        results: {
+          exile: "The thief was escorted beyond the gate and will not return. The settlement lost one person.",
+          maim: "The sentence was carried out. The thief survived, but moved among the injured, and the camp went quiet.",
+          forgive: "The victim was compensated from common stores. The decision calmed some people and angered others.",
+        },
+      },
+      collapsedUnderpass: {
+        title: "Collapsed underpass",
+        body:
+          "A scout reports a freshly collapsed underpass. Knocking comes from under the concrete, but the site is unstable and noise carries.",
+        options: {
+          digOut: "Try to dig them out",
+          markDanger: "Mark the danger and leave",
+          leaveIt: "Leave it alone",
+        },
+        results: {
+          digOut: "The rescue cost strength and food, but there was a pack of usable material under the rubble.",
+          markDanger: "The patrol marked the site for later. No one risked their life, but the knocking took a while to stop.",
+          leaveIt: "The order was clear: do not stop. Some people have avoided looking at command since then.",
+        },
+      },
+      brokenWaterFilter: {
+        title: "Broken water filter",
+        body:
+          "One filter cracked, and some water smells of metal and algae. You can repair it, ration around it, or risk emergency use.",
+        options: {
+          repair: "Repair it with material",
+          ration: "Start water rationing",
+          riskDirtyWater: "Risk the dirty water",
+        },
+        results: {
+          repair: "Material went into a quick repair, and the filter returned some water to safe storage.",
+          ration: "Rationing kept control, but the mood around the tanks turned tense fast.",
+          riskDirtyWater: "The water was only roughly treated. One person became ill, and people began doubting command.",
         },
       },
     },
@@ -213,6 +457,10 @@ export const questTranslations: Record<Locale, QuestTranslationPack> = {
       cropSpoilage: {
         title: "Crop spoilage",
         result: "Part of the harvest spoiled in damp storage. Food stocks fell.",
+      },
+      scarcityTheft: {
+        title: "Desperate theft",
+        result: "Scarcity is wearing discipline thin. {amount} {resource} disappeared from storage.",
       },
     },
   },
