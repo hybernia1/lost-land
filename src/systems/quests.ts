@@ -33,29 +33,48 @@ const RECENT_DECISION_MEMORY = 2;
 const RECENT_SUDDEN_MEMORY = 2;
 const SUDDEN_QUEST_CHANCE = 0.35;
 const DECISION_PROFILE_SCORE_RANGE = 2;
+const DECISION_PROFILE_DECISIVE_THRESHOLD = 18;
 const SCARCITY_THEFT_RESOURCE_IDS: ResourceId[] = ["food", "water", "material"];
 const SCARCITY_THEFT_THRESHOLD = 0.22;
 const SCARCITY_THEFT_BASE_CHANCE = 0.18;
 const SCARCITY_THEFT_PRESSURE_CHANCE = 0.42;
 
+export type DecisionProfileKind =
+  | "noData"
+  | "balanced"
+  | "philanthropist"
+  | "principled"
+  | "merciful"
+  | "security"
+  | "open"
+  | "cautious";
+
 export const decisionProfileAxes: {
   id: DecisionProfileAxisId;
+  leftKind: DecisionProfileKind;
   leftLabelKey: string;
+  rightKind: DecisionProfileKind;
   rightLabelKey: string;
 }[] = [
   {
     id: "philanthropyPrinciple",
+    leftKind: "philanthropist",
     leftLabelKey: "profilePhilanthropist",
+    rightKind: "principled",
     rightLabelKey: "profilePrincipled",
   },
   {
     id: "mercySecurity",
+    leftKind: "merciful",
     leftLabelKey: "profileMerciful",
+    rightKind: "security",
     rightLabelKey: "profileSecurity",
   },
   {
     id: "opennessCaution",
+    leftKind: "open",
     leftLabelKey: "profileOpen",
+    rightKind: "cautious",
     rightLabelKey: "profileCautious",
   },
 ];
@@ -240,6 +259,27 @@ export function getDecisionProfileAxisValue(
   );
 
   return Math.max(-100, Math.min(100, (score / maxMagnitude) * 100));
+}
+
+export function getDecisionProfileKind(state: GameState): DecisionProfileKind {
+  if (state.quests.decisionHistory.length === 0) {
+    return "noData";
+  }
+
+  const strongest = decisionProfileAxes
+    .map((axis) => ({
+      axis,
+      value: getDecisionProfileAxisValue(state, axis.id),
+    }))
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))[0];
+
+  if (!strongest || Math.abs(strongest.value) < DECISION_PROFILE_DECISIVE_THRESHOLD) {
+    return "balanced";
+  }
+
+  return strongest.value < 0
+    ? strongest.axis.leftKind
+    : strongest.axis.rightKind;
 }
 
 export function getDecisionOptionCost(option: DecisionQuestOptionDefinition): ResourceBag {
