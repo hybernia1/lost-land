@@ -13,6 +13,12 @@ const tileAssetUrls = import.meta.glob([
   query: "?url",
 }) as Record<string, string>;
 
+const buildingAssetUrls = import.meta.glob("../assets/buildings/*.{png,jpg,jpeg}", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>;
+
 export function getTiledTilesetSource(source: string): string {
   const filename = getFilename(source);
   const match = Object.entries(tiledTilesetSources).find(([path]) => getFilename(path) === filename);
@@ -30,6 +36,17 @@ export function getTileAssetUrl(imagePath: string): string {
 
   if (!match) {
     throw new Error(`Missing tile atlas asset "${imagePath}".`);
+  }
+
+  return match[1];
+}
+
+export function getBuildingAssetUrl(imagePath: string): string {
+  const filename = getFilename(imagePath);
+  const match = Object.entries(buildingAssetUrls).find(([path]) => getFilename(path) === filename);
+
+  if (!match) {
+    throw new Error(`Missing building atlas asset "${imagePath}".`);
   }
 
   return match[1];

@@ -1,4 +1,5 @@
 import {
+  AnimatedSprite,
   Application,
   Container,
   Graphics,
@@ -9,7 +10,6 @@ import {
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
-import { getBuildingVisualLevel, getBuildingVisualPhase } from "../data/buildingVisuals";
 import { getEnvironmentDefinition } from "../data/environment";
 import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
 import { objectiveQuestById } from "../data/quests";
@@ -228,14 +228,6 @@ type TabOptions<T extends string> = {
   onSelect: (id: T) => void;
 };
 
-type MainBuildingEffect = {
-  phase: number;
-  effectBounds: Bounds;
-  base: Graphics;
-  lights: Graphics;
-  smoke: Graphics;
-};
-
 const resourceColors: Record<ResourceId, number> = {
   food: 0xd8b66a,
   water: 0x66bde8,
@@ -276,7 +268,6 @@ export class PixiVillageRenderer {
   private readonly hudLayer = new Container();
   private readonly tooltipLayer = new Container();
   private readonly assets = new VillageAssets();
-  private mainBuildingEffects: MainBuildingEffect[] = [];
   private layout: SceneLayout = {
     originX: 0,
     originY: 0,
@@ -364,7 +355,6 @@ export class PixiVillageRenderer {
     const hudHeight = height / hudPixelScale;
     const visualTime = performance.now() / 1000;
     this.hudPixelScale = hudPixelScale;
-    this.mainBuildingEffects = [];
     this.worldLayer.removeChildren();
     this.cameraLayer.removeChildren();
     this.hudLayer.removeChildren();
@@ -639,7 +629,6 @@ export class PixiVillageRenderer {
     app.canvas.classList.add("pixi-canvas");
     this.host.append(app.canvas);
     app.stage.addChild(this.rootLayer);
-    app.ticker.add(() => this.updateMainBuildingEffects());
     this.app = app;
 
     await this.assets.load();
@@ -825,7 +814,7 @@ export class PixiVillageRenderer {
       );
       this.bindTooltip(plotLayer, tooltip);
 
-      const asset = new Sprite(this.assets.getBuildingTexture(buildingId, Math.max(1, building.level), building.level > 0));
+      const asset = this.createBuildingSprite(buildingId, Math.max(1, building.level), building.level > 0);
       asset.anchor.set(0.5);
       this.fitSprite(
         asset,
@@ -834,7 +823,6 @@ export class PixiVillageRenderer {
       );
       asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
       plotLayer.addChild(asset);
-      this.drawBuildingVisualEffects(plotLayer, buildingId, Math.max(1, building.level), bounds, visualTime);
       if (isBuildingInactiveDueToCoal(state, buildingId)) {
         this.drawPowerWarning(plotLayer, bounds);
       }
@@ -2705,7 +2693,7 @@ export class PixiVillageRenderer {
     parent.addChild(row);
     this.drawPanel(row, 0, 0, options.width, options.height);
 
-    const asset = new Sprite(this.assets.getBuildingTexture(options.buildingId, options.level, options.built));
+    const asset = this.createBuildingSprite(options.buildingId, options.level, options.built);
     asset.anchor.set(0.5);
     asset.x = 72;
     asset.y = options.height / 2;
@@ -2795,7 +2783,7 @@ export class PixiVillageRenderer {
     const titleWidth = modalWidth - titleX - sideMargin;
     const bodyWidth = modalWidth - sideMargin * 2;
 
-    const asset = new Sprite(this.assets.getBuildingTexture(buildingId, Math.max(1, level), level > 0));
+    const asset = this.createBuildingSprite(buildingId, Math.max(1, level), level > 0);
     asset.anchor.set(0.5);
     asset.x = sideMargin + 54;
     asset.y = contentTop + 50;
@@ -4562,52 +4550,6 @@ export class PixiVillageRenderer {
     this.cameraLayer.addChild(marker);
   }
 
-  private drawBuildingVisualEffects(
-    parent: Container,
-    buildingId: BuildingId,
-    level: number,
-    bounds: Bounds,
-    visualTime: number,
-  ): void {
-    if (buildingId !== "mainBuilding") {
-      return;
-    }
-
-    const phase = getBuildingVisualPhase(level);
-    const effectBounds = this.getMainBuildingEffectBounds(level, bounds);
-    const effects = new Container();
-    effects.eventMode = "none";
-    const base = new Graphics();
-    const lights = new Graphics();
-    const smoke = new Graphics();
-    base.eventMode = "none";
-    lights.eventMode = "none";
-    smoke.eventMode = "none";
-    effects.addChild(base);
-    effects.addChild(lights);
-    effects.addChild(smoke);
-    this.drawMainBuildingBaseGlow(base, phase, effectBounds, visualTime);
-    this.drawMainBuildingLights(lights, phase, effectBounds, visualTime);
-    this.drawMainBuildingSmoke(smoke, phase, effectBounds, visualTime);
-    this.mainBuildingEffects.push({ phase, effectBounds, base, lights, smoke });
-
-    parent.addChild(effects);
-  }
-
-  private getMainBuildingEffectBounds(level: number, plotBounds: Bounds): Bounds {
-    const progress = (getBuildingVisualLevel(level) - 1) / 19;
-    const width = plotBounds.width * (0.58 + progress * 0.58);
-    const height = plotBounds.height * (0.42 + progress * 0.48);
-    const baseY = plotBounds.height * (0.34 - progress * 0.02);
-
-    return {
-      x: -width / 2,
-      y: baseY - height,
-      width,
-      height,
-    };
-  }
-
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
     const badge = new Container();
     badge.x = bounds.width * 0.28;
@@ -4774,88 +4716,17 @@ export class PixiVillageRenderer {
     );
   }
 
-  private drawMainBuildingBaseGlow(
-    graphics: Graphics,
-    _phase: number,
-    _bounds: Bounds,
-    _visualTime: number,
-  ): void {
-    graphics.clear();
-  }
+  private createBuildingSprite(buildingId: BuildingId, level: number, built: boolean): Sprite {
+    const animationFrames = this.assets.getBuildingAnimationFrames(buildingId, level, built);
 
-  private drawMainBuildingLights(
-    graphics: Graphics,
-    phase: number,
-    bounds: Bounds,
-    visualTime: number,
-  ): void {
-    graphics.clear();
-    const positions = [
-      { x: 0.28, y: 0.62, delay: 0 },
-      { x: 0.45, y: 0.46, delay: 1.1 },
-      { x: 0.64, y: 0.56, delay: 2.2 },
-      { x: 0.76, y: 0.38, delay: 3.1 },
-    ];
-
-    for (let index = 0; index <= Math.min(phase, positions.length - 1); index += 1) {
-      const position = positions[index];
-      const flicker = 0.58 + Math.sin(visualTime * 7.2 + position.delay) * 0.22 +
-        Math.sin(visualTime * 13.4 + position.delay) * 0.08;
-      const x = bounds.x + bounds.width * position.x;
-      const y = bounds.y + bounds.height * position.y;
-      const radius = Math.max(2, (3.3 + phase * 0.25) * this.layout.scale);
-
-      graphics
-        .circle(x, y, radius * 3.4)
-        .fill({ color: 0xffc85b, alpha: 0.045 * flicker });
-      graphics
-        .circle(x, y, radius * 1.45)
-        .fill({ color: 0xffd36a, alpha: 0.14 * flicker });
-      graphics
-        .circle(x, y, radius)
-        .fill({ color: 0xfff2b0, alpha: 0.42 * flicker });
-    }
-  }
-
-  private drawMainBuildingSmoke(
-    graphics: Graphics,
-    phase: number,
-    bounds: Bounds,
-    visualTime: number,
-  ): void {
-    graphics.clear();
-    const sourceCount = Math.min(3, 1 + Math.floor(phase / 2));
-
-    for (let source = 0; source < sourceCount; source += 1) {
-      const sourceX = bounds.x + bounds.width * (0.46 + source * 0.11);
-      const sourceY = bounds.y + bounds.height * (0.2 + source * 0.035);
-
-      for (let puff = 0; puff < 4; puff += 1) {
-        const progress = (visualTime * (0.13 + source * 0.02) + puff * 0.25 + source * 0.17) % 1;
-        const drift = Math.sin(visualTime * 1.8 + puff * 1.7 + source) * bounds.width * 0.016;
-        const rise = bounds.height * (0.05 + progress * (0.22 + phase * 0.015));
-        const radius = Math.max(3.5, bounds.width * (0.018 + progress * 0.025));
-        const alpha = (1 - progress) * (0.13 + phase * 0.012);
-
-        graphics
-          .circle(sourceX + drift + progress * bounds.width * 0.035, sourceY - rise, radius)
-          .fill({ color: 0xb8b2a0, alpha });
-        graphics
-          .circle(sourceX + drift - radius * 0.45, sourceY - rise + radius * 0.18, radius * 0.62)
-          .fill({ color: 0xd6d0bd, alpha: alpha * 0.52 });
-      }
+    if (animationFrames) {
+      const sprite = new AnimatedSprite(animationFrames);
+      sprite.loop = true;
+      sprite.play();
+      return sprite;
     }
 
-    for (let index = 0; index < phase; index += 1) {
-      const blink = 0.45 + Math.sin(visualTime * 5 + index) * 0.2;
-      graphics
-        .circle(
-          bounds.x + bounds.width * 0.6,
-          bounds.y + bounds.height * (0.18 - index * 0.06),
-          Math.max(1.5, 2.3 * this.layout.scale),
-        )
-        .fill({ color: 0x9bd8ff, alpha: 0.12 * blink });
-    }
+    return new Sprite(this.assets.getBuildingTexture(buildingId, level, built));
   }
 
   private fitSprite(sprite: Sprite, maxWidth: number, maxHeight: number): void {
@@ -4863,19 +4734,6 @@ export class PixiVillageRenderer {
     const heightScale = maxHeight / sprite.texture.height;
     const scale = Math.min(widthScale, heightScale);
     sprite.scale.set(scale);
-  }
-
-  private updateMainBuildingEffects(): void {
-    if (this.mainBuildingEffects.length === 0) {
-      return;
-    }
-
-    const visualTime = performance.now() / 1000;
-    for (const effect of this.mainBuildingEffects) {
-      this.drawMainBuildingBaseGlow(effect.base, effect.phase, effect.effectBounds, visualTime);
-      this.drawMainBuildingLights(effect.lights, effect.phase, effect.effectBounds, visualTime);
-      this.drawMainBuildingSmoke(effect.smoke, effect.phase, effect.effectBounds, visualTime);
-    }
   }
 
   private drawCenteredText(

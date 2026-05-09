@@ -4,14 +4,27 @@ import clinicAtlasUrl from "../assets/buildings/clinic-atlas.png";
 import dormitoryAtlasUrl from "../assets/buildings/dormitory-atlas.png";
 import generatorAtlasUrl from "../assets/buildings/generator-atlas.png";
 import hydroponicsAtlasUrl from "../assets/buildings/hydroponics-atlas.png";
-import mainBuildingAtlasUrl from "../assets/buildings/main-building-atlas.png";
 import marketAtlasUrl from "../assets/buildings/market-atlas.png";
 import storageAtlasUrl from "../assets/buildings/storage-atlas.png";
 import watchtowerAtlasUrl from "../assets/buildings/watchtower-atlas.png";
 import waterStillAtlasUrl from "../assets/buildings/water-still-atlas.png";
 import workshopAtlasUrl from "../assets/buildings/workshop-atlas.png";
+import mainBuildingTilesetSource from "../maps/tilesets/main-building.tsj?raw";
+import { getBuildingAssetUrl } from "./tiledAssets";
 
 export const BUILDING_VISUAL_LEVELS = 1;
+
+export type BuildingAtlasFrameDefinition = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type BuildingAnimationFrameDefinition = {
+  frameKey: string;
+  durationMs: number;
+};
 
 export type BuildingAtlasVisualDefinition = {
   kind: "atlas";
@@ -23,9 +36,39 @@ export type BuildingAtlasVisualDefinition = {
   rows: number;
   levels: number;
   framePrefix: string;
+  frames?: Record<string, BuildingAtlasFrameDefinition>;
+  animations?: Record<string, BuildingAnimationFrameDefinition[]>;
 };
 
 export type BuildingVisualDefinition = BuildingAtlasVisualDefinition;
+
+type TiledProperty = {
+  name: string;
+  value: unknown;
+};
+
+type TiledAnimationFrame = {
+  tileid: number;
+  duration: number;
+};
+
+type TiledTilesetTile = {
+  id: number;
+  animation?: TiledAnimationFrame[];
+  properties?: TiledProperty[];
+};
+
+type TiledTileset = {
+  columns?: number;
+  image: string;
+  imageheight?: number;
+  imagewidth?: number;
+  name: string;
+  tilecount?: number;
+  tileheight: number;
+  tilewidth: number;
+  tiles?: TiledTilesetTile[];
+};
 
 function singleFrameAtlas(atlasId: string, atlasUrl: string, framePrefix: string): BuildingAtlasVisualDefinition {
   return {
@@ -41,8 +84,81 @@ function singleFrameAtlas(atlasId: string, atlasUrl: string, framePrefix: string
   };
 }
 
+function tiledBuildingAtlas(
+  atlasId: string,
+  tilesetSource: string,
+  framePrefix: string,
+): BuildingAtlasVisualDefinition {
+  const tileset = JSON.parse(tilesetSource) as TiledTileset;
+  const columns = tileset.columns ?? Math.max(1, Math.floor((tileset.imagewidth ?? tileset.tilewidth) / tileset.tilewidth));
+  const rows = Math.max(1, Math.ceil((tileset.tilecount ?? columns) / columns));
+  const tileCount = tileset.tilecount ?? columns * rows;
+  const frames: Record<string, BuildingAtlasFrameDefinition> = {};
+  const frameKeysByTileId = new Map<number, string>();
+
+  for (let tileIndex = 0; tileIndex < tileCount; tileIndex += 1) {
+    const tile = tileset.tiles?.find((candidate) => candidate.id === tileIndex);
+    const frameKey = getStringProperty(tile?.properties, "frameKey") ?? `${framePrefix}_${tileIndex + 1}`;
+
+    frameKeysByTileId.set(tileIndex, frameKey);
+    frames[frameKey] = {
+      x: (tileIndex % columns) * tileset.tilewidth,
+      y: Math.floor(tileIndex / columns) * tileset.tileheight,
+      width: tileset.tilewidth,
+      height: tileset.tileheight,
+    };
+  }
+
+  return {
+    kind: "atlas",
+    atlasId,
+    atlasUrl: getBuildingAssetUrl(tileset.image),
+    frameWidth: tileset.tilewidth,
+    frameHeight: tileset.tileheight,
+    columns,
+    rows,
+    levels: BUILDING_VISUAL_LEVELS,
+    framePrefix,
+    frames,
+    animations: getTiledAnimations(tileset, frameKeysByTileId),
+  };
+}
+
+function getTiledAnimations(
+  tileset: TiledTileset,
+  frameKeysByTileId: Map<number, string>,
+): Record<string, BuildingAnimationFrameDefinition[]> {
+  const animations: Record<string, BuildingAnimationFrameDefinition[]> = {};
+
+  for (const tile of tileset.tiles ?? []) {
+    if (!tile.animation || tile.animation.length === 0) {
+      continue;
+    }
+
+    const frameKey = frameKeysByTileId.get(tile.id);
+
+    if (!frameKey) {
+      continue;
+    }
+
+    animations[frameKey] = tile.animation.flatMap((frame) => {
+      const animationFrameKey = frameKeysByTileId.get(frame.tileid);
+      return animationFrameKey
+        ? [{ frameKey: animationFrameKey, durationMs: frame.duration }]
+        : [];
+    });
+  }
+
+  return animations;
+}
+
+function getStringProperty(properties: TiledProperty[] | undefined, name: string): string | null {
+  const property = properties?.find((candidate) => candidate.name === name);
+  return typeof property?.value === "string" ? property.value : null;
+}
+
 export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisualDefinition>> = {
-  mainBuilding: singleFrameAtlas("main-building-atlas", mainBuildingAtlasUrl, "mainBuilding"),
+  mainBuilding: tiledBuildingAtlas("main-building-tiled-atlas", mainBuildingTilesetSource, "mainBuilding"),
   storage: singleFrameAtlas("storage-atlas", storageAtlasUrl, "storage"),
   dormitory: singleFrameAtlas("dormitory-atlas", dormitoryAtlasUrl, "dormitory"),
   hydroponics: singleFrameAtlas("hydroponics-atlas", hydroponicsAtlasUrl, "hydroponics"),
