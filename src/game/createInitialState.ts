@@ -3,7 +3,6 @@ import { emptyResourceRecord } from "../data/resources";
 import { villagePlotDefinitions } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
-import { createInitialMap } from "../systems/map";
 import { createInitialQuestState } from "../systems/quests";
 import { SAVE_VERSION } from "../systems/save";
 import type { BuildingId, BuildingState, GameState, ResourceId } from "./types";
@@ -69,7 +68,6 @@ export function createInitialState(
         buildingId: plot.id === "plot-main" ? "mainBuilding" : null,
       })),
     },
-    map: createInitialMap(),
     log: getLocalizedInitialLogEntries(),
   };
 

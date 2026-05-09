@@ -1,5 +1,5 @@
-import { cs } from "./cs";
-import { en } from "./en";
+import { cs } from "./cs/index";
+import { en } from "./en/index";
 import type { Locale, TranslationPack } from "./types";
 
 const LANGUAGE_KEY = "lost-land.language";

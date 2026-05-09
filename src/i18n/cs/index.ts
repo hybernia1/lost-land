@@ -1,7 +1,7 @@
-import type { TranslationPack } from "./types";
-import { questTranslations } from "./quests";
+import { quests } from "./quests";
+import type { CsTranslationPack } from "./types";
 
-export const cs: TranslationPack = {
+export const cs: CsTranslationPack = {
   locale: "cs",
   label: "Čeština",
   ui: {
@@ -236,16 +236,7 @@ export const cs: TranslationPack = {
       description: "Postupně léčí zraněné přeživší a při péči spotřebovává jídlo i vodu.",
     },
   },
-  quests: questTranslations.cs,
-  tiles: {
-    base: "Domovská základna",
-    ruins: "Městské ruiny",
-    forest: "Zarostlý les",
-    highway: "Mrtvá dálnice",
-    hospital: "Opuštěná nemocnice",
-    warehouse: "Sklad zásob",
-    infested: "Zamořený blok",
-  },
+  quests,
   roles: {
     workers: "Pracovníci",
     troops: "Vojáci",

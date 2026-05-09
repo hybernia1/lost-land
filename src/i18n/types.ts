@@ -1,7 +1,25 @@
-import type { BuildingId, ResourceId, TileKind } from "../game/types";
-import type { QuestTranslationPack } from "./quests";
+import type { BuildingId, ResourceId } from "../game/types";
 
 export type Locale = "cs" | "en";
+
+export type QuestTranslationPack = {
+  ui: Record<string, string>;
+  objectives: Record<string, {
+    title: string;
+    description: string;
+    reward: string;
+  }>;
+  decisions: Record<string, {
+    title: string;
+    body: string;
+    options: Record<string, string>;
+    results: Record<string, string>;
+  }>;
+  sudden: Record<string, {
+    title: string;
+    result: string;
+  }>;
+};
 
 export type TranslationPack = {
   locale: Locale;
@@ -11,6 +29,5 @@ export type TranslationPack = {
   resourceDescriptions: Record<ResourceId, string>;
   buildings: Record<BuildingId, { name: string; description: string }>;
   quests: QuestTranslationPack;
-  tiles: Record<TileKind, string>;
   roles: Record<string, string>;
 };

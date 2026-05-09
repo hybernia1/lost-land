@@ -1,7 +1,7 @@
-import type { TranslationPack } from "./types";
-import { questTranslations } from "./quests";
+import { quests } from "./quests";
+import type { EnTranslationPack } from "./types";
 
-export const en: TranslationPack = {
+export const en: EnTranslationPack = {
   locale: "en",
   label: "English",
   ui: {
@@ -232,16 +232,7 @@ export const en: TranslationPack = {
       description: "Treats injured survivors over time and consumes food and water for care.",
     },
   },
-  quests: questTranslations.en,
-  tiles: {
-    base: "Home Base",
-    ruins: "City Ruins",
-    forest: "Overgrown Woods",
-    highway: "Dead Highway",
-    hospital: "Abandoned Hospital",
-    warehouse: "Supply Warehouse",
-    infested: "Infested Block",
-  },
+  quests,
   roles: {
     workers: "Workers",
     troops: "Troops",

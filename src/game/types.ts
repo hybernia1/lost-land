@@ -25,15 +25,6 @@ export type BuildingCategory =
   | "defense"
   | "support";
 
-export type TileKind =
-  | "base"
-  | "ruins"
-  | "forest"
-  | "highway"
-  | "hospital"
-  | "warehouse"
-  | "infested";
-
 export type ResourceBag = Partial<Record<ResourceId, number>>;
 
 export type BuildingLevelRequirement = {
@@ -112,17 +103,6 @@ export type HealthState = {
   nextIncidentAt: number;
   starvationProgress: number;
   dehydrationProgress: number;
-};
-
-export type MapSector = {
-  id: string;
-  x: number;
-  y: number;
-  kind: TileKind;
-  revealed: boolean;
-  scouted: boolean;
-  threat: number;
-  loot: ResourceBag;
 };
 
 export type GameSpeed = 1 | 24;
@@ -218,11 +198,6 @@ export type GameState = {
   village: {
     selectedPlotId: string;
     plots: VillagePlotState[];
-  };
-  map: {
-    width: number;
-    height: number;
-    sectors: MapSector[];
   };
   log: LogEntry[];
 };
