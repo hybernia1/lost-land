@@ -324,6 +324,13 @@ export class App {
       return;
     }
 
+    if (action === "open-weather-overview") {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = "weather";
+      this.requestRender();
+      return;
+    }
+
     if (action === "set-continuous-shifts") {
       this.game.setContinuousShifts(continuousShifts ?? false);
       return;

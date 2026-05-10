@@ -21,6 +21,7 @@ const activeConditionIds: Exclude<EnvironmentConditionId, "stable">[] = [
   "snowFront",
   "radiation",
 ];
+const ACTIVE_CONDITION_ROLL_THRESHOLD = 80;
 
 export function createDefaultEnvironmentState(
   nextConditionAt = ENVIRONMENT_INITIAL_DELAY_SECONDS,
@@ -95,6 +96,19 @@ function startNextCondition(state: GameState): void {
   }
 
   const condition = pickNextCondition(state);
+  if (!condition) {
+    const stableDefinition = getEnvironmentDefinition("stable");
+    const stableDurationHours = pickDurationHours(
+      state,
+      stableDefinition.minDurationHours,
+      stableDefinition.maxDurationHours,
+    );
+    state.environment = createDefaultEnvironmentState(
+      state.elapsedSeconds + stableDurationHours * GAME_HOUR_REAL_SECONDS,
+    );
+    return;
+  }
+
   const intensity = pickIntensity(state);
   const definition = getEnvironmentDefinition(condition);
   const durationHours = pickDurationHours(state, definition.minDurationHours, definition.maxDurationHours);
@@ -223,7 +237,12 @@ function getExposureInjuries(homeless: number, deaths: number, intensity: number
   return Math.min(remaining, Math.ceil(remaining * ratio));
 }
 
-function pickNextCondition(state: GameState): Exclude<EnvironmentConditionId, "stable"> {
+function pickNextCondition(state: GameState): Exclude<EnvironmentConditionId, "stable"> | null {
+  const activeRoll = stableRoll(`condition-active:${Math.floor(state.environment.nextConditionAt)}:${state.saveId}`);
+  if (activeRoll >= ACTIVE_CONDITION_ROLL_THRESHOLD) {
+    return null;
+  }
+
   const roll = stableRoll(`condition:${Math.floor(state.environment.nextConditionAt)}:${state.saveId}`);
   const index = roll < 38 ? 0 : roll < 70 ? 1 : 2;
 
@@ -233,15 +252,11 @@ function pickNextCondition(state: GameState): Exclude<EnvironmentConditionId, "s
 function pickIntensity(state: GameState): number {
   const roll = stableRoll(`intensity:${Math.floor(state.environment.nextConditionAt)}:${state.saveId}`);
 
-  if (roll < 50) {
+  if (roll < 61) {
     return 1;
   }
 
-  if (roll < 82) {
-    return 2;
-  }
-
-  return 3;
+  return 2;
 }
 
 function pickDurationHours(state: GameState, minHours: number, maxHours: number): number {

@@ -10,7 +10,11 @@ import {
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
-import { getEnvironmentDefinition } from "../data/environment";
+import {
+  ENVIRONMENT_MAX_INTENSITY,
+  getEnvironmentDefinition,
+  getEnvironmentIntensityIndex,
+} from "../data/environment";
 import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
 import { objectiveQuestById } from "../data/quests";
 import { defaultVillageLayout } from "../data/villageLayouts";
@@ -120,7 +124,7 @@ export type PixiActionDetail = {
   continuousShifts?: boolean;
 };
 
-export type VillageInfoPanel = ResourceId | "survivors" | "decisionArchive";
+export type VillageInfoPanel = ResourceId | "survivors" | "decisionArchive" | "weather";
 
 type EffectLine = {
   iconId: string;
@@ -133,6 +137,7 @@ type BrandAlert = {
   iconId: string;
   label?: string;
   tooltip?: string;
+  action?: PixiActionDetail;
   tone: "cold" | "danger" | "warning" | "neutral";
 };
 
@@ -1203,6 +1208,10 @@ export class PixiVillageRenderer {
       this.bindTooltip(group, alert.tooltip);
     }
 
+    if (alert.action) {
+      this.bindAction(group, alert.action);
+    }
+
     return group;
   }
 
@@ -1256,12 +1265,14 @@ export class PixiVillageRenderer {
       alerts.push({
         iconId: environmentAlertIconByCondition[condition],
         tooltip,
+        action: { action: "open-weather-overview" },
         tone: environmentAlertToneByCondition[condition],
       });
       alerts.push({
         iconId: "crisis-countdown",
         label: remaining,
         tooltip,
+        action: { action: "open-weather-overview" },
         tone: condition === "radiation" ? "danger" : "warning",
       });
     }
@@ -2183,7 +2194,184 @@ export class PixiVillageRenderer {
       return;
     }
 
+    if (infoPanel === "weather") {
+      this.drawWeatherOverviewPanel(state, translations, width, height);
+      return;
+    }
+
     this.drawResourceBreakdownPanel(state, translations, width, height, infoPanel);
+  }
+
+  private drawWeatherOverviewPanel(
+    state: GameState,
+    translations: TranslationPack,
+    width: number,
+    height: number,
+  ): void {
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
+
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
+    overlay.addChild(backdrop);
+    this.bindAction(backdrop, { action: "close-village-modal" });
+
+    const panelWidth = Math.min(620, width - 48);
+    const panelHeight = 356;
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(36, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+    this.createIconButton(
+      panel,
+      "close",
+      panelWidth - 54,
+      18,
+      34,
+      34,
+      { action: "close-village-modal" },
+      translations.ui.close,
+    );
+
+    const condition = state.environment.condition;
+    const definition = getEnvironmentDefinition(condition);
+    const conditionLabel = translations.ui[definition.labelKey] ?? definition.id;
+    const intensity = Math.max(1, Math.min(ENVIRONMENT_MAX_INTENSITY, Math.floor(state.environment.intensity)));
+    const intensityIndex = getEnvironmentIntensityIndex(intensity);
+    const moralePenaltyPerHour =
+      definition.moralePenaltyPerHourByIntensity[intensityIndex] ?? 0;
+    const healthIncidentRisk =
+      definition.healthIncidentChanceByIntensity[intensityIndex] ?? 0;
+    const shelterDeadlineHours =
+      definition.shelterDeadlineHoursByIntensity?.[intensityIndex] ?? null;
+    const endsIn = condition === "stable"
+      ? translations.ui.environmentStable
+      : this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
+
+    this.drawIcon(panel, this.getEnvironmentPanelIconId(condition), 28, 31, 20);
+    this.drawText(panel, translations.ui.weatherOverview ?? translations.ui.environment, 56, 20, {
+      fill: 0xf5efdf,
+      fontSize: 22,
+      fontWeight: "900",
+    });
+    const conditionLabelRightX = panelWidth - 76;
+    this.drawText(panel, conditionLabel, conditionLabelRightX, 24, {
+      fill: 0xf1df9a,
+      fontSize: 16,
+      fontWeight: "900",
+      align: "right",
+    }).anchor.set(1, 0);
+
+    this.drawText(panel, this.getEnvironmentDescription(state, translations), 24, 66, {
+      fill: 0xc8cabb,
+      fontSize: 13,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 48,
+    });
+
+    this.drawText(panel, translations.ui.weatherStatus ?? "Status", 24, 122, {
+      fill: 0xaeb4b8,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    this.drawBreakdownRow(
+      panel,
+      translations.ui.environmentIntensity,
+      `${intensity}/${ENVIRONMENT_MAX_INTENSITY}`,
+      intensity,
+      panelWidth,
+      154,
+    );
+    this.drawBreakdownRow(
+      panel,
+      translations.ui.environmentEndsIn,
+      endsIn,
+      condition === "stable" ? 0 : -0.01,
+      panelWidth,
+      188,
+    );
+
+    this.drawText(panel, translations.ui.weatherPenalties ?? "Potential penalties", 24, 224, {
+      fill: 0xaeb4b8,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    this.drawBreakdownRow(
+      panel,
+      translations.ui.weatherMoralePenalty ?? "Morale penalty",
+      `-${this.formatRate(moralePenaltyPerHour)}/h`,
+      -moralePenaltyPerHour / GAME_HOUR_REAL_SECONDS,
+      panelWidth,
+      256,
+    );
+    this.drawBreakdownRow(
+      panel,
+      translations.ui.weatherHealthRisk ?? "Health incident pressure",
+      `+${Math.round(healthIncidentRisk)}`,
+      -Math.max(0.01, healthIncidentRisk),
+      panelWidth,
+      290,
+    );
+
+    if (shelterDeadlineHours !== null) {
+      const shelterLabel = translations.ui.weatherShelterDeadline ?? "Shelter deadline";
+      const shelterValue = state.environment.activeCrisis?.kind === "shelter"
+        ? this.formatScoutingRemaining(Math.max(0, state.environment.activeCrisis.deadlineAt - state.elapsedSeconds))
+        : `${shelterDeadlineHours}h`;
+      const shelterTitle = state.environment.activeCrisis?.kind === "shelter"
+        ? translations.ui.weatherShelterDeadlineCurrent ?? shelterLabel
+        : shelterLabel;
+      this.drawBreakdownRow(
+        panel,
+        shelterTitle,
+        shelterValue,
+        -0.01,
+        panelWidth,
+        324,
+      );
+    }
+  }
+
+  private getEnvironmentPanelIconId(condition: EnvironmentConditionId): string {
+    if (condition === "rain") {
+      return "crisis-rain";
+    }
+
+    if (condition === "snowFront") {
+      return "crisis-snow";
+    }
+
+    if (condition === "radiation") {
+      return "crisis-radiation";
+    }
+
+    return "clock";
+  }
+
+  private getEnvironmentDescription(state: GameState, translations: TranslationPack): string {
+    const condition = state.environment.condition;
+
+    if (condition === "rain") {
+      return translations.ui.weatherRainDescription ??
+        "Dešťová fronta snižuje morálku a zvyšuje tlak na zdravotní incidenty.";
+    }
+
+    if (condition === "snowFront") {
+      return translations.ui.weatherSnowDescription ??
+        "Sněhová fronta zvyšuje tlak na zdraví i morálku. Bezdomovci riskují omrzliny a ztráty.";
+    }
+
+    if (condition === "radiation") {
+      return translations.ui.weatherRadiationDescription ??
+        "Radiace výrazně zatěžuje zdraví komunity a sráží morálku.";
+    }
+
+    return translations.ui.weatherStableDescription ??
+      "Aktuálně neprobíhá žádná aktivní fronta. Tábor je v relativně stabilním prostředí.";
   }
 
   private drawResourceBreakdownPanel(
@@ -2426,7 +2614,7 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const intensity = Math.max(1, Math.min(3, intensityRaw));
+    const intensity = Math.max(1, Math.min(ENVIRONMENT_MAX_INTENSITY, intensityRaw));
     const hazeColor = condition === "radiation"
       ? 0x98cf6a
       : condition === "snowFront"

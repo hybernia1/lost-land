@@ -55,10 +55,11 @@ export function installGodMode(root: HTMLElement, game: Game): GodModeController
         <div class="god-mode-grid compact">
           <button data-dev-action="set-environment" data-condition="stable">Stable</button>
           <button data-dev-action="set-environment" data-condition="rain" data-intensity="1">Rain 1</button>
+          <button data-dev-action="set-environment" data-condition="rain" data-intensity="2">Rain 2</button>
+          <button data-dev-action="set-environment" data-condition="snowFront" data-intensity="1">Snow 1</button>
           <button data-dev-action="set-environment" data-condition="snowFront" data-intensity="2">Snow 2</button>
-          <button data-dev-action="set-environment" data-condition="snowFront" data-intensity="3">Snow 3</button>
+          <button data-dev-action="set-environment" data-condition="radiation" data-intensity="1">Rad 1</button>
           <button data-dev-action="set-environment" data-condition="radiation" data-intensity="2">Rad 2</button>
-          <button data-dev-action="set-environment" data-condition="radiation" data-intensity="3">Rad 3</button>
         </div>
       </div>
     `;
@@ -98,7 +99,7 @@ export function installGodMode(root: HTMLElement, game: Game): GodModeController
       );
     } else if (action === "homeless-snow") {
       game.devAddWorkers(8);
-      game.devSetEnvironment("snowFront", 3);
+      game.devSetEnvironment("snowFront", 2);
     }
   };
 

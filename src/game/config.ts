@@ -14,9 +14,9 @@ export const gameConfig = {
   },
   environment: {
     minIntensity: 1,
-    maxIntensity: 3,
-    initialDelayHours: 6,
-    cooldownHours: 7,
+    maxIntensity: 2,
+    initialDelayHours: 8,
+    cooldownHours: 9,
     shelterWarningLeadHours: 2,
     shelterRepeatDeadlineHours: 4,
     devConditionDurationHours: 8,

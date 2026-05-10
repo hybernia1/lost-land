@@ -165,7 +165,10 @@ export class Game {
       return;
     }
 
-    const clampedIntensity = Math.max(1, Math.min(3, Math.floor(intensity)));
+    const clampedIntensity = Math.max(
+      gameConfig.environment.minIntensity,
+      Math.min(gameConfig.environment.maxIntensity, Math.floor(intensity)),
+    );
     const durationSeconds = condition === "stable"
       ? 0
       : gameConfig.environment.devConditionDurationHours * GAME_HOUR_REAL_SECONDS;
