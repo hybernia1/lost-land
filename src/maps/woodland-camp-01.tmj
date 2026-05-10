@@ -704,6 +704,58 @@
                  "width":128,
                  "x":3005.69696969697,
                  "y":1967.0303030303
+                }, 
+                {
+                 "gid":79,
+                 "height":128,
+                 "id":147,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":2056,
+                 "y":1026
+                }, 
+                {
+                 "gid":79,
+                 "height":128,
+                 "id":148,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":2142.5,
+                 "y":1026
+                }, 
+                {
+                 "gid":79,
+                 "height":128,
+                 "id":149,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":2227,
+                 "y":1026
+                }, 
+                {
+                 "gid":73,
+                 "height":128,
+                 "id":150,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":2305,
+                 "y":1014.5
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -986,7 +1038,7 @@
          "y":0
         }],
  "nextlayerid":10,
- "nextobjectid":147,
+ "nextobjectid":151,
  "orientation":"orthogonal",
  "properties":[
         {
@@ -1017,6 +1069,10 @@
         {
          "firstgid":65,
          "source":"tilesets\/palisade.tsj"
+        }, 
+        {
+         "firstgid":69,
+         "source":"tilesets\/roads.tsj"
         }],
  "tilewidth":128,
  "type":"map",
