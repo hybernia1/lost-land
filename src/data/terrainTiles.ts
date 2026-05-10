@@ -16,5 +16,11 @@ export type TerrainTextureDefinition = {
   tilesetId: string;
   atlasUrl: string;
   frame: TerrainTileFrame;
+  animation?: TerrainTileAnimationFrame[];
   tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
+};
+
+export type TerrainTileAnimationFrame = {
+  textureKey: TerrainTextureKey;
+  durationMs: number;
 };

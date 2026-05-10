@@ -16,6 +16,7 @@ import type { BuildingId } from "../game/types";
 
 const buildingTextureCache = new Map<string, Texture>();
 const terrainTextureCache = new Map<string, Texture>();
+const terrainAnimationCache = new Map<string, FrameObject[] | null>();
 
 export class VillageAssets {
   private readonly buildingAtlases = new Map<string, Texture>();
@@ -96,6 +97,33 @@ export class VillageAssets {
 
     terrainTextureCache.set(key, texture);
     return texture;
+  }
+
+  getTerrainTileAnimationFrames(textureKey: string): FrameObject[] | null {
+    const cacheKey = `terrain:animation:${textureKey}`;
+    const cached = terrainAnimationCache.get(cacheKey);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const tile = this.getTerrainTextureDefinition(textureKey);
+
+    if (!tile?.animation || tile.animation.length <= 1) {
+      terrainAnimationCache.set(cacheKey, null);
+      return null;
+    }
+
+    const frames = tile.animation.flatMap((frame): FrameObject[] => {
+      const texture = this.getTerrainTileTexture(frame.textureKey);
+      return texture
+        ? [{ texture, time: frame.durationMs }]
+        : [];
+    });
+
+    const animationFrames = frames.length > 1 ? frames : null;
+    terrainAnimationCache.set(cacheKey, animationFrames);
+    return animationFrames;
   }
 
   private async loadTextures(): Promise<void> {

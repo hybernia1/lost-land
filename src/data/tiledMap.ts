@@ -15,9 +15,15 @@ type TiledProperty = {
   value: unknown;
 };
 
+type TiledAnimationFrame = {
+  tileid: number;
+  duration: number;
+};
+
 type TiledTilesetTile = {
   id: number;
   properties?: TiledProperty[];
+  animation?: TiledAnimationFrame[];
 };
 
 type TiledTileset = {
@@ -139,9 +145,11 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
     const atlasUrl = getTileAssetUrl(tileset.image ?? "");
     const tileCount = tileset.tilecount ?? ((tileset.columns ?? 1) * Math.ceil((tileset.imageheight ?? tileset.tileheight) / tileset.tileheight));
     const columns = tileset.columns ?? Math.max(1, Math.floor((tileset.imagewidth ?? tileset.tilewidth) / tileset.tilewidth));
+    const tilesById = new Map((tileset.tiles ?? []).map((tile) => [tile.id, tile]));
+    const textureKeyByTileIndex = new Map<number, TerrainTextureKey>();
 
     for (let tileIndex = 0; tileIndex < tileCount; tileIndex += 1) {
-      const tile = tileset.tiles?.find((candidate) => candidate.id === tileIndex);
+      const tile = tilesById.get(tileIndex);
       const tileId = getStringProperty(tile?.properties, "tileId") ?? `${tileset.name}_${tileIndex}`;
       const textureKey = `${tileset.name}:${tileId}`;
       const frame = {
@@ -160,6 +168,31 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tintByEnvironment: getEnvironmentTint(tileId),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
+      textureKeyByTileIndex.set(tileIndex, textureKey);
+    }
+
+    for (const tile of tilesById.values()) {
+      if (!tile.animation || tile.animation.length === 0) {
+        continue;
+      }
+
+      const textureKey = textureKeyByTileIndex.get(tile.id);
+      const tileTexture = textureKey ? tileTextures[textureKey] : null;
+
+      if (!textureKey || !tileTexture) {
+        continue;
+      }
+
+      const animation = tile.animation.flatMap((frame) => {
+        const frameTextureKey = textureKeyByTileIndex.get(frame.tileid);
+        return frameTextureKey
+          ? [{ textureKey: frameTextureKey, durationMs: frame.duration }]
+          : [];
+      });
+
+      if (animation.length > 1) {
+        tileTexture.animation = animation;
+      }
     }
   }
 
