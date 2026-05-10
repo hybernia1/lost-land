@@ -339,10 +339,16 @@ export class PixiVillageRenderer {
     translations?: TranslationPack,
     modalPlotId?: string | null,
     infoPanel?: VillageInfoPanel | null,
+    resolvedDecisionPreview?: DecisionHistoryEntry | null,
   ): void {
     this.lastState = state;
     this.lastTranslations = translations;
-    this.cameraDragBlocked = Boolean(modalPlotId || infoPanel || state.quests.activeDecision);
+    this.cameraDragBlocked = Boolean(
+      modalPlotId ||
+      infoPanel ||
+      state.quests.activeDecision ||
+      resolvedDecisionPreview,
+    );
 
     if (!this.app) {
       return;
@@ -392,7 +398,13 @@ export class PixiVillageRenderer {
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
-    this.drawQuestDecisionModal(state, translations, hudWidth, hudHeight);
+    this.drawQuestDecisionModal(
+      state,
+      translations,
+      hudWidth,
+      hudHeight,
+      resolvedDecisionPreview ?? null,
+    );
     this.applyHudPixelScale(this.hudLayer, hudPixelScale);
     this.scaleHudInteractionBounds(hudPixelScale);
   }
@@ -2371,24 +2383,27 @@ export class PixiVillageRenderer {
     translations: TranslationPack | undefined,
     width: number,
     height: number,
+    resolvedDecisionPreview: DecisionHistoryEntry | null,
   ): void {
     const activeDecision = state.quests.activeDecision;
 
-    if (!activeDecision || !translations) {
+    if (!translations || (!activeDecision && !resolvedDecisionPreview)) {
       return;
     }
 
-    const definition = decisionQuestById[activeDecision.definitionId];
-    const copy = translations.quests.decisions[definition.id];
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
     backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.7 });
-    backdrop.eventMode = "static";
-    backdrop.on("pointerdown", (event) => {
-      event.stopPropagation();
-    });
+    if (activeDecision) {
+      backdrop.eventMode = "static";
+      backdrop.on("pointerdown", (event) => {
+        event.stopPropagation();
+      });
+    } else {
+      this.bindAction(backdrop, { action: "close-decision-result" });
+    }
     overlay.addChild(backdrop);
 
     const panelWidth = Math.min(560, width - 48);
@@ -2400,50 +2415,116 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
 
-    this.drawIcon(panel, "people", 30, 38, 24);
-    this.drawText(panel, translations.quests.ui.decisionRequired, 62, 18, {
+    if (activeDecision) {
+      const definition = decisionQuestById[activeDecision.definitionId];
+      const copy = translations.quests.decisions[definition.id];
+      this.drawIcon(panel, "people", 30, 38, 24);
+      this.drawText(panel, translations.quests.ui.decisionRequired, 62, 18, {
+        fill: 0xd8c890,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      this.drawText(panel, copy?.title ?? definition.id, 62, 38, {
+        fill: 0xf5efdf,
+        fontSize: 24,
+        fontWeight: "900",
+      });
+      this.drawText(panel, copy?.body ?? "", 28, 86, {
+        fill: 0xd7ddd8,
+        fontSize: 14,
+        fontWeight: "700",
+        wordWrap: true,
+        wordWrapWidth: panelWidth - 56,
+      });
+      this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, 170, {
+        fill: 0xffc66d,
+        fontSize: 12,
+        fontWeight: "900",
+        wordWrap: true,
+        wordWrapWidth: panelWidth - 56,
+      });
+
+      const buttonWidth = panelWidth - 56;
+      definition.options.forEach((option, index) => {
+        const affordable = canAffordDecisionOption(state, option);
+        this.createModalButton(
+          panel,
+          copy?.options[option.id] ?? option.id,
+          28,
+          212 + index * 42,
+          buttonWidth,
+          34,
+          {
+            action: "resolve-quest-decision",
+            questOption: option.id,
+          },
+          !affordable,
+          affordable ? undefined : translations.quests.ui.notEnoughSupplies,
+        );
+      });
+      return;
+    }
+
+    const resultEntry = resolvedDecisionPreview;
+
+    if (!resultEntry) {
+      return;
+    }
+
+    const resultDefinition = decisionQuestById[resultEntry.definitionId];
+    const resultCopy = translations.quests.decisions[resultDefinition.id];
+    const resultOption = this.getDecisionHistoryOption(resultEntry);
+    const selectedOptionLabel = resultCopy?.options[resultEntry.optionId] ?? resultEntry.optionId;
+    const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(resultEntry.resolvedAt)} ${formatGameClock(resultEntry.resolvedAt)}`;
+    this.createIconButton(
+      panel,
+      "close",
+      panelWidth - 58,
+      18,
+      38,
+      38,
+      { action: "close-decision-result" },
+      translations.ui.close,
+    );
+    this.drawIcon(panel, "archive", 30, 38, 24);
+    this.drawText(panel, translations.ui.decisionArchive ?? "Decision archive", 62, 18, {
       fill: 0xd8c890,
       fontSize: 12,
       fontWeight: "900",
     });
-    this.drawText(panel, copy?.title ?? definition.id, 62, 38, {
+    this.drawText(panel, resultCopy?.title ?? resultDefinition.id, 62, 38, {
       fill: 0xf5efdf,
       fontSize: 24,
       fontWeight: "900",
     });
-    this.drawText(panel, copy?.body ?? "", 28, 86, {
+    this.drawText(panel, resolvedDay, 28, 76, {
+      fill: 0xaeb6ad,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+    this.drawText(panel, `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`, 28, 94, {
       fill: 0xd7ddd8,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: 13,
+      fontWeight: "800",
       wordWrap: true,
       wordWrapWidth: panelWidth - 56,
     });
-    this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, 170, {
-      fill: 0xffc66d,
-      fontSize: 12,
-      fontWeight: "900",
+    this.drawText(panel, resultCopy?.results[resultEntry.optionId] ?? "", 28, 124, {
+      fill: 0xf1df9a,
+      fontSize: 13,
+      fontWeight: "800",
       wordWrap: true,
       wordWrapWidth: panelWidth - 56,
     });
 
-    const buttonWidth = panelWidth - 56;
-    definition.options.forEach((option, index) => {
-      const affordable = canAffordDecisionOption(state, option);
-      this.createModalButton(
+    if (resultOption) {
+      this.drawDecisionImpactChips(
         panel,
-        copy?.options[option.id] ?? option.id,
-        28,
-        212 + index * 42,
-        buttonWidth,
-        34,
-        {
-          action: "resolve-quest-decision",
-          questOption: option.id,
-        },
-        !affordable,
-        affordable ? undefined : translations.quests.ui.notEnoughSupplies,
+        this.getDecisionImpactLines(resultOption, translations).slice(0, 8),
+        panelWidth - 28,
+        286,
       );
-    });
+    }
   }
 
   private drawVillageModal(

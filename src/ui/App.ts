@@ -1,6 +1,6 @@
 import type { Game } from "../game/Game";
 import { formatGameClock, getGameDay } from "../game/time";
-import type { BuildingId, GameSpeed, GameState, ScoutingMode } from "../game/types";
+import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState, ScoutingMode } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
@@ -18,6 +18,7 @@ export class App {
   private shellReady = false;
   private villageModalPlotId: string | null = null;
   private villageInfoPanel: VillageInfoPanel | null = null;
+  private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
   private renderQueued = false;
   private tooltipTarget: HTMLElement | null = null;
   private suppressVillageClickUntil = 0;
@@ -40,6 +41,9 @@ export class App {
     window.addEventListener("resize", () => this.requestRender());
     this.game.subscribe((state) => {
       this.state = state;
+      if (state.quests.activeDecision) {
+        this.resolvedDecisionPreview = null;
+      }
       this.requestRender();
     });
   }
@@ -202,6 +206,7 @@ export class App {
       this.t(),
       this.villageModalPlotId,
       this.villageInfoPanel,
+      this.resolvedDecisionPreview,
     );
 
     this.updateShellMode();
@@ -324,8 +329,28 @@ export class App {
       return;
     }
 
-    if (action === "resolve-quest-decision" && questOption) {
+    if (action === "resolve-quest-decision" && questOption && this.state) {
+      const activeDecision = this.state.quests.activeDecision;
       this.game.resolveQuestDecision(questOption);
+      const history = this.state.quests.decisionHistory;
+      const latestHistory = history[history.length - 1];
+
+      if (
+        activeDecision &&
+        latestHistory &&
+        latestHistory.definitionId === activeDecision.definitionId &&
+        latestHistory.optionId === questOption
+      ) {
+        this.resolvedDecisionPreview = latestHistory;
+      }
+
+      this.requestRender();
+      return;
+    }
+
+    if (action === "close-decision-result") {
+      this.resolvedDecisionPreview = null;
+      this.requestRender();
       return;
     }
 
@@ -558,6 +583,7 @@ export class App {
 
   private startGameSession(): void {
     this.mode = "game";
+    this.resolvedDecisionPreview = null;
     this.game.start();
     this.requestRender();
   }
@@ -574,6 +600,7 @@ export class App {
     this.mode = "menu";
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
+    this.resolvedDecisionPreview = null;
     this.godMode?.destroy();
     this.godMode = null;
     this.game.stop();
