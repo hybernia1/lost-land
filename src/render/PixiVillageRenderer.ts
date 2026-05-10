@@ -2528,17 +2528,32 @@ export class PixiVillageRenderer {
         ? 0x152233
         : 0x071322;
     const skyAlpha = Math.min(0.72, daylight.darkness * 1.05);
+    const screenX = -1;
+    const screenY = -1;
+    const screenWidth = Math.ceil(width) + 2;
+    const screenHeight = Math.ceil(height) + 2;
 
-    graphic.rect(0, 0, width, height)
+    graphic.rect(screenX, screenY, screenWidth, screenHeight)
       .fill({ color: tint, alpha: skyAlpha });
 
     const horizonAlpha = Math.min(0.14, daylight.darkness * 0.32);
     const horizonColor = daylight.phase === "dusk" ? 0x7b452d : 0x37576f;
-    graphic.rect(0, height * 0.52, width, height * 0.48)
-      .fill({ color: horizonColor, alpha: horizonAlpha });
+    const horizonStart = Math.floor(height * 0.48);
+    const horizonEnd = Math.ceil(height + 1);
+    const horizonBands = 18;
+    const horizonBandHeight = Math.max(2, Math.ceil((horizonEnd - horizonStart) / horizonBands));
+
+    for (let bandIndex = 0; bandIndex < horizonBands; bandIndex += 1) {
+      const progress = (bandIndex + 1) / horizonBands;
+      const eased = progress * progress;
+      const y = horizonStart + bandIndex * horizonBandHeight;
+      const bandAlpha = horizonAlpha * eased;
+      graphic.rect(screenX, y, screenWidth, horizonBandHeight + 1)
+        .fill({ color: horizonColor, alpha: bandAlpha });
+    }
 
     if (daylight.phase === "night") {
-      graphic.rect(0, 0, width, height * 0.36)
+      graphic.rect(screenX, screenY, screenWidth, Math.max(2, Math.ceil(height * 0.36) + 1))
         .fill({ color: 0x040b14, alpha: Math.min(0.18, daylight.darkness * 0.24) });
     }
   }
@@ -2553,8 +2568,8 @@ export class PixiVillageRenderer {
   }
 
   private refreshAmbientOverlays(nowMs: number): void {
-    const width = this.host.clientWidth;
-    const height = this.host.clientHeight;
+    const width = this.app?.screen.width ?? this.host.clientWidth;
+    const height = this.app?.screen.height ?? this.host.clientHeight;
 
     if (width <= 0 || height <= 0) {
       return;
