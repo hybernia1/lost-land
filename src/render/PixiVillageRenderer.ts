@@ -243,8 +243,12 @@ const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
   VILLAGE_BUILDING_RENDER_SCALE / BUILDING_PREVIEW_BASE_RENDER_SCALE,
 );
 const villagePlotDefinitions = defaultVillageLayout.plots;
+const nonPerimeterVillagePlots = villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter");
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 const HUD_MAX_PIXEL_SCALE = 1.2;
+const HUD_TOP_STRIP_HEIGHT = 68;
+const HUD_SIDE_PANEL_MARGIN = 0;
+const HUD_LEFT_PANEL_WIDTH = 366;
 const CAMERA_MIN_ZOOM = 0.75;
 const CAMERA_MAX_ZOOM = 1.75;
 const CAMERA_ZOOM_STEP = 0.0018;
@@ -269,9 +273,29 @@ export class PixiVillageRenderer {
   private app: Application | null = null;
   private readonly rootLayer = new Container();
   private readonly worldLayer = new Container();
+  private readonly backgroundLayer = new Container();
   private readonly cameraLayer = new Container();
+  private readonly cameraStaticLayer = new Container();
+  private readonly cameraDynamicLayer = new Container();
+  private readonly environmentOverlayLayer = new Container();
+  private readonly daylightOverlayLayer = new Container();
+  private readonly environmentOverlayGraphic = new Graphics();
+  private readonly daylightOverlayGraphic = new Graphics();
   private readonly hudLayer = new Container();
   private readonly tooltipLayer = new Container();
+  private readonly canvasTooltipPanel = new Graphics();
+  private readonly canvasTooltipLabel = new Text({
+    text: "",
+    style: {
+      fill: 0xf4eedf,
+      fontFamily: "Inter, Arial, sans-serif",
+      fontSize: 13,
+      fontWeight: "700",
+      lineHeight: 18,
+      wordWrap: true,
+      wordWrapWidth: 280,
+    },
+  });
   private readonly assets = new VillageAssets();
   private layout: SceneLayout = {
     originX: 0,
@@ -313,17 +337,44 @@ export class PixiVillageRenderer {
   private cameraDragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null;
   private cameraDragMoved = false;
   private cameraDragBlocked = false;
+  private lastStaticWorldKey: string | null = null;
+  private ambientAnimationFrameId: number | null = null;
+  private ambientCondition: EnvironmentConditionId = "stable";
+  private ambientIntensity = 1;
+  private ambientElapsedSeconds = 0;
+  private ambientSpeed: GameSpeed = 1;
+  private ambientPaused = false;
+  private ambientSyncAtMs = 0;
+  private canvasTooltipText = "";
+  private canvasTooltipWidth = 0;
+  private canvasTooltipHeight = 0;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
   private readonly handlePointerDown = (event: PointerEvent) => this.handleHostPointerDown(event);
   private readonly handlePointerMove = (event: PointerEvent) => this.handleHostPointerMove(event);
   private readonly handlePointerUp = (event: PointerEvent) => this.handleHostPointerUp(event);
+  private readonly handleAmbientAnimationFrame = (timestamp: number) => this.animateAmbientOverlays(timestamp);
 
   constructor(
     private readonly host: HTMLElement,
     private readonly requestRender: () => void = () => {},
   ) {
     this.tooltipLayer.eventMode = "none";
+    this.canvasTooltipLabel.x = 12;
+    this.canvasTooltipLabel.y = 9;
+    this.tooltipLayer.addChild(this.canvasTooltipPanel, this.canvasTooltipLabel);
+    this.tooltipLayer.visible = false;
+    this.environmentOverlayGraphic.eventMode = "none";
+    this.daylightOverlayGraphic.eventMode = "none";
+    this.environmentOverlayLayer.addChild(this.environmentOverlayGraphic);
+    this.daylightOverlayLayer.addChild(this.daylightOverlayGraphic);
+    this.cameraLayer.addChild(this.cameraStaticLayer, this.cameraDynamicLayer);
+    this.worldLayer.addChild(
+      this.backgroundLayer,
+      this.cameraLayer,
+      this.environmentOverlayLayer,
+      this.daylightOverlayLayer,
+    );
     this.rootLayer.addChild(this.worldLayer, this.hudLayer, this.tooltipLayer);
     this.host.addEventListener("wheel", this.handleWheel, { passive: false });
     this.host.addEventListener("mouseleave", this.handleMouseLeave);
@@ -367,9 +418,9 @@ export class PixiVillageRenderer {
     const hudHeight = height / hudPixelScale;
     const visualTime = performance.now() / 1000;
     this.hudPixelScale = hudPixelScale;
-    this.worldLayer.removeChildren();
-    this.cameraLayer.removeChildren();
-    this.hudLayer.removeChildren();
+    this.clearContainerChildren(this.backgroundLayer);
+    this.clearContainerChildren(this.cameraDynamicLayer);
+    this.clearContainerChildren(this.hudLayer);
     this.buildChoicesScrollArea = null;
     this.buildChoicesScrollMax = 0;
     this.logScrollArea = null;
@@ -384,17 +435,20 @@ export class PixiVillageRenderer {
     this.cameraLayer.x = this.cameraOffsetX;
     this.cameraLayer.y = this.cameraOffsetY;
     this.cameraLayer.scale.set(this.cameraZoom);
+    const staticWorldKey = this.getStaticWorldKey(state, width, height);
+    if (staticWorldKey !== this.lastStaticWorldKey) {
+      this.clearContainerChildren(this.cameraStaticLayer);
+      this.drawTerrain(state, width, height);
+      this.drawDecorObjects();
+      this.lastStaticWorldKey = staticWorldKey;
+    }
     this.drawBackground(state, width, height);
-    this.drawDecorObjects();
-    this.worldLayer.addChild(this.cameraLayer);
-    this.drawEnvironmentOverlay(state, width, height, visualTime);
     this.drawPalisade(state, translations);
 
-    for (const plot of villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter")) {
+    for (const plot of nonPerimeterVillagePlots) {
       this.drawPlot(plot, state, translations, visualTime);
     }
 
-    this.drawDaylightOverlay(state, width, height);
     this.drawHud(state, translations, hudWidth, hudHeight);
     this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
@@ -405,8 +459,23 @@ export class PixiVillageRenderer {
       hudHeight,
       resolvedDecisionPreview ?? null,
     );
+    this.syncAmbientOverlayState(state);
+    this.refreshAmbientOverlays(performance.now());
+    this.updateAmbientAnimationLoop();
     this.applyHudPixelScale(this.hudLayer, hudPixelScale);
     this.scaleHudInteractionBounds(hudPixelScale);
+  }
+
+  private clearContainerChildren(container: Container): void {
+    const children = container.removeChildren();
+
+    for (const child of children) {
+      if (child instanceof AnimatedSprite) {
+        child.stop();
+      }
+
+      child.destroy({ children: true });
+    }
   }
 
   hitTest(clientX: number, clientY: number): string | null {
@@ -459,6 +528,11 @@ export class PixiVillageRenderer {
     }
 
     if (this.handleBuildChoicesWheel(event)) {
+      return;
+    }
+
+    if (this.isHudPointer(event.clientX, event.clientY)) {
+      event.preventDefault();
       return;
     }
 
@@ -537,6 +611,7 @@ export class PixiVillageRenderer {
 
   private handleCameraZoom(event: WheelEvent): void {
     if (this.cameraDragBlocked || this.isHudPointer(event.clientX, event.clientY)) {
+      event.preventDefault();
       return;
     }
 
@@ -636,6 +711,7 @@ export class PixiVillageRenderer {
     this.host.removeEventListener("pointermove", this.handlePointerMove);
     this.host.removeEventListener("pointerup", this.handlePointerUp);
     this.host.removeEventListener("pointercancel", this.handlePointerUp);
+    this.stopAmbientAnimation();
     this.app?.destroy(true);
     this.app = null;
   }
@@ -662,12 +738,11 @@ export class PixiVillageRenderer {
   private drawBackground(_state: GameState, width: number, height: number): void {
     const base = new Graphics();
     base.rect(0, 0, width, height).fill({ color: 0x151812, alpha: 1 });
-    this.worldLayer.addChild(base);
-    this.drawTerrain(_state, width, height);
+    this.backgroundLayer.addChild(base);
 
     const overlay = new Graphics();
     overlay.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.08 });
-    this.worldLayer.addChild(overlay);
+    this.backgroundLayer.addChild(overlay);
   }
 
   private drawTerrain(state: GameState, _viewportWidth: number, _viewportHeight: number): void {
@@ -741,7 +816,7 @@ export class PixiVillageRenderer {
             sprite.height = tileSize + 0.5;
           }
 
-          this.cameraLayer.addChild(sprite);
+          this.cameraStaticLayer.addChild(sprite);
         }
       }
     }
@@ -793,7 +868,7 @@ export class PixiVillageRenderer {
         sprite.height = objectHeight;
         sprite.rotation = (object.rotation * Math.PI) / 180;
         sprite.alpha = object.opacity * layer.opacity;
-        this.cameraLayer.addChild(sprite);
+        this.cameraStaticLayer.addChild(sprite);
       }
     }
   }
@@ -824,7 +899,7 @@ export class PixiVillageRenderer {
 
     if (building) {
       this.drawBuildingLevelBadge(
-        this.cameraLayer,
+        this.cameraDynamicLayer,
         Math.max(1, building.level),
         badgeX,
         badgeY,
@@ -835,7 +910,7 @@ export class PixiVillageRenderer {
 
     if (building && building.upgradingRemaining > 0) {
       this.drawConstructionCountdown(
-        this.cameraLayer,
+        this.cameraDynamicLayer,
         building.upgradingRemaining,
         bounds.x + bounds.width / 2,
         bounds.y - 52 * this.layout.scale,
@@ -872,7 +947,7 @@ export class PixiVillageRenderer {
         y >= -bounds.height / 2 &&
         y <= bounds.height / 2,
     };
-    this.cameraLayer.addChild(plotLayer);
+    this.cameraDynamicLayer.addChild(plotLayer);
 
     if (buildingId && building) {
       const tooltip = upgradingTooltip(
@@ -963,11 +1038,18 @@ export class PixiVillageRenderer {
       ? `${t.ui.leadershipProfile ?? "Leadership profile"}\n${profileLabel}`
       : undefined;
 
+    const topStripBottom = this.drawTopStrip(width);
+    const topRowY = 8;
+    const topPanelsY = topStripBottom + 10;
+    this.drawLeftHudArea(height);
+
     this.drawBrand(
       state.communityName,
       decisionProfileIconByKind[profileKind],
       profileTooltip,
       this.getBrandAlerts(state, t),
+      20,
+      topRowY - 2,
     );
     this.drawTopPills(
       [
@@ -995,14 +1077,39 @@ export class PixiVillageRenderer {
         },
       ],
       width,
+      topRowY,
     );
-    this.drawResourcePills(state, translations, width, rates);
-    const scoutingPanelHeight = this.drawActiveScouting(state, translations, width);
-    this.drawQuestPanel(state, translations, width, 152 + scoutingPanelHeight + 12);
+    this.drawResourcePills(state, translations, width, rates, topRowY);
+    const scoutingPanelHeight = this.drawActiveScouting(state, translations, width, topPanelsY);
+    this.drawQuestPanel(state, translations, width, topPanelsY + scoutingPanelHeight + 10);
     this.drawEventLog(state, translations, height);
-    this.drawQueue(state, translations, height);
     this.drawActionPanel(state, translations, width, height);
     this.drawToolbar(state, translations, width, height);
+  }
+
+  private drawLeftHudArea(height: number): void {
+    const areaHeight = Math.max(0, height - HUD_TOP_STRIP_HEIGHT);
+
+    if (areaHeight <= 0) {
+      return;
+    }
+
+    const area = new Graphics();
+    area
+      .rect(0, HUD_TOP_STRIP_HEIGHT, HUD_LEFT_PANEL_WIDTH, areaHeight)
+      .fill({ color: 0x151812, alpha: 1 })
+      .stroke({ color: 0xb6c38f, alpha: 0.2, width: 1 });
+    this.hudLayer.addChild(area);
+  }
+
+  private drawTopStrip(width: number): number {
+    const strip = new Graphics();
+    strip
+      .rect(0, 0, width, HUD_TOP_STRIP_HEIGHT)
+      .fill({ color: 0x151812, alpha: 1 })
+      .stroke({ color: 0xb6c38f, alpha: 0.24, width: 1 });
+    this.hudLayer.addChild(strip);
+    return HUD_TOP_STRIP_HEIGHT;
   }
 
   private drawBrand(
@@ -1010,27 +1117,33 @@ export class PixiVillageRenderer {
     iconId: string,
     tooltip?: string,
     alerts: BrandAlert[] = [],
+    x = 28,
+    y = 22,
   ): void {
     const layer = new Container();
-    layer.x = 28;
-    layer.y = 22;
+    layer.x = x;
+    layer.y = y;
     this.hudLayer.addChild(layer);
 
     const mark = new Graphics();
-    mark.roundRect(0, 0, 52, 52, 8).fill({ color: 0x141611, alpha: 0.76 }).stroke({ color: 0xe0c46f, alpha: 0.5, width: 2 });
+    mark
+      .roundRect(0, 0, 44, 44, 7)
+      .fill({ color: 0x141611, alpha: 0.62 })
+      .stroke({ color: 0xd9c88b, alpha: 0.36, width: 1.2 });
     layer.addChild(mark);
-    this.drawIcon(layer, iconId, 26, 26, 30);
+    this.drawIcon(layer, iconId, 22, 22, 24);
     if (tooltip) {
-      mark.hitArea = new Rectangle(0, 0, 52, 52);
+      mark.hitArea = new Rectangle(0, 0, 44, 44);
       this.bindTooltip(mark, tooltip);
     }
-    this.drawText(layer, title.toUpperCase(), 64, 4, {
+    const titleLabel = this.drawText(layer, title.toUpperCase(), 56, 2, {
       fill: 0xf5efdf,
-      fontSize: 33,
+      fontSize: 25,
       fontWeight: "900",
     });
+    const titleBottom = titleLabel.y + titleLabel.height;
 
-    this.drawBrandAlerts(layer, alerts, 0, 62);
+    this.drawBrandAlerts(layer, alerts, 56, titleBottom + 4);
   }
 
   private drawBrandAlerts(parent: Container, alerts: BrandAlert[], x: number, y: number): void {
@@ -1053,24 +1166,24 @@ export class PixiVillageRenderer {
         style: {
           fill: 0xf5efdf,
           fontFamily: "Inter, Arial, sans-serif",
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: "900",
         },
       })
       : null;
-    const width = label ? Math.max(62, label.width + 42) : 40;
-    const height = 36;
+    const width = label ? Math.max(48, label.width + 32) : 28;
+    const height = 22;
     const colors = this.getBrandAlertColors(alert.tone);
     const background = new Graphics();
     background.roundRect(0, 0, width, height, 8)
       .fill({ color: colors.fill, alpha: 0.82 })
-      .stroke({ color: colors.stroke, alpha: 0.78, width: 1.5 });
+      .stroke({ color: colors.stroke, alpha: 0.64, width: 1 });
     group.addChild(background);
-    this.drawIcon(group, alert.iconId, 20, height / 2, 21);
+    this.drawIcon(group, alert.iconId, 12, height / 2, 13);
 
     if (label) {
-      label.x = 38;
-      label.y = 10;
+      label.x = 22;
+      label.y = 6;
       group.addChild(label);
     }
 
@@ -1204,9 +1317,10 @@ export class PixiVillageRenderer {
       action?: PixiActionDetail;
     }>,
     width: number,
+    y: number,
   ): void {
     const group = new Container();
-    group.y = 30;
+    group.y = y;
     this.hudLayer.addChild(group);
 
     let x = 0;
@@ -1218,13 +1332,15 @@ export class PixiVillageRenderer {
         item.sublabel,
         item.sublabelFill,
         item.action,
+        0xe9e4d2,
+        true,
       );
       pill.x = x;
       group.addChild(pill);
-      x += pill.width + 8;
+      x += pill.width + 6;
     }
 
-    group.x = Math.max(390, (width - x) / 2);
+    group.x = Math.max(300, (width - x) / 2);
     this.registerHudInteractionForContainer(group, 6);
   }
 
@@ -1233,9 +1349,10 @@ export class PixiVillageRenderer {
     translations: TranslationPack | undefined,
     width: number,
     rates: Record<ResourceId, number>,
+    y: number,
   ): void {
     const group = new Container();
-    group.y = 18;
+    group.y = y;
     this.hudLayer.addChild(group);
 
     let x = 0;
@@ -1257,13 +1374,14 @@ export class PixiVillageRenderer {
         this.getRateColor(rate),
         { action: "open-resource-breakdown", resourceId: resource.id },
         stockRatio < 0.2 ? 0xff6f7d : undefined,
+        true,
       );
       pill.x = x;
       group.addChild(pill);
-      x += pill.width + 8;
+      x += pill.width + 6;
     }
 
-    group.x = Math.max(28, width - x - 28);
+    group.x = Math.max(18, width - x - 18);
     this.registerHudInteractionForContainer(group, 6);
   }
 
@@ -1705,17 +1823,17 @@ export class PixiVillageRenderer {
     state: GameState,
     translations: TranslationPack | undefined,
     width: number,
+    y: number,
   ): number {
-    const panelWidth = 308;
+    const panelWidth = HUD_LEFT_PANEL_WIDTH;
     const layer = new Container();
-    layer.x = Math.max(28, width - panelWidth - 28);
-    layer.y = 152;
+    layer.x = HUD_SIDE_PANEL_MARGIN;
+    layer.y = y;
     this.hudLayer.addChild(layer);
 
     const missions = state.scouting.missions.slice(0, 4);
     const panelHeight = missions.length > 0 ? 52 + missions.length * 24 : 82;
 
-    this.drawPanel(layer, 0, 0, panelWidth, panelHeight);
     this.drawIcon(layer, "scout", 18, 22, 15);
     this.drawText(layer, translations?.ui.activeScouting ?? "Active scouting", 34, 14, {
       fill: 0xf3edda,
@@ -1770,18 +1888,17 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const panelWidth = 308;
+    const panelWidth = HUD_LEFT_PANEL_WIDTH;
     const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
     const rowHeight = 70;
     const panelHeight = activeObjectives.length > 0
       ? 48 + activeObjectives.length * rowHeight
       : 82;
     const layer = new Container();
-    layer.x = Math.max(28, width - panelWidth - 28);
+    layer.x = HUD_SIDE_PANEL_MARGIN;
     layer.y = y;
     this.hudLayer.addChild(layer);
 
-    this.drawPanel(layer, 0, 0, panelWidth, panelHeight);
     this.drawIcon(layer, "build", 18, 22, 15);
     this.drawText(layer, translations.quests.ui.activeObjectives, 34, 14, {
       fill: 0xf3edda,
@@ -1871,10 +1988,10 @@ export class PixiVillageRenderer {
   private drawQueue(state: GameState, translations: TranslationPack | undefined, height: number): void {
     const queue = getActiveBuildingQueue(state);
     const layer = new Container();
-    layer.x = 28;
+    layer.x = HUD_SIDE_PANEL_MARGIN;
     layer.y = height - 104;
     this.hudLayer.addChild(layer);
-    this.drawPanel(layer, 0, 0, 308, 78);
+    this.drawPanel(layer, 0, 0, 308, 78, 0.76, 0);
     this.drawIcon(layer, "build", 18, 22, 14);
     this.drawText(layer, translations?.ui.buildingQueue ?? "Building queue", 34, 14, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
     this.drawText(layer, `${queue.length}/${MAX_ACTIVE_BUILDINGS}`, 280, 14, { fill: 0xf1df9a, fontSize: 13, fontWeight: "800" }).anchor.set(1, 0);
@@ -1900,15 +2017,14 @@ export class PixiVillageRenderer {
 
   private drawEventLog(state: GameState, translations: TranslationPack | undefined, height: number): void {
     const layer = new Container();
-    layer.x = 28;
+    layer.x = HUD_SIDE_PANEL_MARGIN;
     layer.y = Math.max(258, height - 374);
     this.hudLayer.addChild(layer);
 
-    const width = 366;
-    const panelHeight = Math.max(168, Math.min(248, height - layer.y - 126));
+    const width = HUD_LEFT_PANEL_WIDTH;
+    const panelHeight = Math.max(168, Math.min(326, height - layer.y - 48));
     const viewportY = 42;
     const viewportHeight = panelHeight - 54;
-    this.drawPanel(layer, 0, 0, width, panelHeight);
     this.drawIcon(layer, "clock", 18, 22, 14);
     this.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
       fill: 0xf5efdf,
@@ -2287,95 +2403,258 @@ export class PixiVillageRenderer {
     return translations.ui.moraleWaterShortage;
   }
 
-  private drawEnvironmentOverlay(
-    state: GameState,
+  private redrawEnvironmentOverlay(
+    graphic: Graphics,
+    condition: EnvironmentConditionId,
+    intensityRaw: number,
     width: number,
     height: number,
     visualTime: number,
   ): void {
-    const condition = state.environment.condition;
+    graphic.clear();
 
     if (condition === "stable") {
       return;
     }
 
-    const intensity = Math.max(1, Math.min(3, state.environment.intensity));
-    const overlay = new Graphics();
-    const color = condition === "radiation"
-      ? 0xa7d85f
+    const intensity = Math.max(1, Math.min(3, intensityRaw));
+    const hazeColor = condition === "radiation"
+      ? 0x98cf6a
       : condition === "snowFront"
-        ? 0xdde8ef
-        : 0x5d86a3;
-    const alpha = condition === "radiation"
-      ? 0.05 + intensity * 0.035
+        ? 0xd9e6f2
+        : 0x4d7694;
+    const hazeAlpha = condition === "radiation"
+      ? 0.07 + intensity * 0.03
       : condition === "snowFront"
-        ? 0.06 + intensity * 0.025
-        : 0.05 + intensity * 0.02;
+        ? 0.06 + intensity * 0.022
+        : 0.055 + intensity * 0.018;
 
-    overlay.rect(0, 0, width, height).fill({ color, alpha });
+    graphic.rect(0, 0, width, height).fill({ color: hazeColor, alpha: hazeAlpha });
 
     if (condition === "rain") {
-      const spacing = Math.max(28, 48 - intensity * 6);
-      const drift = (visualTime * 70) % spacing;
-      for (let x = -width; x < width * 1.4; x += spacing) {
-        overlay.moveTo(x + drift, 0);
-        overlay.lineTo(x + drift + height * 0.42, height);
+      const laneSpacingA = Math.max(17, 30 - intensity * 2);
+      const laneSpacingB = Math.max(23, 40 - intensity * 2);
+      const laneHeightA = laneSpacingA * 1.52;
+      const laneHeightB = laneSpacingB * 1.66;
+      const cycleA = height + laneHeightA * 2;
+      const cycleB = height + laneHeightB * 2;
+      const fallA = visualTime * (240 + intensity * 34);
+      const fallB = visualTime * (186 + intensity * 28);
+      const dropLenA = 8 + intensity * 2.2;
+      const dropLenB = 6 + intensity * 1.8;
+
+      for (let x = -laneSpacingA; x < width + laneSpacingA; x += laneSpacingA) {
+        const columnShift = ((Math.sin(x * 0.051) + 1) * 0.5) * laneSpacingA * 0.8;
+        for (let y = -laneHeightA * 2; y < height + laneHeightA; y += laneHeightA) {
+          const phase = ((x * 0.37 + y * 0.23) % laneHeightA + laneHeightA) % laneHeightA;
+          const dropY = ((y + fallA + phase) % cycleA) - laneHeightA;
+          const wind = Math.sin(x * 0.019 + dropY * 0.013 + visualTime * 1.05) * (1 + intensity * 0.24);
+          const dropX = x + columnShift + wind;
+          graphic.moveTo(dropX, dropY - dropLenA * 0.45);
+          graphic.lineTo(dropX + wind * 0.12, dropY + dropLenA);
+        }
       }
-      overlay.stroke({ color: 0x9fc6d8, alpha: 0.15 + intensity * 0.05, width: 1 });
+      graphic.stroke({ color: 0xbdddef, alpha: 0.2 + intensity * 0.04, width: 1.08 });
+
+      for (let x = -laneSpacingB; x < width + laneSpacingB; x += laneSpacingB) {
+        const columnShift = ((Math.cos(x * 0.043) + 1) * 0.5) * laneSpacingB * 0.72;
+        for (let y = -laneHeightB * 2; y < height + laneHeightB; y += laneHeightB) {
+          const phase = ((x * 0.29 + y * 0.19) % laneHeightB + laneHeightB) % laneHeightB;
+          const dropY = ((y + fallB + phase) % cycleB) - laneHeightB;
+          const wind = Math.sin(x * 0.017 + dropY * 0.011 + visualTime * 0.92) * (0.7 + intensity * 0.16);
+          const dropX = x + columnShift + wind;
+          graphic.moveTo(dropX, dropY - dropLenB * 0.35);
+          graphic.lineTo(dropX + wind * 0.1, dropY + dropLenB);
+
+          if (dropY > height * 0.82 && Math.sin(dropX * 0.14 + visualTime * 7.2) > 0.7) {
+            graphic.circle(dropX + wind * 0.2, dropY + dropLenB + 1.5, 0.8 + intensity * 0.12)
+              .fill({ color: 0xd8ecf7, alpha: 0.08 + intensity * 0.02 });
+          }
+        }
+      }
+      graphic.stroke({ color: 0xd8eef8, alpha: 0.12 + intensity * 0.03, width: 0.76 });
     }
 
     if (condition === "snowFront") {
-      const spacing = Math.max(34, 58 - intensity * 7);
-      const drift = (visualTime * 16) % spacing;
-      for (let x = 0; x < width; x += spacing) {
-        for (let y = -spacing; y < height; y += spacing) {
-          overlay.circle(x + Math.sin(y * 0.04 + visualTime) * 8, y + drift, 1.2 + intensity * 0.35)
-            .fill({ color: 0xffffff, alpha: 0.18 + intensity * 0.05 });
-        }
+      const area = width * height;
+      const layerACount = Math.max(120, Math.round((area / 9000) * (0.9 + intensity * 0.18)));
+      const layerBCount = Math.max(90, Math.round((area / 14000) * (0.9 + intensity * 0.15)));
+      const travel = height + 88;
+      const windDrift = visualTime * (7 + intensity * 1.2);
+      const fallA = visualTime * (30 + intensity * 5.5);
+      const fallB = visualTime * (22 + intensity * 4.2);
+
+      for (let index = 0; index < layerACount; index += 1) {
+        const seedX = this.seededUnit(index + 11);
+        const seedY = this.seededUnit(index + 137);
+        const seedPhase = this.seededUnit(index + 307);
+        const x = ((seedX * width) + windDrift * (0.7 + seedY * 0.8)) % (width + 32) - 16;
+        const y = ((seedY * travel) + fallA * (0.9 + seedX * 0.6)) % travel - 44;
+        const flutter = Math.sin(visualTime * (1.3 + seedPhase * 0.8) + seedX * 8) * (1 + intensity * 0.18);
+        const radius = 1.25 + seedPhase * 0.9 + intensity * 0.16;
+        graphic.circle(x + flutter, y, radius).fill({
+          color: 0xffffff,
+          alpha: 0.16 + intensity * 0.04,
+        });
+      }
+
+      for (let index = 0; index < layerBCount; index += 1) {
+        const seedX = this.seededUnit(index + 503);
+        const seedY = this.seededUnit(index + 911);
+        const seedPhase = this.seededUnit(index + 1237);
+        const x = ((seedX * width) + windDrift * 1.25 * (0.7 + seedY * 0.6)) % (width + 24) - 12;
+        const y = ((seedY * travel) + fallB * (0.85 + seedX * 0.55)) % travel - 40;
+        const flutter = Math.sin(visualTime * (1.9 + seedPhase * 0.7) + seedY * 10) * (0.8 + intensity * 0.12);
+        const radius = 0.9 + seedPhase * 0.55 + intensity * 0.1;
+        graphic.circle(x + flutter, y, radius).fill({
+          color: 0xeef6ff,
+          alpha: 0.1 + intensity * 0.028,
+        });
       }
     }
 
     if (condition === "radiation") {
-      const spacing = Math.max(24, 42 - intensity * 5);
-      const offset = (visualTime * 20) % spacing;
-      for (let y = offset; y < height; y += spacing) {
-        overlay.moveTo(0, y);
-        overlay.lineTo(width, y + Math.sin(y * 0.02) * 4);
+      const bandSpacing = Math.max(20, 34 - intensity * 3);
+      const scanOffset = (visualTime * (24 + intensity * 5)) % bandSpacing;
+      for (let y = scanOffset; y < height + bandSpacing; y += bandSpacing) {
+        const bend = Math.sin(y * 0.013 + visualTime * 0.6) * (3.6 + intensity);
+        graphic.moveTo(-6, y);
+        graphic.lineTo(width + 6, y + bend);
       }
-      overlay.stroke({ color: 0xcdfb84, alpha: 0.08 + intensity * 0.03, width: 1 });
-    }
+      graphic.stroke({ color: 0xc9f187, alpha: 0.09 + intensity * 0.035, width: 1 });
 
-    this.worldLayer.addChild(overlay);
+      const moteSpacing = Math.max(32, 56 - intensity * 6);
+      for (let x = -moteSpacing; x < width + moteSpacing; x += moteSpacing) {
+        for (let y = -moteSpacing; y < height + moteSpacing; y += moteSpacing) {
+          const jitterX = Math.sin((x + y) * 0.01 + visualTime * 1.7) * 6;
+          const jitterY = Math.cos((x - y) * 0.012 + visualTime * 1.25) * 5;
+          graphic.circle(x + jitterX, y + jitterY, 1 + intensity * 0.2).fill({
+            color: 0xd8f8a6,
+            alpha: 0.06 + intensity * 0.025,
+          });
+        }
+      }
+    }
   }
 
-  private drawDaylightOverlay(state: GameState, width: number, height: number): void {
-    const daylight = getDaylightState(state.elapsedSeconds);
+  private redrawDaylightOverlay(
+    graphic: Graphics,
+    elapsedSeconds: number,
+    width: number,
+    height: number,
+  ): void {
+    graphic.clear();
+
+    const daylight = getDaylightState(elapsedSeconds);
 
     if (daylight.darkness <= 0) {
       return;
     }
 
-    const overlay = new Graphics();
-    overlay.eventMode = "none";
-
     const tint = daylight.phase === "dusk"
-      ? 0x211920
+      ? 0x231621
       : daylight.phase === "dawn"
-        ? 0x17212c
-        : 0x07111f;
+        ? 0x152233
+        : 0x071322;
+    const skyAlpha = Math.min(0.72, daylight.darkness * 1.05);
 
-    overlay.rect(0, 0, width, height)
-      .fill({ color: tint, alpha: daylight.darkness });
+    graphic.rect(0, 0, width, height)
+      .fill({ color: tint, alpha: skyAlpha });
 
-    if (daylight.phase === "dusk" || daylight.phase === "dawn") {
-      overlay.rect(0, height * 0.56, width, height * 0.44)
-        .fill({
-          color: daylight.phase === "dusk" ? 0x5f3927 : 0x31475c,
-          alpha: Math.min(0.1, daylight.darkness * 0.22),
-        });
+    const horizonAlpha = Math.min(0.14, daylight.darkness * 0.32);
+    const horizonColor = daylight.phase === "dusk" ? 0x7b452d : 0x37576f;
+    graphic.rect(0, height * 0.52, width, height * 0.48)
+      .fill({ color: horizonColor, alpha: horizonAlpha });
+
+    if (daylight.phase === "night") {
+      graphic.rect(0, 0, width, height * 0.36)
+        .fill({ color: 0x040b14, alpha: Math.min(0.18, daylight.darkness * 0.24) });
+    }
+  }
+
+  private syncAmbientOverlayState(state: GameState): void {
+    this.ambientCondition = state.environment.condition;
+    this.ambientIntensity = state.environment.intensity;
+    this.ambientElapsedSeconds = state.elapsedSeconds;
+    this.ambientSpeed = state.speed;
+    this.ambientPaused = state.paused;
+    this.ambientSyncAtMs = performance.now();
+  }
+
+  private refreshAmbientOverlays(nowMs: number): void {
+    const width = this.host.clientWidth;
+    const height = this.host.clientHeight;
+
+    if (width <= 0 || height <= 0) {
+      return;
     }
 
-    this.worldLayer.addChild(overlay);
+    const visualTime = nowMs / 1000;
+    const elapsedSeconds = this.getAmbientElapsedSeconds(nowMs);
+    this.redrawEnvironmentOverlay(
+      this.environmentOverlayGraphic,
+      this.ambientCondition,
+      this.ambientIntensity,
+      width,
+      height,
+      visualTime,
+    );
+    this.redrawDaylightOverlay(this.daylightOverlayGraphic, elapsedSeconds, width, height);
+  }
+
+  private getAmbientElapsedSeconds(nowMs: number): number {
+    if (this.ambientPaused) {
+      return this.ambientElapsedSeconds;
+    }
+
+    return this.ambientElapsedSeconds + ((nowMs - this.ambientSyncAtMs) / 1000) * this.ambientSpeed;
+  }
+
+  private shouldAnimateAmbientOverlays(): boolean {
+    const isEnvironmentAnimated = this.ambientCondition !== "stable";
+    const daylight = getDaylightState(this.ambientElapsedSeconds);
+    const isDaylightAnimated = daylight.darkness > 0;
+    return isEnvironmentAnimated || isDaylightAnimated;
+  }
+
+  private updateAmbientAnimationLoop(): void {
+    if (this.shouldAnimateAmbientOverlays()) {
+      this.startAmbientAnimation();
+      return;
+    }
+
+    this.stopAmbientAnimation();
+  }
+
+  private startAmbientAnimation(): void {
+    if (this.ambientAnimationFrameId !== null) {
+      return;
+    }
+
+    this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
+  }
+
+  private stopAmbientAnimation(): void {
+    if (this.ambientAnimationFrameId === null) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.ambientAnimationFrameId);
+    this.ambientAnimationFrameId = null;
+  }
+
+  private animateAmbientOverlays(timestamp: number): void {
+    this.ambientAnimationFrameId = null;
+
+    if (!this.app) {
+      return;
+    }
+
+    this.refreshAmbientOverlays(timestamp);
+
+    if (this.shouldAnimateAmbientOverlays()) {
+      this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
+    }
   }
 
   private drawQuestDecisionModal(
@@ -4301,6 +4580,7 @@ export class PixiVillageRenderer {
     sublabelFill = 0xaeb4b8,
     action?: PixiActionDetail,
     labelFill = 0xe9e4d2,
+    compact = false,
   ): Container {
     const group = new Container();
     const text = new Text({
@@ -4308,7 +4588,7 @@ export class PixiVillageRenderer {
       style: {
         fill: labelFill,
         fontFamily: "Inter, Arial, sans-serif",
-        fontSize: 13,
+        fontSize: compact ? 12 : 13,
         fontWeight: "800",
       },
     });
@@ -4318,21 +4598,26 @@ export class PixiVillageRenderer {
         style: {
           fill: sublabelFill,
           fontFamily: "Inter, Arial, sans-serif",
-          fontSize: 10,
+          fontSize: compact ? 9 : 10,
           fontWeight: "800",
         },
       })
       : null;
-    const width = Math.max(68, Math.max(text.width, subtext?.width ?? 0) + 44);
-    const height = subtext ? 46 : 34;
-    this.drawPanel(group, 0, 0, width, height);
-    this.drawIcon(group, iconId, 17, height / 2, 16);
-    text.x = 32;
-    text.y = subtext ? 6 : 7;
+    const width = Math.max(compact ? 62 : 68, Math.max(text.width, subtext?.width ?? 0) + (compact ? 38 : 44));
+    const height = subtext ? (compact ? 38 : 46) : (compact ? 30 : 34);
+    const panel = new Graphics();
+    panel
+      .roundRect(0, 0, width, height, compact ? 7 : 8)
+      .fill({ color: 0x10120e, alpha: compact ? 0.64 : 0.76 })
+      .stroke({ color: compact ? 0xb8c693 : 0xe0c46f, alpha: compact ? 0.16 : 0.22, width: 1 });
+    group.addChild(panel);
+    this.drawIcon(group, iconId, compact ? 15 : 17, height / 2, compact ? 14 : 16);
+    text.x = compact ? 28 : 32;
+    text.y = subtext ? (compact ? 4 : 6) : (compact ? 6 : 7);
     group.addChild(text);
     if (subtext) {
-      subtext.x = 32;
-      subtext.y = 25;
+      subtext.x = compact ? 28 : 32;
+      subtext.y = compact ? 22 : 25;
       group.addChild(subtext);
     }
     if (tooltip) {
@@ -4565,9 +4850,15 @@ export class PixiVillageRenderer {
     width: number,
     height: number,
     fillAlpha = 0.76,
+    cornerRadius = 8,
   ): Graphics {
     const panel = new Graphics();
-    panel.roundRect(x, y, width, height, 8)
+    if (cornerRadius > 0) {
+      panel.roundRect(x, y, width, height, cornerRadius);
+    } else {
+      panel.rect(x, y, width, height);
+    }
+    panel
       .fill({ color: 0x10120e, alpha: fillAlpha })
       .stroke({ color: 0xe0c46f, alpha: 0.22, width: 1 });
     parent.addChild(panel);
@@ -4618,31 +4909,19 @@ export class PixiVillageRenderer {
       return;
     }
 
-    this.tooltipLayer.removeChildren();
+    if (this.canvasTooltipText !== text) {
+      this.canvasTooltipText = text;
+      this.canvasTooltipLabel.text = text;
+      this.canvasTooltipWidth = Math.min(320, Math.max(92, this.canvasTooltipLabel.width + 24));
+      this.canvasTooltipHeight = Math.max(36, this.canvasTooltipLabel.height + 18);
+      this.canvasTooltipPanel.clear();
+      this.canvasTooltipPanel.roundRect(0, 0, this.canvasTooltipWidth, this.canvasTooltipHeight, 7)
+        .fill({ color: 0x111519, alpha: 0.96 })
+        .stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
+    }
 
-    const label = new Text({
-      text,
-      style: {
-        fill: 0xf4eedf,
-        fontFamily: "Inter, Arial, sans-serif",
-        fontSize: 13,
-        fontWeight: "700",
-        lineHeight: 18,
-        wordWrap: true,
-        wordWrapWidth: 280,
-      },
-    });
-    label.x = 12;
-    label.y = 9;
-
-    const panelWidth = Math.min(320, Math.max(92, label.width + 24));
-    const panelHeight = Math.max(36, label.height + 18);
-    const panel = new Graphics();
-    panel.roundRect(0, 0, panelWidth, panelHeight, 7)
-      .fill({ color: 0x111519, alpha: 0.96 })
-      .stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
-    this.tooltipLayer.addChild(panel, label);
-    this.positionCanvasTooltip(x, y, panelWidth, panelHeight);
+    this.tooltipLayer.visible = true;
+    this.positionCanvasTooltip(x, y, this.canvasTooltipWidth, this.canvasTooltipHeight);
   }
 
   private positionCanvasTooltip(x: number, y: number, width: number, height: number): void {
@@ -4666,7 +4945,8 @@ export class PixiVillageRenderer {
   }
 
   private hideCanvasTooltip(): void {
-    this.tooltipLayer.removeChildren();
+    this.tooltipLayer.visible = false;
+    this.canvasTooltipText = "";
   }
 
   private addPalisadeTooltip(
@@ -4693,7 +4973,7 @@ export class PixiVillageRenderer {
       hitLayer,
       upgradingTooltip(name, level, upgradingRemaining, "Lvl"),
     );
-    this.cameraLayer.addChild(hitLayer);
+    this.cameraDynamicLayer.addChild(hitLayer);
 
     if (!selected) {
       return;
@@ -4708,7 +4988,7 @@ export class PixiVillageRenderer {
         width: 2,
       },
     );
-    this.cameraLayer.addChild(marker);
+    this.cameraDynamicLayer.addChild(marker);
   }
 
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
@@ -5093,7 +5373,7 @@ export class PixiVillageRenderer {
 
     return {
       originX: (width - villageWidth) / 2,
-      originY: Math.max(92, (height - villageHeight) / 2),
+      originY: Math.max(76, (height - villageHeight) / 2),
       width: villageWidth,
       height: villageHeight,
       scale,
@@ -5113,6 +5393,26 @@ export class PixiVillageRenderer {
       width: this.host.clientWidth / zoom,
       height: this.host.clientHeight / zoom,
     };
+  }
+
+  private getStaticWorldKey(state: GameState, width: number, height: number): string {
+    return [
+      state.environment.condition,
+      state.environment.intensity,
+      width,
+      height,
+      this.layout.scale.toFixed(4),
+      this.layout.originX.toFixed(2),
+      this.layout.originY.toFixed(2),
+      this.cameraZoom.toFixed(4),
+      this.cameraOffsetX.toFixed(2),
+      this.cameraOffsetY.toFixed(2),
+    ].join("|");
+  }
+
+  private seededUnit(seed: number): number {
+    const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return value - Math.floor(value);
   }
 
   private getPlotBounds(plot: VillagePlotDefinition): Bounds {
