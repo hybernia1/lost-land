@@ -267,6 +267,9 @@ const CAMERA_ZOOM_STEP = 0.0018;
 const CAMERA_SMOOTH_FACTOR = 0.2;
 const CAMERA_OFFSET_SNAP_EPSILON = 0.2;
 const CAMERA_ZOOM_SNAP_EPSILON = 0.001;
+const MAX_RENDER_RESOLUTION = 1.5;
+const MAX_VISUAL_FPS = 30;
+const VISUAL_FRAME_MIN_MS = 1000 / MAX_VISUAL_FPS;
 
 function upgradingTooltip(
   name: string,
@@ -363,6 +366,7 @@ export class PixiVillageRenderer {
   private ambientSpeed: GameSpeed = 1;
   private ambientPaused = false;
   private ambientSyncAtMs = 0;
+  private lastVisualFrameAtMs = 0;
   private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
@@ -482,6 +486,7 @@ export class PixiVillageRenderer {
     this.updateAmbientAnimationLoop();
     this.applyHudPixelScale(this.hudLayer, hudPixelScale);
     this.scaleHudInteractionBounds(hudPixelScale);
+    this.app.render();
   }
 
   private clearContainerChildren(container: Container): void {
@@ -737,9 +742,10 @@ export class PixiVillageRenderer {
     await app.init({
       resizeTo: this.host,
       backgroundAlpha: 0,
-      antialias: true,
+      antialias: false,
+      autoStart: false,
       autoDensity: true,
-      resolution: window.devicePixelRatio || 1,
+      resolution: Math.min(window.devicePixelRatio || 1, MAX_RENDER_RESOLUTION),
     });
 
     app.canvas.classList.add("pixi-canvas");
@@ -2645,12 +2651,24 @@ export class PixiVillageRenderer {
       return;
     }
 
+    if (
+      this.lastVisualFrameAtMs > 0 &&
+      timestamp - this.lastVisualFrameAtMs < VISUAL_FRAME_MIN_MS
+    ) {
+      if (this.shouldAnimateVisuals()) {
+        this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
+      }
+      return;
+    }
+    this.lastVisualFrameAtMs = timestamp;
+
     if (this.shouldAnimateAmbientOverlays()) {
       this.refreshAmbientOverlays(timestamp);
     }
 
     this.refreshTextureAnimations(timestamp);
     this.refreshCameraTransform();
+    this.app.render();
 
     if (this.shouldAnimateVisuals()) {
       this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
