@@ -12,24 +12,6 @@
   "tiles": [
     {
       "id": 0,
-      "animation": [
-        { "tileid": 0, "duration": 120 },
-        { "tileid": 1, "duration": 120 },
-        { "tileid": 2, "duration": 120 },
-        { "tileid": 3, "duration": 120 },
-        { "tileid": 4, "duration": 120 },
-        { "tileid": 5, "duration": 120 },
-        { "tileid": 6, "duration": 120 },
-        { "tileid": 7, "duration": 120 },
-        { "tileid": 8, "duration": 120 },
-        { "tileid": 9, "duration": 120 },
-        { "tileid": 10, "duration": 120 },
-        { "tileid": 11, "duration": 120 },
-        { "tileid": 12, "duration": 120 },
-        { "tileid": 13, "duration": 120 },
-        { "tileid": 14, "duration": 120 },
-        { "tileid": 15, "duration": 120 }
-      ],
       "properties": [{ "name": "tileId", "type": "string", "value": "tree" }]
     }
   ],
