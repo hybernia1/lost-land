@@ -1,11 +1,11 @@
 import {
-  AnimatedSprite,
   Application,
   Container,
   Graphics,
   Rectangle,
   Text,
   Sprite,
+  type FrameObject,
   type TextStyleFontWeight,
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
@@ -88,6 +88,18 @@ type Bounds = {
   y: number;
   width: number;
   height: number;
+};
+
+type TextureAnimationFrame = {
+  texture: FrameObject["texture"];
+  durationMs: number;
+};
+
+type TextureAnimationBinding = {
+  sprite: Sprite;
+  frames: TextureAnimationFrame[];
+  totalDurationMs: number;
+  currentFrameIndex: number;
 };
 
 export type PixiActionDetail = {
@@ -345,6 +357,7 @@ export class PixiVillageRenderer {
   private ambientSpeed: GameSpeed = 1;
   private ambientPaused = false;
   private ambientSyncAtMs = 0;
+  private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
   private canvasTooltipHeight = 0;
@@ -435,10 +448,10 @@ export class PixiVillageRenderer {
     this.cameraLayer.x = this.cameraOffsetX;
     this.cameraLayer.y = this.cameraOffsetY;
     this.cameraLayer.scale.set(this.cameraZoom);
-    const staticWorldKey = this.getStaticWorldKey(state, width, height);
+    const staticWorldKey = this.getStaticWorldKey(state);
     if (staticWorldKey !== this.lastStaticWorldKey) {
       this.clearContainerChildren(this.cameraStaticLayer);
-      this.drawTerrain(state, width, height);
+      this.drawTerrain(state);
       this.drawDecorObjects();
       this.lastStaticWorldKey = staticWorldKey;
     }
@@ -470,9 +483,7 @@ export class PixiVillageRenderer {
     const children = container.removeChildren();
 
     for (const child of children) {
-      if (child instanceof AnimatedSprite) {
-        child.stop();
-      }
+      this.unregisterTextureAnimationsForNode(child as Container);
 
       child.destroy({ children: true });
     }
@@ -745,7 +756,7 @@ export class PixiVillageRenderer {
     this.backgroundLayer.addChild(overlay);
   }
 
-  private drawTerrain(state: GameState, _viewportWidth: number, _viewportHeight: number): void {
+  private drawTerrain(state: GameState): void {
     const layout = defaultVillageLayout;
 
     const scale = this.layout.scale;
@@ -754,70 +765,43 @@ export class PixiVillageRenderer {
     const terrainHeight = layout.height * scale;
     const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
     const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-    const visibleBounds = this.getVisibleWorldBounds();
-    const cullPadding = tileSize * 2;
 
     for (const layer of layout.tileLayers) {
-      const minGridX = Math.max(0, Math.floor((visibleBounds.x - cullPadding - originX) / tileSize));
-      const minGridY = Math.max(0, Math.floor((visibleBounds.y - cullPadding - originY) / tileSize));
-      const maxGridX = Math.min(
-        layer.width - 1,
-        Math.ceil((visibleBounds.x + visibleBounds.width + cullPadding - originX) / tileSize),
-      );
-      const maxGridY = Math.min(
-        layer.height - 1,
-        Math.ceil((visibleBounds.y + visibleBounds.height + cullPadding - originY) / tileSize),
-      );
+      for (const tile of layer.tiles) {
+        const tileX = originX + tile.x * tileSize;
+        const tileY = originY + tile.y * tileSize;
 
-      if (minGridX > maxGridX || minGridY > maxGridY) {
-        continue;
-      }
+        const sprite = this.createTerrainSprite(tile.textureKey);
 
-      for (let gridY = minGridY; gridY <= maxGridY; gridY += 1) {
-        for (let gridX = minGridX; gridX <= maxGridX; gridX += 1) {
-          const tile = layer.tileByIndex[gridY * layer.width + gridX];
-
-          if (!tile) {
-            continue;
-          }
-
-          const tileX = originX + gridX * tileSize;
-          const tileY = originY + gridY * tileSize;
-
-          const texture = this.assets.getTerrainTileTexture(tile.textureKey);
-
-          if (!texture) {
-            continue;
-          }
-
-          const sprite = new Sprite(texture);
-          const tileDefinition = layout.tileTextures[tile.textureKey];
-          const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
-
-          if (tint) {
-            sprite.tint = tint;
-          }
-
-          sprite.alpha = layer.opacity;
-
-          if (tile.rotation || tile.flipX || tile.flipY) {
-            sprite.anchor.set(0.5);
-            sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
-            sprite.x = tileX + tileSize / 2;
-            sprite.y = tileY + tileSize / 2;
-            sprite.scale.set(
-              (tile.flipX ? -1 : 1) * ((tileSize + 0.5) / texture.width),
-              (tile.flipY ? -1 : 1) * ((tileSize + 0.5) / texture.height),
-            );
-          } else {
-            sprite.x = tileX;
-            sprite.y = tileY;
-            sprite.width = tileSize + 0.5;
-            sprite.height = tileSize + 0.5;
-          }
-
-          this.cameraStaticLayer.addChild(sprite);
+        if (!sprite) {
+          continue;
         }
+        const tileDefinition = layout.tileTextures[tile.textureKey];
+        const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
+
+        if (tint) {
+          sprite.tint = tint;
+        }
+
+        sprite.alpha = layer.opacity;
+
+        if (tile.rotation || tile.flipX || tile.flipY) {
+          sprite.anchor.set(0.5);
+          sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
+          sprite.x = tileX + tileSize / 2;
+          sprite.y = tileY + tileSize / 2;
+          sprite.scale.set(
+            (tile.flipX ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.width),
+            (tile.flipY ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.height),
+          );
+        } else {
+          sprite.x = tileX;
+          sprite.y = tileY;
+          sprite.width = tileSize + 0.5;
+          sprite.height = tileSize + 0.5;
+        }
+
+        this.cameraStaticLayer.addChild(sprite);
       }
     }
   }
@@ -829,8 +813,6 @@ export class PixiVillageRenderer {
     const terrainHeight = layout.height * scale;
     const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
     const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-    const visibleBounds = this.getVisibleWorldBounds();
-    const cullPadding = layout.tileSize * scale * 2;
 
     for (const layer of layout.objectLayers.filter((candidate) => candidate.name === "decor")) {
       const objects = [...layer.objects].sort((left, right) => left.y - right.y);
@@ -845,22 +827,11 @@ export class PixiVillageRenderer {
         const objectWidth = object.width * scale;
         const objectHeight = object.height * scale;
 
-        if (
-          objectX + objectWidth < visibleBounds.x - cullPadding ||
-          objectX > visibleBounds.x + visibleBounds.width + cullPadding ||
-          objectY < visibleBounds.y - cullPadding ||
-          objectY - objectHeight > visibleBounds.y + visibleBounds.height + cullPadding
-        ) {
+        const sprite = this.createTerrainSprite(object.textureKey);
+
+        if (!sprite) {
           continue;
         }
-
-        const texture = this.assets.getTerrainTileTexture(object.textureKey);
-
-        if (!texture) {
-          continue;
-        }
-
-        const sprite = new Sprite(texture);
         sprite.anchor.set(0, 1);
         sprite.x = objectX;
         sprite.y = objectY;
@@ -2617,8 +2588,12 @@ export class PixiVillageRenderer {
     return isEnvironmentAnimated || isDaylightAnimated;
   }
 
+  private shouldAnimateVisuals(): boolean {
+    return this.shouldAnimateAmbientOverlays() || this.textureAnimationBindings.size > 0;
+  }
+
   private updateAmbientAnimationLoop(): void {
-    if (this.shouldAnimateAmbientOverlays()) {
+    if (this.shouldAnimateVisuals()) {
       this.startAmbientAnimation();
       return;
     }
@@ -2650,9 +2625,13 @@ export class PixiVillageRenderer {
       return;
     }
 
-    this.refreshAmbientOverlays(timestamp);
-
     if (this.shouldAnimateAmbientOverlays()) {
+      this.refreshAmbientOverlays(timestamp);
+    }
+
+    this.refreshTextureAnimations(timestamp);
+
+    if (this.shouldAnimateVisuals()) {
       this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
     }
   }
@@ -5235,13 +5214,154 @@ export class PixiVillageRenderer {
     const animationFrames = this.assets.getBuildingAnimationFrames(buildingId, level, built);
 
     if (animationFrames) {
-      const sprite = new AnimatedSprite(animationFrames);
-      sprite.loop = true;
-      sprite.play();
-      return sprite;
+      const texture = this.resolveAnimationTexture(animationFrames, performance.now());
+      if (texture) {
+        return new Sprite(texture);
+      }
     }
 
     return new Sprite(this.assets.getBuildingTexture(buildingId, level, built));
+  }
+
+  private createTerrainSprite(textureKey: string): Sprite | null {
+    const animationFrames = this.assets.getTerrainTileAnimationFrames(textureKey);
+
+    if (animationFrames) {
+      const sprite = new Sprite();
+      this.registerTextureAnimation(sprite, animationFrames);
+      return sprite;
+    }
+
+    const texture = this.assets.getTerrainTileTexture(textureKey);
+    return texture ? new Sprite(texture) : null;
+  }
+
+  private registerTextureAnimation(
+    sprite: Sprite,
+    animationFrames: FrameObject[],
+  ): void {
+    const frames = animationFrames.flatMap((frame): TextureAnimationFrame[] => {
+      const durationMs = typeof frame.time === "number" ? frame.time : 100;
+      return durationMs > 0
+        ? [{ texture: frame.texture, durationMs }]
+        : [];
+    });
+
+    if (frames.length <= 1) {
+      if (frames[0]) {
+        sprite.texture = frames[0].texture;
+      }
+      return;
+    }
+
+    const totalDurationMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+    if (totalDurationMs <= 0) {
+      sprite.texture = frames[0].texture;
+      return;
+    }
+
+    const binding: TextureAnimationBinding = {
+      sprite,
+      frames,
+      totalDurationMs,
+      currentFrameIndex: -1,
+    };
+
+    this.textureAnimationBindings.add(binding);
+    this.applyTextureAnimationFrame(binding, performance.now());
+    this.updateAmbientAnimationLoop();
+  }
+
+  private resolveAnimationTexture(
+    animationFrames: FrameObject[],
+    nowMs: number,
+  ): FrameObject["texture"] | null {
+    const frames = animationFrames.flatMap((frame): TextureAnimationFrame[] => {
+      const durationMs = typeof frame.time === "number" ? frame.time : 100;
+      return durationMs > 0
+        ? [{ texture: frame.texture, durationMs }]
+        : [];
+    });
+
+    if (frames.length === 0) {
+      return null;
+    }
+
+    if (frames.length === 1) {
+      return frames[0].texture;
+    }
+
+    const totalDurationMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
+    if (totalDurationMs <= 0) {
+      return frames[0].texture;
+    }
+
+    const frameIndex = this.getTextureAnimationFrameIndex(
+      frames,
+      totalDurationMs,
+      nowMs,
+    );
+    return frames[frameIndex]?.texture ?? frames[0].texture;
+  }
+
+  private refreshTextureAnimations(nowMs: number): void {
+    if (this.textureAnimationBindings.size === 0) {
+      return;
+    }
+
+    for (const binding of Array.from(this.textureAnimationBindings)) {
+      if (binding.sprite.destroyed || !binding.sprite.parent) {
+        this.textureAnimationBindings.delete(binding);
+        continue;
+      }
+
+      this.applyTextureAnimationFrame(binding, nowMs);
+    }
+  }
+
+  private applyTextureAnimationFrame(binding: TextureAnimationBinding, nowMs: number): void {
+    const frameIndex = this.getTextureAnimationFrameIndex(
+      binding.frames,
+      binding.totalDurationMs,
+      nowMs,
+    );
+
+    if (frameIndex === binding.currentFrameIndex) {
+      return;
+    }
+
+    binding.currentFrameIndex = frameIndex;
+    binding.sprite.texture = binding.frames[frameIndex].texture;
+  }
+
+  private getTextureAnimationFrameIndex(
+    frames: TextureAnimationFrame[],
+    totalDurationMs: number,
+    nowMs: number,
+  ): number {
+    const loopPositionMs = nowMs % totalDurationMs;
+    let elapsed = 0;
+
+    for (let index = 0; index < frames.length; index += 1) {
+      elapsed += frames[index].durationMs;
+      if (loopPositionMs < elapsed) {
+        return index;
+      }
+    }
+
+    return frames.length - 1;
+  }
+
+  private unregisterTextureAnimationsForNode(node: Container): void {
+    for (const binding of Array.from(this.textureAnimationBindings)) {
+      if (binding.sprite === node) {
+        this.textureAnimationBindings.delete(binding);
+      }
+    }
+
+    for (const child of node.children) {
+      this.unregisterTextureAnimationsForNode(child as Container);
+    }
   }
 
   private fitSprite(sprite: Sprite, maxWidth: number, maxHeight: number): void {
@@ -5458,29 +5578,12 @@ export class PixiVillageRenderer {
     return Math.min(HUD_MAX_PIXEL_SCALE, Math.max(1, Math.min(width / 1120, height / 640)));
   }
 
-  private getVisibleWorldBounds(): Bounds {
-    const zoom = this.cameraZoom || 1;
-
-    return {
-      x: -this.cameraOffsetX / zoom,
-      y: -this.cameraOffsetY / zoom,
-      width: this.host.clientWidth / zoom,
-      height: this.host.clientHeight / zoom,
-    };
-  }
-
-  private getStaticWorldKey(state: GameState, width: number, height: number): string {
+  private getStaticWorldKey(state: GameState): string {
     return [
       state.environment.condition,
-      state.environment.intensity,
-      width,
-      height,
       this.layout.scale.toFixed(4),
       this.layout.originX.toFixed(2),
       this.layout.originY.toFixed(2),
-      this.cameraZoom.toFixed(4),
-      this.cameraOffsetX.toFixed(2),
-      this.cameraOffsetY.toFixed(2),
     ].join("|");
   }
 
