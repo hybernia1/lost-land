@@ -270,6 +270,11 @@ const CAMERA_ZOOM_SNAP_EPSILON = 0.001;
 const MAX_RENDER_RESOLUTION = 1.5;
 const MAX_VISUAL_FPS = 30;
 const VISUAL_FRAME_MIN_MS = 1000 / MAX_VISUAL_FPS;
+const MAX_WEATHER_OVERLAY_FPS = 12;
+const WEATHER_OVERLAY_FRAME_MIN_MS = 1000 / MAX_WEATHER_OVERLAY_FPS;
+const MAX_DAYLIGHT_TRANSITION_FPS = 4;
+const DAYLIGHT_TRANSITION_FRAME_MIN_MS = 1000 / MAX_DAYLIGHT_TRANSITION_FPS;
+const DAYLIGHT_DARKNESS_BUCKET_STEP = 0.015;
 
 function upgradingTooltip(
   name: string,
@@ -367,6 +372,10 @@ export class PixiVillageRenderer {
   private ambientPaused = false;
   private ambientSyncAtMs = 0;
   private lastVisualFrameAtMs = 0;
+  private lastEnvironmentOverlayFrameAtMs = 0;
+  private lastDaylightOverlayFrameAtMs = 0;
+  private lastEnvironmentOverlayKey = "";
+  private lastDaylightOverlayKey = "";
   private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
@@ -482,7 +491,7 @@ export class PixiVillageRenderer {
       resolvedDecisionPreview ?? null,
     );
     this.syncAmbientOverlayState(state);
-    this.refreshAmbientOverlays(performance.now());
+    this.refreshAmbientOverlays(performance.now(), true);
     this.updateAmbientAnimationLoop();
     this.applyHudPixelScale(this.hudLayer, hudPixelScale);
     this.scaleHudInteractionBounds(hudPixelScale);
@@ -2578,7 +2587,7 @@ export class PixiVillageRenderer {
     this.ambientSyncAtMs = performance.now();
   }
 
-  private refreshAmbientOverlays(nowMs: number): void {
+  private refreshAmbientOverlays(nowMs: number, force = false): void {
     const width = this.app?.screen.width ?? this.host.clientWidth;
     const height = this.app?.screen.height ?? this.host.clientHeight;
 
@@ -2588,6 +2597,31 @@ export class PixiVillageRenderer {
 
     const visualTime = nowMs / 1000;
     const elapsedSeconds = this.getAmbientElapsedSeconds(nowMs);
+    this.refreshEnvironmentOverlay(width, height, visualTime, nowMs, force);
+    this.refreshDaylightOverlay(width, height, elapsedSeconds, nowMs, force);
+  }
+
+  private refreshEnvironmentOverlay(
+    width: number,
+    height: number,
+    visualTime: number,
+    nowMs: number,
+    force: boolean,
+  ): void {
+    const overlayKey = `${this.ambientCondition}|${this.ambientIntensity}|${Math.round(width)}|${Math.round(height)}`;
+    const needsKeyRefresh = overlayKey !== this.lastEnvironmentOverlayKey;
+    const isAnimatedWeather = this.ambientCondition !== "stable";
+
+    if (
+      !force &&
+      !needsKeyRefresh &&
+      isAnimatedWeather &&
+      this.lastEnvironmentOverlayFrameAtMs > 0 &&
+      nowMs - this.lastEnvironmentOverlayFrameAtMs < WEATHER_OVERLAY_FRAME_MIN_MS
+    ) {
+      return;
+    }
+
     this.redrawEnvironmentOverlay(
       this.environmentOverlayGraphic,
       this.ambientCondition,
@@ -2596,7 +2630,39 @@ export class PixiVillageRenderer {
       height,
       visualTime,
     );
+    this.lastEnvironmentOverlayKey = overlayKey;
+    this.lastEnvironmentOverlayFrameAtMs = nowMs;
+  }
+
+  private refreshDaylightOverlay(
+    width: number,
+    height: number,
+    elapsedSeconds: number,
+    nowMs: number,
+    force: boolean,
+  ): void {
+    const daylight = getDaylightState(elapsedSeconds);
+    const isDaylightTransition = daylight.phase === "dusk" || daylight.phase === "dawn";
+    const darknessBucket = Math.round(daylight.darkness / DAYLIGHT_DARKNESS_BUCKET_STEP);
+    const key = `${daylight.phase}|${darknessBucket}|${Math.round(width)}|${Math.round(height)}`;
+    const needsKeyRefresh = key !== this.lastDaylightOverlayKey;
+
+    if (!force && !needsKeyRefresh) {
+      if (!isDaylightTransition) {
+        return;
+      }
+
+      if (
+        this.lastDaylightOverlayFrameAtMs > 0 &&
+        nowMs - this.lastDaylightOverlayFrameAtMs < DAYLIGHT_TRANSITION_FRAME_MIN_MS
+      ) {
+        return;
+      }
+    }
+
     this.redrawDaylightOverlay(this.daylightOverlayGraphic, elapsedSeconds, width, height);
+    this.lastDaylightOverlayKey = key;
+    this.lastDaylightOverlayFrameAtMs = nowMs;
   }
 
   private getAmbientElapsedSeconds(nowMs: number): number {
@@ -2609,8 +2675,8 @@ export class PixiVillageRenderer {
 
   private shouldAnimateAmbientOverlays(): boolean {
     const isEnvironmentAnimated = this.ambientCondition !== "stable";
-    const daylight = getDaylightState(this.ambientElapsedSeconds);
-    const isDaylightAnimated = daylight.darkness > 0;
+    const daylightPhase = getDaylightState(this.ambientElapsedSeconds).phase;
+    const isDaylightAnimated = daylightPhase === "dusk" || daylightPhase === "dawn";
     return isEnvironmentAnimated || isDaylightAnimated;
   }
 
