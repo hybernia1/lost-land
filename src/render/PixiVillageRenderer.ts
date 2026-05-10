@@ -5778,22 +5778,29 @@ export class PixiVillageRenderer {
     const clampedZoom = Math.max(CAMERA_MIN_ZOOM, Math.min(CAMERA_MAX_ZOOM, zoom));
     const scaledTerrainWidth = terrainWidth * clampedZoom;
     const scaledTerrainHeight = terrainHeight * clampedZoom;
+    const insets = this.getCameraViewportInsets(viewportWidth, viewportHeight);
+    const safeLeft = insets.left;
+    const safeTop = insets.top;
+    const safeRight = viewportWidth - insets.right;
+    const safeBottom = viewportHeight - insets.bottom;
+    const safeWidth = Math.max(1, safeRight - safeLeft);
+    const safeHeight = Math.max(1, safeBottom - safeTop);
     let clampedOffsetX = offsetX;
     let clampedOffsetY = offsetY;
 
-    if (scaledTerrainWidth <= viewportWidth) {
-      clampedOffsetX = (viewportWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
+    if (scaledTerrainWidth <= safeWidth) {
+      clampedOffsetX = safeLeft + (safeWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
     } else {
-      const minX = viewportWidth - (originX + terrainWidth) * clampedZoom;
-      const maxX = -originX * clampedZoom;
+      const minX = safeRight - (originX + terrainWidth) * clampedZoom;
+      const maxX = safeLeft - originX * clampedZoom;
       clampedOffsetX = Math.max(minX, Math.min(maxX, clampedOffsetX));
     }
 
-    if (scaledTerrainHeight <= viewportHeight) {
-      clampedOffsetY = (viewportHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
+    if (scaledTerrainHeight <= safeHeight) {
+      clampedOffsetY = safeTop + (safeHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
     } else {
-      const minY = viewportHeight - (originY + terrainHeight) * clampedZoom;
-      const maxY = -originY * clampedZoom;
+      const minY = safeBottom - (originY + terrainHeight) * clampedZoom;
+      const maxY = safeTop - originY * clampedZoom;
       clampedOffsetY = Math.max(minY, Math.min(maxY, clampedOffsetY));
     }
 
@@ -5801,6 +5808,32 @@ export class PixiVillageRenderer {
       zoom: clampedZoom,
       offsetX: clampedOffsetX,
       offsetY: clampedOffsetY,
+    };
+  }
+
+  private getCameraViewportInsets(
+    viewportWidth: number,
+    viewportHeight: number,
+  ): { left: number; right: number; top: number; bottom: number } {
+    const hudScale = this.getHudPixelScale(viewportWidth, viewportHeight);
+    const minSafeWidth = 240;
+    const minSafeHeight = 220;
+    let left = HUD_LEFT_PANEL_WIDTH * hudScale;
+    const right = 0;
+    let top = HUD_TOP_STRIP_HEIGHT * hudScale;
+    const bottom = 0;
+    const maxLeftInset = Math.max(0, viewportWidth - minSafeWidth);
+
+    left = Math.min(left, maxLeftInset);
+
+    const maxTopInset = Math.max(0, viewportHeight - minSafeHeight);
+    top = Math.min(top, maxTopInset);
+
+    return {
+      left,
+      right,
+      top,
+      bottom,
     };
   }
 
