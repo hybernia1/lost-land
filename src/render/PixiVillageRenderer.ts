@@ -1395,7 +1395,7 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
@@ -1413,7 +1413,7 @@ export class PixiVillageRenderer {
     const scoutingTroops = getScoutingTroopCount(state);
     const totalPopulation = getPopulation(state) + scoutingTroops;
 
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
     this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
     this.drawIcon(panel, "people", 24, 34, 20);
     this.drawText(panel, translations.ui.survivors, 52, 20, {
@@ -1471,7 +1471,7 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
@@ -1483,7 +1483,7 @@ export class PixiVillageRenderer {
     panel.eventMode = "static";
     overlay.addChild(panel);
 
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
     this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
     this.drawIcon(panel, "archive", 28, 34, 22);
     this.drawText(panel, translations.ui.decisionArchive ?? "Decision archive", 58, 19, {
@@ -2188,7 +2188,7 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.52 });
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
@@ -2199,7 +2199,7 @@ export class PixiVillageRenderer {
     panel.y = Math.max(36, (height - panelHeight) / 2);
     panel.eventMode = "static";
     overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
     this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
 
     const breakdown = getResourceBreakdown(state, resourceId);
@@ -2674,7 +2674,7 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.7 });
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
     if (activeDecision) {
       backdrop.eventMode = "static";
       backdrop.on("pointerdown", (event) => {
@@ -2692,7 +2692,7 @@ export class PixiVillageRenderer {
     panel.y = Math.max(34, (height - panelHeight) / 2);
     panel.eventMode = "static";
     overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
 
     if (activeDecision) {
       const definition = decisionQuestById[activeDecision.definitionId];
@@ -2827,22 +2827,22 @@ export class PixiVillageRenderer {
     this.hudLayer.addChild(overlay);
 
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0.62 });
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
     overlay.addChild(backdrop);
     this.bindAction(backdrop, { action: "close-village-modal" });
 
     const isBuildChoice = selectedPlot.buildingId === null;
     const detailBuildingId = selectedPlot.buildingId;
-    const modalWidth = isBuildChoice ? Math.min(1100, width - 48) : Math.min(860, width - 40);
+    const modalWidth = isBuildChoice ? Math.min(900, width - 56) : Math.min(860, width - 40);
     const modalHeight = isBuildChoice
-      ? Math.min(840, height - 48)
+      ? Math.min(690, height - 56)
       : Math.min(detailBuildingId === "barracks" ? 590 : 510, height - 40);
     const panel = new Container();
     panel.x = (width - modalWidth) / 2;
     panel.y = (height - modalHeight) / 2;
     panel.eventMode = "static";
     overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, modalWidth, modalHeight, 1);
+    this.drawPanel(panel, 0, 0, modalWidth, modalHeight, 1, 0);
 
     if (selectedPlot.buildingId === null) {
       const title = translations.ui.availableBuilds;
@@ -2880,7 +2880,7 @@ export class PixiVillageRenderer {
     parent.addChild(badge);
 
     const badgeBox = new Graphics();
-    badgeBox.roundRect(0, 0, 42, 42, 8)
+    badgeBox.rect(0, 0, 42, 42)
       .fill({ color: 0x11140f, alpha: 0.9 })
       .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
     badge.addChild(badgeBox);
@@ -2930,7 +2930,7 @@ export class PixiVillageRenderer {
     const tabY = 88;
     const listY = tabY + 48;
     const availableHeight = modalHeight - listY - 24;
-    const rowHeight = modalHeight < 620 ? 80 : 88;
+    const rowHeight = modalHeight < 620 ? 96 : 104;
     const contentHeight = filteredBuildings.length * rowHeight + gap * Math.max(0, filteredBuildings.length - 1);
     const maxScroll = Math.max(0, contentHeight - availableHeight);
     const needsScroll = maxScroll > 1;
@@ -2978,13 +2978,18 @@ export class PixiVillageRenderer {
       const mainBuildingUnlocked = isMainBuildingRequirementMet(state, buildingId, 1);
       const requiredMainBuildingLevel = getMainBuildingLevelRequirement(buildingId, 1);
       const disabled = !mainBuildingUnlocked || !affordable || !queueAvailable || !workersAvailable;
-      const buttonLabel = !mainBuildingUnlocked
-        ? this.getMainBuildingRequirementLabel(translations, requiredMainBuildingLevel)
-        : !queueAvailable
-        ? translations.ui.queueFull
-        : !workersAvailable
-          ? translations.ui.notEnoughWorkers
-          : translations.ui.buildHere;
+      const disabledTooltip = disabled
+        ? this.getBuildActionDisabledTooltip(
+          translations,
+          cost,
+          state.resources,
+          requiredWorkers,
+          state.survivors.workers,
+          queueAvailable,
+          mainBuildingUnlocked,
+          requiredMainBuildingLevel,
+        )
+        : undefined;
 
       this.drawBuildRow(listContent, {
         x: 0,
@@ -2998,8 +3003,9 @@ export class PixiVillageRenderer {
         description: translated.description,
         cost,
         requiredWorkers,
-        buttonLabel,
+        buttonLabel: translations.ui.buildHere,
         disabled,
+        disabledTooltip,
         action: { action: "build", building: buildingId, plot: plotId },
         state,
         translations,
@@ -3113,6 +3119,7 @@ export class PixiVillageRenderer {
       requiredWorkers: number;
       buttonLabel: string;
       disabled: boolean;
+      disabledTooltip?: string;
       action: PixiActionDetail;
       state: GameState;
       translations: TranslationPack;
@@ -3142,7 +3149,11 @@ export class PixiVillageRenderer {
     const buttonX = options.width - buttonWidth - 28;
     const textWidth = Math.max(220, buttonX - textX - 24);
     const compact = options.height < 66;
-    const tokenY = options.height - 22;
+    const sectionLabelY = options.height - 46;
+    const tokenY = options.height - 26;
+    const costSectionWidth = Math.max(150, Math.min(220, Math.floor(textWidth * 0.46)));
+    const effectsX = textX + costSectionWidth + 22;
+    const effectsWidth = Math.max(110, buttonX - effectsX - 18);
 
     this.drawText(row, options.title, textX, compact ? 8 : 11, {
       fill: 0xf5efdf,
@@ -3157,29 +3168,40 @@ export class PixiVillageRenderer {
       wordWrapWidth: textWidth,
     });
 
-    let tokenOffset = 0;
-    tokenOffset += this.drawCostLine(row, options.cost, options.state.resources, options.translations, textX, tokenY);
-    tokenOffset += tokenOffset > 0 ? 12 : 0;
-    tokenOffset += this.drawEffects(row, options.effects, textX + tokenOffset, tokenY, buttonX - textX - tokenOffset - 18);
+    this.drawText(row, options.translations.ui.buildCosts ?? "Costs", textX, sectionLabelY, {
+      fill: 0xaeb4b8,
+      fontSize: 10,
+      fontWeight: "800",
+    });
+    this.drawText(row, options.translations.ui.buildBenefits ?? "Benefits", effectsX, sectionLabelY, {
+      fill: 0xaeb4b8,
+      fontSize: 10,
+      fontWeight: "800",
+    });
+
+    const costWidth = this.drawCostLine(row, options.cost, options.state.resources, options.translations, textX, tokenY);
+    this.drawEffects(row, options.effects, effectsX, tokenY, effectsWidth);
+
     if (options.requiredWorkers > 0) {
       this.drawWorkerRequirement(
         row,
         options.requiredWorkers,
         options.state.survivors.workers,
         options.translations,
-        Math.min(textX + tokenOffset + 12, buttonX - 64),
+        Math.max(textX, Math.min(textX + costWidth + 8, textX + costSectionWidth - 54)),
         tokenY,
       );
     }
     this.createModalButton(
       row,
-      options.disabled ? options.buttonLabel : options.buttonLabel.toUpperCase(),
+      options.buttonLabel,
       buttonX,
       (options.height - buttonHeight) / 2,
       buttonWidth,
       buttonHeight,
       options.action,
       options.disabled,
+      options.disabledTooltip,
     );
   }
 
@@ -4180,6 +4202,58 @@ export class PixiVillageRenderer {
       translations.ui.requiresMainBuildingLevel ?? "Requires main building level {level}.",
       { level: requiredLevel },
     );
+  }
+
+  private getBuildActionDisabledTooltip(
+    translations: TranslationPack,
+    cost: ResourceBag,
+    resources: GameState["resources"],
+    requiredWorkers: number,
+    availableWorkers: number,
+    queueAvailable: boolean,
+    mainBuildingUnlocked: boolean,
+    requiredMainBuildingLevel: number,
+  ): string {
+    const reasons: string[] = [];
+
+    if (!mainBuildingUnlocked) {
+      reasons.push(this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel));
+    }
+    if (!queueAvailable) {
+      reasons.push(translations.ui.queueFull);
+    }
+    if (availableWorkers < requiredWorkers) {
+      reasons.push(translations.ui.notEnoughWorkers);
+    }
+
+    const missingResourceLabels = this.getMissingResourceLabels(cost, resources, translations);
+    if (missingResourceLabels.length > 0) {
+      reasons.push(`${translations.ui.notEnoughResources ?? "Not enough resources"}: ${missingResourceLabels.join(", ")}`);
+    }
+
+    return reasons.join("\n");
+  }
+
+  private getMissingResourceLabels(
+    bag: ResourceBag,
+    availableResources: GameState["resources"],
+    translations: TranslationPack,
+  ): string[] {
+    const labels: string[] = [];
+
+    for (const [resourceId, amount] of Object.entries(bag)) {
+      if ((amount ?? 0) <= 0) {
+        continue;
+      }
+      const typedResourceId = resourceId as ResourceId;
+      const required = Math.ceil(amount ?? 0);
+      const available = availableResources[typedResourceId] ?? 0;
+      if (available < required) {
+        labels.push(translations.resources[typedResourceId]);
+      }
+    }
+
+    return labels;
   }
 
   private drawInfoToken(
