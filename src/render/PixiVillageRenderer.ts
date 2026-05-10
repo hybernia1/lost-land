@@ -264,6 +264,9 @@ const HUD_LEFT_PANEL_WIDTH = 366;
 const CAMERA_MIN_ZOOM = 0.75;
 const CAMERA_MAX_ZOOM = 1.75;
 const CAMERA_ZOOM_STEP = 0.0018;
+const CAMERA_SMOOTH_FACTOR = 0.2;
+const CAMERA_OFFSET_SNAP_EPSILON = 0.2;
+const CAMERA_ZOOM_SNAP_EPSILON = 0.001;
 
 function upgradingTooltip(
   name: string,
@@ -346,6 +349,9 @@ export class PixiVillageRenderer {
   private cameraOffsetX = 0;
   private cameraOffsetY = 0;
   private cameraZoom = 1;
+  private cameraTargetOffsetX = 0;
+  private cameraTargetOffsetY = 0;
+  private cameraTargetZoom = 1;
   private cameraDragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null;
   private cameraDragMoved = false;
   private cameraDragBlocked = false;
@@ -444,10 +450,9 @@ export class PixiVillageRenderer {
     this.decisionHistoryScrollMax = 0;
     this.hudInteractionAreas = [];
     this.hudLayer.scale.set(1);
-    this.clampCamera(width, height);
-    this.cameraLayer.x = this.cameraOffsetX;
-    this.cameraLayer.y = this.cameraOffsetY;
-    this.cameraLayer.scale.set(this.cameraZoom);
+    this.clampCurrentCamera(width, height);
+    this.clampTargetCamera(width, height);
+    this.applyCameraTransform();
     const staticWorldKey = this.getStaticWorldKey(state);
     if (staticWorldKey !== this.lastStaticWorldKey) {
       this.clearContainerChildren(this.cameraStaticLayer);
@@ -629,7 +634,7 @@ export class PixiVillageRenderer {
     const rect = this.host.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    const previousZoom = this.cameraZoom;
+    const previousZoom = this.cameraTargetZoom;
     const nextZoom = Math.max(
       CAMERA_MIN_ZOOM,
       Math.min(CAMERA_MAX_ZOOM, previousZoom * Math.exp(-event.deltaY * CAMERA_ZOOM_STEP)),
@@ -640,14 +645,14 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const worldX = (x - this.cameraOffsetX) / previousZoom;
-    const worldY = (y - this.cameraOffsetY) / previousZoom;
-    this.cameraZoom = nextZoom;
-    this.cameraOffsetX = x - worldX * nextZoom;
-    this.cameraOffsetY = y - worldY * nextZoom;
-    this.clampCamera(this.host.clientWidth, this.host.clientHeight);
+    const worldX = (x - this.cameraTargetOffsetX) / previousZoom;
+    const worldY = (y - this.cameraTargetOffsetY) / previousZoom;
+    this.cameraTargetZoom = nextZoom;
+    this.cameraTargetOffsetX = x - worldX * nextZoom;
+    this.cameraTargetOffsetY = y - worldY * nextZoom;
+    this.clampTargetCamera(this.host.clientWidth, this.host.clientHeight);
+    this.updateAmbientAnimationLoop();
     event.preventDefault();
-    this.requestRender();
   }
 
   private handleHostPointerDown(event: PointerEvent): void {
@@ -658,8 +663,8 @@ export class PixiVillageRenderer {
     this.cameraDragStart = {
       x: event.clientX,
       y: event.clientY,
-      offsetX: this.cameraOffsetX,
-      offsetY: this.cameraOffsetY,
+      offsetX: this.cameraTargetOffsetX,
+      offsetY: this.cameraTargetOffsetY,
     };
     this.cameraDragMoved = false;
     this.host.setPointerCapture(event.pointerId);
@@ -678,10 +683,10 @@ export class PixiVillageRenderer {
     }
 
     this.cameraDragMoved = true;
-    this.cameraOffsetX = this.cameraDragStart.offsetX + deltaX;
-    this.cameraOffsetY = this.cameraDragStart.offsetY + deltaY;
-    this.clampCamera(this.host.clientWidth, this.host.clientHeight);
-    this.requestRender();
+    this.cameraTargetOffsetX = this.cameraDragStart.offsetX + deltaX;
+    this.cameraTargetOffsetY = this.cameraDragStart.offsetY + deltaY;
+    this.clampTargetCamera(this.host.clientWidth, this.host.clientHeight);
+    this.updateAmbientAnimationLoop();
     event.preventDefault();
   }
 
@@ -2604,7 +2609,7 @@ export class PixiVillageRenderer {
   }
 
   private shouldAnimateVisuals(): boolean {
-    return this.shouldAnimateAmbientOverlays() || this.textureAnimationBindings.size > 0;
+    return this.shouldAnimateAmbientOverlays() || this.textureAnimationBindings.size > 0 || this.shouldAnimateCamera();
   }
 
   private updateAmbientAnimationLoop(): void {
@@ -2645,6 +2650,7 @@ export class PixiVillageRenderer {
     }
 
     this.refreshTextureAnimations(timestamp);
+    this.refreshCameraTransform();
 
     if (this.shouldAnimateVisuals()) {
       this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
@@ -5549,30 +5555,116 @@ export class PixiVillageRenderer {
     return event.deltaY / this.hudPixelScale;
   }
 
-  private clampCamera(viewportWidth: number, viewportHeight: number): void {
+  private shouldAnimateCamera(): boolean {
+    return (
+      Math.abs(this.cameraTargetZoom - this.cameraZoom) > CAMERA_ZOOM_SNAP_EPSILON ||
+      Math.abs(this.cameraTargetOffsetX - this.cameraOffsetX) > CAMERA_OFFSET_SNAP_EPSILON ||
+      Math.abs(this.cameraTargetOffsetY - this.cameraOffsetY) > CAMERA_OFFSET_SNAP_EPSILON
+    );
+  }
+
+  private refreshCameraTransform(): void {
+    const viewportWidth = this.host.clientWidth;
+    const viewportHeight = this.host.clientHeight;
+
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+      return;
+    }
+
+    if (!this.shouldAnimateCamera()) {
+      return;
+    }
+
+    this.cameraZoom += (this.cameraTargetZoom - this.cameraZoom) * CAMERA_SMOOTH_FACTOR;
+    this.cameraOffsetX += (this.cameraTargetOffsetX - this.cameraOffsetX) * CAMERA_SMOOTH_FACTOR;
+    this.cameraOffsetY += (this.cameraTargetOffsetY - this.cameraOffsetY) * CAMERA_SMOOTH_FACTOR;
+    this.clampCurrentCamera(viewportWidth, viewportHeight);
+
+    if (
+      Math.abs(this.cameraTargetZoom - this.cameraZoom) <= CAMERA_ZOOM_SNAP_EPSILON &&
+      Math.abs(this.cameraTargetOffsetX - this.cameraOffsetX) <= CAMERA_OFFSET_SNAP_EPSILON &&
+      Math.abs(this.cameraTargetOffsetY - this.cameraOffsetY) <= CAMERA_OFFSET_SNAP_EPSILON
+    ) {
+      this.cameraZoom = this.cameraTargetZoom;
+      this.cameraOffsetX = this.cameraTargetOffsetX;
+      this.cameraOffsetY = this.cameraTargetOffsetY;
+      this.clampCurrentCamera(viewportWidth, viewportHeight);
+    }
+
+    this.applyCameraTransform();
+  }
+
+  private clampCurrentCamera(viewportWidth: number, viewportHeight: number): void {
+    const clamped = this.clampCamera(
+      this.cameraZoom,
+      this.cameraOffsetX,
+      this.cameraOffsetY,
+      viewportWidth,
+      viewportHeight,
+    );
+    this.cameraZoom = clamped.zoom;
+    this.cameraOffsetX = clamped.offsetX;
+    this.cameraOffsetY = clamped.offsetY;
+  }
+
+  private clampTargetCamera(viewportWidth: number, viewportHeight: number): void {
+    const clamped = this.clampCamera(
+      this.cameraTargetZoom,
+      this.cameraTargetOffsetX,
+      this.cameraTargetOffsetY,
+      viewportWidth,
+      viewportHeight,
+    );
+    this.cameraTargetZoom = clamped.zoom;
+    this.cameraTargetOffsetX = clamped.offsetX;
+    this.cameraTargetOffsetY = clamped.offsetY;
+  }
+
+  private applyCameraTransform(): void {
+    this.cameraLayer.x = this.cameraOffsetX;
+    this.cameraLayer.y = this.cameraOffsetY;
+    this.cameraLayer.scale.set(this.cameraZoom);
+  }
+
+  private clampCamera(
+    zoom: number,
+    offsetX: number,
+    offsetY: number,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): { zoom: number; offsetX: number; offsetY: number } {
     const scale = this.layout.scale;
     const terrainWidth = defaultVillageLayout.width * scale;
     const terrainHeight = defaultVillageLayout.height * scale;
     const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
     const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-    const scaledTerrainWidth = terrainWidth * this.cameraZoom;
-    const scaledTerrainHeight = terrainHeight * this.cameraZoom;
+    const clampedZoom = Math.max(CAMERA_MIN_ZOOM, Math.min(CAMERA_MAX_ZOOM, zoom));
+    const scaledTerrainWidth = terrainWidth * clampedZoom;
+    const scaledTerrainHeight = terrainHeight * clampedZoom;
+    let clampedOffsetX = offsetX;
+    let clampedOffsetY = offsetY;
 
     if (scaledTerrainWidth <= viewportWidth) {
-      this.cameraOffsetX = (viewportWidth - scaledTerrainWidth) / 2 - originX * this.cameraZoom;
+      clampedOffsetX = (viewportWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
     } else {
-      const minX = viewportWidth - (originX + terrainWidth) * this.cameraZoom;
-      const maxX = -originX * this.cameraZoom;
-      this.cameraOffsetX = Math.max(minX, Math.min(maxX, this.cameraOffsetX));
+      const minX = viewportWidth - (originX + terrainWidth) * clampedZoom;
+      const maxX = -originX * clampedZoom;
+      clampedOffsetX = Math.max(minX, Math.min(maxX, clampedOffsetX));
     }
 
     if (scaledTerrainHeight <= viewportHeight) {
-      this.cameraOffsetY = (viewportHeight - scaledTerrainHeight) / 2 - originY * this.cameraZoom;
+      clampedOffsetY = (viewportHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
     } else {
-      const minY = viewportHeight - (originY + terrainHeight) * this.cameraZoom;
-      const maxY = -originY * this.cameraZoom;
-      this.cameraOffsetY = Math.max(minY, Math.min(maxY, this.cameraOffsetY));
+      const minY = viewportHeight - (originY + terrainHeight) * clampedZoom;
+      const maxY = -originY * clampedZoom;
+      clampedOffsetY = Math.max(minY, Math.min(maxY, clampedOffsetY));
     }
+
+    return {
+      zoom: clampedZoom,
+      offsetX: clampedOffsetX,
+      offsetY: clampedOffsetY,
+    };
   }
 
   private getLayout(width: number, height: number): SceneLayout {
