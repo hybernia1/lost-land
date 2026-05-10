@@ -270,8 +270,6 @@ const CAMERA_ZOOM_SNAP_EPSILON = 0.001;
 const MAX_RENDER_RESOLUTION = 1.5;
 const MAX_VISUAL_FPS = 30;
 const VISUAL_FRAME_MIN_MS = 1000 / MAX_VISUAL_FPS;
-const MAX_TEXTURE_ANIMATION_FPS = 10;
-const TEXTURE_ANIMATION_FRAME_MIN_MS = 1000 / MAX_TEXTURE_ANIMATION_FPS;
 const MAX_WEATHER_OVERLAY_FPS = 12;
 const WEATHER_OVERLAY_FRAME_MIN_MS = 1000 / MAX_WEATHER_OVERLAY_FPS;
 const MAX_DAYLIGHT_TRANSITION_FPS = 4;
@@ -366,7 +364,6 @@ export class PixiVillageRenderer {
   private cameraDragMoved = false;
   private cameraDragBlocked = false;
   private lastStaticWorldKey: string | null = null;
-  private lastBackgroundKey: string | null = null;
   private ambientAnimationFrameId: number | null = null;
   private ambientCondition: EnvironmentConditionId = "stable";
   private ambientIntensity = 1;
@@ -379,10 +376,6 @@ export class PixiVillageRenderer {
   private lastDaylightOverlayFrameAtMs = 0;
   private lastEnvironmentOverlayKey = "";
   private lastDaylightOverlayKey = "";
-  private lastTextureAnimationFrameAtMs = 0;
-  private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
-  private lastFormattedLogTranslations: TranslationPack | undefined;
-  private lastFormattedLogEntries: string[] = [];
   private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
@@ -457,6 +450,7 @@ export class PixiVillageRenderer {
     const hudHeight = height / hudPixelScale;
     const visualTime = performance.now() / 1000;
     this.hudPixelScale = hudPixelScale;
+    this.clearContainerChildren(this.backgroundLayer);
     this.clearContainerChildren(this.cameraDynamicLayer);
     this.clearContainerChildren(this.hudLayer);
     this.buildChoicesScrollArea = null;
@@ -479,12 +473,7 @@ export class PixiVillageRenderer {
       this.drawDecorObjects();
       this.lastStaticWorldKey = staticWorldKey;
     }
-    const backgroundKey = `${Math.round(width)}x${Math.round(height)}`;
-    if (backgroundKey !== this.lastBackgroundKey) {
-      this.clearContainerChildren(this.backgroundLayer);
-      this.drawBackground(state, width, height);
-      this.lastBackgroundKey = backgroundKey;
-    }
+    this.drawBackground(state, width, height);
     this.drawPalisade(state, translations);
 
     for (const plot of nonPerimeterVillagePlots) {
@@ -2034,7 +2023,9 @@ export class PixiVillageRenderer {
       fontWeight: "800",
     });
 
-    const entries = this.getFormattedLogEntries(state, translations);
+    const entries = translations
+      ? state.log.map((entry) => formatLogEntry(entry, translations))
+      : state.log.map((entry) => entry.key);
 
     if (entries.length === 0) {
       this.drawText(layer, "-", 14, viewportY, {
@@ -5423,14 +5414,6 @@ export class PixiVillageRenderer {
       return;
     }
 
-    if (
-      this.lastTextureAnimationFrameAtMs > 0 &&
-      nowMs - this.lastTextureAnimationFrameAtMs < TEXTURE_ANIMATION_FRAME_MIN_MS
-    ) {
-      return;
-    }
-    this.lastTextureAnimationFrameAtMs = nowMs;
-
     for (const binding of Array.from(this.textureAnimationBindings)) {
       if (binding.sprite.destroyed || !binding.sprite.parent) {
         this.textureAnimationBindings.delete(binding);
@@ -5880,25 +5863,5 @@ export class PixiVillageRenderer {
 
   private getTroopHousingCapacity(state: GameState): number {
     return state.buildings.barracks.level > 0 ? state.survivors.troops : 0;
-  }
-
-  private getFormattedLogEntries(
-    state: GameState,
-    translations: TranslationPack | undefined,
-  ): string[] {
-    if (
-      this.lastFormattedLogSource === state.log &&
-      this.lastFormattedLogTranslations === translations
-    ) {
-      return this.lastFormattedLogEntries;
-    }
-
-    const entries = translations
-      ? state.log.map((entry) => formatLogEntry(entry, translations))
-      : state.log.map((entry) => entry.key);
-    this.lastFormattedLogSource = state.log;
-    this.lastFormattedLogTranslations = translations;
-    this.lastFormattedLogEntries = entries;
-    return entries;
   }
 }
