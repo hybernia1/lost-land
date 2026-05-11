@@ -21,3 +21,17 @@ export const villagePlotRulesById: Record<string, VillagePlotRule> = {
     allowedBuildingIds: ["mainBuilding"],
   },
 };
+
+export function plotAllowsBuilding(
+  plot: Pick<VillagePlotDefinition, "allowedBuildingIds">,
+  buildingId: BuildingId,
+): boolean {
+  return plot.allowedBuildingIds?.includes(buildingId) ?? false;
+}
+
+export function findFirstPlotIdForBuilding(
+  plots: ReadonlyArray<Pick<VillagePlotDefinition, "id" | "allowedBuildingIds">>,
+  buildingId: BuildingId,
+): string | null {
+  return plots.find((plot) => plotAllowsBuilding(plot, buildingId))?.id ?? null;
+}
