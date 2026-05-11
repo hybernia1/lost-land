@@ -130,10 +130,13 @@ export type PixiActionDetail = {
   continuousShifts?: boolean;
 };
 
-export type ConquestVictoryPreview = {
+export type ConquestResultPreview = {
+  outcome: "victory" | "failed" | "overrun";
   resourceId: "food" | "water" | "material" | "coal";
+  sentTroops: number;
   returnedTroops: number;
   deaths: number;
+  requiredTroops?: number;
   resolvedAt: number;
 };
 
@@ -469,7 +472,7 @@ export class PixiVillageRenderer {
     modalPlotId?: string | null,
     infoPanel?: VillageInfoPanel | null,
     resolvedDecisionPreview?: DecisionHistoryEntry | null,
-    conquestVictoryPreview?: ConquestVictoryPreview | null,
+    conquestResultPreview?: ConquestResultPreview | null,
   ): void {
     this.lastState = state;
     this.lastTranslations = translations;
@@ -479,7 +482,7 @@ export class PixiVillageRenderer {
       infoPanel ||
       state.quests.activeDecision ||
       resolvedDecisionPreview ||
-      conquestVictoryPreview,
+      conquestResultPreview,
     );
 
     if (!this.app) {
@@ -545,11 +548,11 @@ export class PixiVillageRenderer {
       hudHeight,
       resolvedDecisionPreview ?? null,
     );
-    this.drawConquestVictoryModal(
+    this.drawConquestResultModal(
       translations,
       hudWidth,
       hudHeight,
-      conquestVictoryPreview ?? null,
+      conquestResultPreview ?? null,
     );
     this.syncAmbientOverlayState(state);
     this.refreshAmbientOverlays(performance.now(), true);
@@ -3334,13 +3337,13 @@ export class PixiVillageRenderer {
     }
   }
 
-  private drawConquestVictoryModal(
+  private drawConquestResultModal(
     translations: TranslationPack | undefined,
     width: number,
     height: number,
-    conquestVictoryPreview: ConquestVictoryPreview | null,
+    conquestResultPreview: ConquestResultPreview | null,
   ): void {
-    if (!translations || !conquestVictoryPreview) {
+    if (!translations || !conquestResultPreview) {
       return;
     }
 
@@ -3361,28 +3364,38 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
 
-    const sentTroops = conquestVictoryPreview.returnedTroops + conquestVictoryPreview.deaths;
-    const resourceName = translations.resources[conquestVictoryPreview.resourceId];
-    const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(conquestVictoryPreview.resolvedAt)} ${formatGameClock(conquestVictoryPreview.resolvedAt)}`;
-    const summary = this.formatTemplate(
-      translations.ui.conquestVictorySummary ?? "{resource} oasis secured.",
-      { resource: resourceName },
-    );
+    const resourceName = translations.resources[conquestResultPreview.resourceId];
+    const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(conquestResultPreview.resolvedAt)} ${formatGameClock(conquestResultPreview.resolvedAt)}`;
+    const isVictory = conquestResultPreview.outcome === "victory";
+    const isOverrun = conquestResultPreview.outcome === "overrun";
+    const summary = isVictory
+      ? this.formatTemplate(
+          translations.ui.conquestVictorySummary ?? "{resource} oasis secured.",
+          { resource: resourceName },
+        )
+      : this.formatTemplate(
+          translations.ui.conquestDefeatSummary ?? "{resource} oasis assault failed.",
+          { resource: resourceName },
+        );
     const sentLine = this.formatTemplate(
       translations.ui.conquestVictorySent ?? "Assault force: {count}",
-      { count: sentTroops },
+      { count: conquestResultPreview.sentTroops },
     );
     const returnedLine = this.formatTemplate(
       translations.ui.conquestVictoryReturned ?? "Returned: {count}",
-      { count: conquestVictoryPreview.returnedTroops },
+      { count: conquestResultPreview.returnedTroops },
     );
     const fallenLine = this.formatTemplate(
       translations.ui.conquestVictoryFallen ?? "Fallen: {count}",
-      { count: conquestVictoryPreview.deaths },
+      { count: conquestResultPreview.deaths },
     );
-    const body = conquestVictoryPreview.deaths > 0
-      ? translations.ui.conquestVictoryBodyWithLosses ?? "The oasis is ours, but the fight cost lives."
-      : translations.ui.conquestVictoryBodyNoLosses ?? "The team secured the oasis without losses.";
+    const body = isVictory
+      ? (conquestResultPreview.deaths > 0
+          ? translations.ui.conquestVictoryBodyWithLosses ?? "The oasis is ours, but the fight cost lives."
+          : translations.ui.conquestVictoryBodyNoLosses ?? "The team secured the oasis without losses.")
+      : (isOverrun
+          ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis defenses."
+          : translations.ui.conquestDefeatBodyFailed ?? "No one returned from the assault.");
 
     this.createIconButton(
       panel,
@@ -3395,11 +3408,19 @@ export class PixiVillageRenderer {
       translations.ui.close,
     );
     this.drawIcon(panel, "shield", 30, 38, 24);
-    this.drawText(panel, translations.ui.conquestVictoryTitle ?? "Oasis Secured", 62, 18, {
+    this.drawText(
+      panel,
+      isVictory
+        ? translations.ui.conquestVictoryTitle ?? "Oasis secured"
+        : translations.ui.conquestDefeatTitle ?? "Oasis assault failed",
+      62,
+      18,
+      {
       fill: 0xd8c890,
       fontSize: 12,
       fontWeight: "900",
-    });
+      },
+    );
     this.drawText(panel, summary, 62, 38, {
       fill: 0xf5efdf,
       fontSize: 24,
@@ -3424,15 +3445,32 @@ export class PixiVillageRenderer {
       fontWeight: "900",
     });
     this.drawText(panel, returnedLine, 28, 188, {
-      fill: 0x9ed99b,
+      fill: conquestResultPreview.returnedTroops > 0 ? 0x9ed99b : 0xaeb4b8,
       fontSize: 15,
       fontWeight: "900",
     });
     this.drawText(panel, fallenLine, 28, 220, {
-      fill: conquestVictoryPreview.deaths > 0 ? 0xd38a8a : 0xaeb4b8,
+      fill: conquestResultPreview.deaths > 0 ? 0xd38a8a : 0xaeb4b8,
       fontSize: 15,
       fontWeight: "900",
     });
+
+    if (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0) {
+      this.drawText(
+        panel,
+        this.formatTemplate(
+          translations.ui.conquestDefeatRequirement ?? "Required minimum: {required}",
+          { required: conquestResultPreview.requiredTroops ?? 0 },
+        ),
+        28,
+        252,
+        {
+          fill: 0xf1c17f,
+          fontSize: 13,
+          fontWeight: "900",
+        },
+      );
+    }
   }
 
   private drawVillageModal(

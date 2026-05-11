@@ -4,7 +4,7 @@ import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import type { ConquestVictoryPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
+import type { ConquestResultPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
 import type { GodModeController } from "../dev/godMode";
 
@@ -19,7 +19,7 @@ export class App {
   private villageModalPlotId: string | null = null;
   private villageInfoPanel: VillageInfoPanel | null = null;
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
-  private conquestVictoryPreview: ConquestVictoryPreview | null = null;
+  private conquestResultPreview: ConquestResultPreview | null = null;
   private topLogSignature = "";
   private hasReceivedInitialState = false;
   private renderQueued = false;
@@ -57,7 +57,7 @@ export class App {
       if (state.quests.activeDecision) {
         this.resolvedDecisionPreview = null;
       }
-      this.maybeShowConquestVictoryModal(state, previousSignature, nextSignature);
+      this.maybeShowConquestResultModal(state, previousSignature, nextSignature);
       this.topLogSignature = nextSignature;
       this.requestRender();
     });
@@ -222,7 +222,7 @@ export class App {
       this.villageModalPlotId,
       this.villageInfoPanel,
       this.resolvedDecisionPreview,
-      this.conquestVictoryPreview,
+      this.conquestResultPreview,
     );
 
     this.updateShellMode();
@@ -396,7 +396,7 @@ export class App {
     }
 
     if (action === "close-conquest-result") {
-      this.conquestVictoryPreview = null;
+      this.conquestResultPreview = null;
       this.requestRender();
       return;
     }
@@ -636,7 +636,7 @@ export class App {
   private startGameSession(): void {
     this.mode = "game";
     this.resolvedDecisionPreview = null;
-    this.conquestVictoryPreview = null;
+    this.conquestResultPreview = null;
     this.game.start();
     this.requestRender();
   }
@@ -654,7 +654,7 @@ export class App {
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
-    this.conquestVictoryPreview = null;
+    this.conquestResultPreview = null;
     this.godMode?.destroy();
     this.godMode = null;
     this.game.stop();
@@ -752,7 +752,7 @@ export class App {
     return `${topEntry.key}:${JSON.stringify(topEntry.params ?? {})}`;
   }
 
-  private maybeShowConquestVictoryModal(
+  private maybeShowConquestResultModal(
     state: GameState,
     previousSignature: string,
     nextSignature: string,
@@ -762,7 +762,7 @@ export class App {
     }
 
     const topEntry = state.log[0];
-    if (!topEntry || topEntry.key !== "logResourceSiteCaptured") {
+    if (!topEntry) {
       return;
     }
 
@@ -771,12 +771,45 @@ export class App {
       return;
     }
 
-    this.conquestVictoryPreview = {
-      resourceId,
-      returnedTroops: this.toNonNegativeInt(topEntry.params?.count),
-      deaths: this.toNonNegativeInt(topEntry.params?.deaths),
-      resolvedAt: state.elapsedSeconds,
-    };
+    if (topEntry.key === "logResourceSiteCaptured") {
+      const returnedTroops = this.toNonNegativeInt(topEntry.params?.count);
+      const deaths = this.toNonNegativeInt(topEntry.params?.deaths);
+      this.conquestResultPreview = {
+        outcome: "victory",
+        resourceId,
+        returnedTroops,
+        deaths,
+        sentTroops: returnedTroops + deaths,
+        resolvedAt: state.elapsedSeconds,
+      };
+      return;
+    }
+
+    if (topEntry.key === "logResourceSiteAssaultFailed") {
+      const deaths = this.toNonNegativeInt(topEntry.params?.deaths);
+      this.conquestResultPreview = {
+        outcome: "failed",
+        resourceId,
+        returnedTroops: 0,
+        deaths,
+        sentTroops: deaths,
+        resolvedAt: state.elapsedSeconds,
+      };
+      return;
+    }
+
+    if (topEntry.key === "logResourceSiteAssaultOverrun") {
+      const sentTroops = this.toNonNegativeInt(topEntry.params?.sent);
+      this.conquestResultPreview = {
+        outcome: "overrun",
+        resourceId,
+        returnedTroops: 0,
+        deaths: sentTroops,
+        sentTroops,
+        requiredTroops: this.toNonNegativeInt(topEntry.params?.required),
+        resolvedAt: state.elapsedSeconds,
+      };
+    }
   }
 
   private toNonNegativeInt(value: unknown): number {
@@ -789,7 +822,7 @@ export class App {
 
   private toResourceSiteResourceId(
     value: unknown,
-  ): ConquestVictoryPreview["resourceId"] | null {
+  ): ConquestResultPreview["resourceId"] | null {
     if (value === "food" || value === "water" || value === "material" || value === "coal") {
       return value;
     }
