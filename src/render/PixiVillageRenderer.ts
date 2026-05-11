@@ -270,6 +270,9 @@ const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
 );
 const villagePlotDefinitions = defaultVillageLayout.plots;
 const nonPerimeterVillagePlots = villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter");
+const palisadePlotDefinition = villagePlotDefinitions.find((plot) =>
+  plot.allowedBuildingIds?.includes("palisade"),
+) ?? null;
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 const HUD_DESIGN_SCALE = 1.2;
 const HUD_TOP_STRIP_HEIGHT = 68;
@@ -905,20 +908,23 @@ export class PixiVillageRenderer {
     state: GameState,
     translations?: TranslationPack,
   ): void {
-    const plot = state.village.plots.find((candidate) => candidate.id === "plot-palisade");
-    const plotDefinition = villagePlotDefinitions.find((candidate) => candidate.id === "plot-palisade");
-    const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
-    const selected = state.village.selectedPlotId === "plot-palisade";
+    const plotDefinition = palisadePlotDefinition;
 
     if (!plotDefinition) {
       return;
     }
+
+    const plotId = plotDefinition.id;
+    const plot = state.village.plots.find((candidate) => candidate.id === plotId);
+    const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
+    const selected = state.village.selectedPlotId === plotId;
 
     const bounds = this.getPlotBounds(plotDefinition);
     const badgeX = bounds.x + bounds.width / 2;
     const badgeY = bounds.y - 18 * this.layout.scale;
 
     this.addPalisadeTooltip(
+      plotDefinition,
       selected,
       building?.level ?? 0,
       building?.upgradingRemaining ?? 0,
@@ -5388,17 +5394,12 @@ export class PixiVillageRenderer {
   }
 
   private addPalisadeTooltip(
+    plot: VillagePlotDefinition,
     selected: boolean,
     level: number,
     upgradingRemaining: number,
     name: string,
   ): void {
-    const plot = villagePlotDefinitions.find((candidate) => candidate.id === "plot-palisade");
-
-    if (!plot) {
-      return;
-    }
-
     const bounds = this.getPlotBounds(plot);
     const hitLayer = new Container();
     hitLayer.x = bounds.x;

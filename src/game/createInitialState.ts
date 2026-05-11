@@ -2,6 +2,7 @@ import { buildingDefinitions } from "../data/buildings";
 import { ENVIRONMENT_INITIAL_DELAY_SECONDS } from "../data/environment";
 import { emptyResourceRecord } from "../data/resources";
 import { defaultVillageLayout } from "../data/villageLayouts";
+import { findFirstPlotIdForBuilding } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialQuestState } from "../systems/quests";
@@ -15,6 +16,13 @@ export function createInitialState(
   communityName = "Lost Land",
   saveId = createSaveId(communityName),
 ): GameState {
+  const mainPlotId = findFirstPlotIdForBuilding(defaultVillageLayout.plots, "mainBuilding") ??
+    defaultVillageLayout.plots[0]?.id;
+
+  if (!mainPlotId) {
+    throw new Error("Village layout has no plots.");
+  }
+
   const buildings = Object.fromEntries(
     buildingDefinitions.map((definition) => [
       definition.id,
@@ -71,10 +79,10 @@ export function createInitialState(
     },
     buildings,
     village: {
-      selectedPlotId: "plot-main",
+      selectedPlotId: mainPlotId,
       plots: defaultVillageLayout.plots.map((plot) => ({
         id: plot.id,
-        buildingId: plot.id === "plot-main" ? "mainBuilding" : null,
+        buildingId: plot.id === mainPlotId ? "mainBuilding" : null,
       })),
     },
     log: getLocalizedInitialLogEntries(),

@@ -2,6 +2,7 @@ import { buildingById, buildingDefinitions } from "../data/buildings";
 import { getEnvironmentMoralePenaltyPerHour } from "../data/environment";
 import { resourceIds } from "../data/resources";
 import { defaultVillageLayout } from "../data/villageLayouts";
+import { plotAllowsBuilding } from "../data/villagePlots";
 import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "../game/time";
 import type {
   BuildingId,
@@ -34,6 +35,10 @@ const MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS = 0.07;
 const MAIN_BUILDING_MAX_PRODUCTION_BONUS = 0.5;
 const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
 const villagePlotDefinitions = defaultVillageLayout.plots;
+const villagePlotDefinitionById = new Map(villagePlotDefinitions.map((plot) => [plot.id, plot]));
+const reservedBuildingIds = new Set(
+  villagePlotDefinitions.flatMap((plot) => plot.allowedBuildingIds ?? []),
+);
 const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.45;
 const WORKSHOP_BASE_MATERIAL_RATE = 0.22;
 const WORKSHOP_BASE_COAL_RATE = 0.025;
@@ -550,7 +555,7 @@ export function getAvailableBuildingsForPlot(
   plotId: string,
 ): BuildingId[] {
   const placedBuildingIds = getPlacedBuildingIds(state);
-  const plotDefinition = villagePlotDefinitions.find((plot) => plot.id === plotId);
+  const plotDefinition = villagePlotDefinitionById.get(plotId);
   const allowedBuildingIds = plotDefinition?.allowedBuildingIds;
 
   if (!plotDefinition) {
@@ -563,9 +568,7 @@ export function getAvailableBuildingsForPlot(
         return allowedBuildingIds.includes(definition.id);
       }
 
-      return !villagePlotDefinitions.some((plot) =>
-        plot.allowedBuildingIds?.includes(definition.id),
-      );
+      return !reservedBuildingIds.has(definition.id);
     })
     .filter((definition) => !placedBuildingIds.has(definition.id))
     .map((definition) => definition.id);
@@ -577,7 +580,7 @@ export function startBuildingConstruction(
   buildingId: BuildingId,
 ): boolean {
   const plot = state.village.plots.find((candidate) => candidate.id === plotId);
-  const plotDefinition = villagePlotDefinitions.find((candidate) => candidate.id === plotId);
+  const plotDefinition = villagePlotDefinitionById.get(plotId);
   const building = state.buildings[buildingId];
   const definition = buildingById[buildingId];
 
@@ -594,18 +597,13 @@ export function startBuildingConstruction(
     return false;
   }
 
-  if (
-    plotDefinition?.allowedBuildingIds &&
-    !plotDefinition.allowedBuildingIds.includes(buildingId)
-  ) {
+  if (plotDefinition?.allowedBuildingIds && !plotAllowsBuilding(plotDefinition, buildingId)) {
     return false;
   }
 
   if (
     !plotDefinition?.allowedBuildingIds &&
-    villagePlotDefinitions.some((candidate) =>
-      candidate.allowedBuildingIds?.includes(buildingId),
-    )
+    reservedBuildingIds.has(buildingId)
   ) {
     return false;
   }
