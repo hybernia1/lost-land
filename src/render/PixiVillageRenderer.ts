@@ -472,6 +472,7 @@ export class PixiVillageRenderer {
   constructor(
     private readonly host: HTMLElement,
     private readonly requestRender: () => void = () => {},
+    private readonly playTabSwitchSound: () => void = () => {},
   ) {
     this.tooltipLayer.eventMode = "none";
     this.canvasTooltipLabel.x = 12;
@@ -4864,7 +4865,10 @@ export class PixiVillageRenderer {
         y: y - 8,
         width: 66,
         height: 30,
-        onTap: () => onSelect(resourceId),
+        onTap: () => {
+          this.playTabSwitchSound();
+          onSelect(resourceId);
+        },
         active: resourceId === activeResourceId,
         tone: "secondary",
         fontSize: 11,
@@ -5878,7 +5882,10 @@ export class PixiVillageRenderer {
       });
 
       if (!active) {
-        this.bindLocalAction(tabLayer, () => options.onSelect(tab.id));
+        this.bindLocalAction(tabLayer, () => {
+          this.playTabSwitchSound();
+          options.onSelect(tab.id);
+        });
       }
 
       offsetX += tabWidth + gap;
