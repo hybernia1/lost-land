@@ -692,6 +692,7 @@ export class PixiVillageRenderer {
         fillAlpha?: number,
         cornerRadius?: number,
       ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      bindAction: (target: Container, detail: PixiActionDetail) => this.bindAction(target, detail),
       registerHudInteractionArea: (x: number, y: number, width: number, height: number, padding = 0) =>
         this.registerHudInteractionArea(x, y, width, height, padding),
       createIconButton: (
@@ -724,7 +725,8 @@ export class PixiVillageRenderer {
         detail: PixiActionDetail,
         tooltip: string,
         active = false,
-      ) => this.createCircularActionButton(parent, iconId, x, y, radius, detail, tooltip, active),
+        disabled = false,
+      ) => this.createCircularActionButton(parent, iconId, x, y, radius, detail, tooltip, active, disabled),
       getFormattedLogEntries: (state: GameState, translations: TranslationPack | undefined) =>
         this.getFormattedLogEntries(state, translations),
       wrapLogText: (text: string, fontWeight: TextStyleFontWeight, maxWidth: number) =>
@@ -864,7 +866,19 @@ export class PixiVillageRenderer {
         tabs: Array<TabItem<T>>,
         options: TabOptions<T>,
       ) => this.drawTabs(parent, tabs, options),
+      createModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        disabled = false,
+        tooltip?: string,
+      ) => this.createModalButton(parent, label, x, y, width, height, detail, disabled, tooltip),
       bindLocalAction: (target: Container, onTap: () => void) => this.bindLocalAction(target, onTap),
+      bindAction: (target: Container, detail: PixiActionDetail) => this.bindAction(target, detail),
       bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
       measureWrappedTextHeight: (
         text: string,
@@ -878,6 +892,8 @@ export class PixiVillageRenderer {
         rightX: number,
         y: number,
       ) => this.drawDecisionImpactChips(parent, impacts, rightX, y),
+      drawRewardLine: (parent: Container, bag: ResourceBag, translations: TranslationPack, x: number, y: number) =>
+        this.drawRewardLine(parent, bag, translations, x, y),
       getTroopHousingCapacity: (state: GameState) => this.getTroopHousingCapacity(state),
       getDecisionHistoryScrollY: () => this.decisionHistoryScrollY,
       setDecisionHistoryScrollY: (value: number) => {
@@ -1838,6 +1854,7 @@ export class PixiVillageRenderer {
     detail: PixiActionDetail,
     tooltip: string,
     active = false,
+    disabled = false,
   ): Container {
     return this.createCircleButton(parent, {
       iconId,
@@ -1847,6 +1864,7 @@ export class PixiVillageRenderer {
       detail,
       tooltip,
       active,
+      disabled,
     });
   }
 
@@ -1972,6 +1990,7 @@ export class PixiVillageRenderer {
     target.cursor = "pointer";
     target.on("pointerdown", (event) => {
       event.stopPropagation();
+      this.consumeHostClick();
       this.host.dispatchEvent(new CustomEvent<PixiActionDetail>("pixi-action", { detail }));
     });
   }

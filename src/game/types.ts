@@ -176,6 +176,7 @@ export type DecisionOptionId = string;
 export type ObjectiveQuestState = {
   definitionId: ObjectiveQuestId;
   completedAt: number | null;
+  rewardClaimedAt: number | null;
 };
 
 export type ActiveDecisionQuestState = {

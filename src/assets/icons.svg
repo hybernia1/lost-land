@@ -119,6 +119,22 @@
     <path fill="#d9d2b7" d="M4 3h16v5H4V3Zm2 2v1h12V5H6Zm-1 5h14v10H5V10Zm2 2v6h10v-6H7Z"/>
     <path fill="#e0c46f" d="M9 13h6v2H9v-2Z"/>
   </symbol>
+  <symbol id="icon-market" viewBox="0 0 24 24">
+    <path fill="#d8b66a" d="M3 7.5 5 3h14l2 4.5v2.2c0 1.6-1.3 2.8-2.9 2.8-1 0-1.9-.5-2.4-1.2-.5.7-1.4 1.2-2.4 1.2s-1.9-.5-2.4-1.2c-.5.7-1.4 1.2-2.4 1.2S4 12 3.5 11.3c-.4.5-1 .9-1.7 1.1V7.5h1.2Z"/>
+    <path fill="#3b331d" d="M5 12.3h14V21H5v-8.7Zm2 1.7v5.3h3V14H7Zm5 0v2h5v-2h-5Z"/>
+    <path fill="#f1df9a" d="M6 5h12l1.1 2.5H4.9L6 5Z"/>
+  </symbol>
+  <symbol id="icon-oasis" viewBox="0 0 24 24">
+    <path fill="#66bde8" d="M3 16.5c2.1-1.4 5.4-2.3 9-2.3s6.9.9 9 2.3c-2.1 1.4-5.4 2.3-9 2.3s-6.9-.9-9-2.3Z"/>
+    <path fill="#9ed99b" d="M10.8 13.5c-2.9-3-.9-6.3.7-8.6 2.4 1.5 3.8 3.8 2.2 6.9 1.5-1.1 2.8-1.4 4.5-1.2-1.2 2.7-3.6 4.1-7.4 3.9Z"/>
+    <path fill="#d8b66a" d="M2 19.2h20V21H2v-1.8Z"/>
+    <path fill="#4a4d46" d="M11 2h2v8h-2V2Z"/>
+  </symbol>
+  <symbol id="icon-quest-log" viewBox="0 0 24 24">
+    <path fill="#d9d2b7" d="M6 3h11a2 2 0 0 1 2 2v15a1 1 0 0 1-1.5.9L14 19l-3.5 1.9A1 1 0 0 1 9 20V5a2 2 0 0 1 2-2Zm5 2h-1v13.3l2.5-1.3a1 1 0 0 1 1 0L17 18.3V5h-6Z"/>
+    <path fill="#e0c46f" d="M12 7h4v1.8h-4V7Zm0 3.6h4v1.8h-4v-1.8Zm0 3.6h4V16h-4v-1.8Z"/>
+    <path fill="#9ed99b" d="m6.5 9.3 1.4 1.4 2.6-2.6L12 9.5 7.9 13.6 5 10.7l1.5-1.4Zm0 5 1.4 1.4 2.6-2.6 1.5 1.4-4.1 4.1L5 15.7l1.5-1.4Z"/>
+  </symbol>
   <symbol id="icon-death" viewBox="0 0 24 24">
     <path fill="#d26858" d="M11 4h2v5.6h4v2h-4V20h-2v-8.4H7v-2h4V4Z"/>
   </symbol>

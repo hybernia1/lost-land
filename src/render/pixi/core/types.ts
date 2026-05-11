@@ -15,6 +15,7 @@ import type {
   GameSpeed,
   GameState,
   MarketResourceId,
+  ObjectiveQuestId,
   ResourceBag,
   ResourceId,
 } from "../../../game/types";
@@ -118,6 +119,7 @@ export type PixiActionDetail = {
   delta?: number;
   troopCount?: number;
   questOption?: DecisionOptionId;
+  objectiveQuestId?: ObjectiveQuestId;
   resourceId?: ResourceId;
   marketFromResource?: ResourceId;
   marketToResource?: ResourceId;
@@ -141,7 +143,14 @@ export type GameOverPreview = {
   endedAt: number;
 };
 
-export type VillageInfoPanel = ResourceId | "survivors" | "decisionArchive" | "weather";
+export type VillageInfoPanel =
+  | ResourceId
+  | "survivors"
+  | "decisionArchive"
+  | "weather"
+  | "oasisOverview"
+  | "questLog"
+  | `objective:${ObjectiveQuestId}`;
 
 export type EffectLine = {
   iconId: string;
@@ -216,6 +225,7 @@ export type CircleButtonOptions = {
   detail: PixiActionDetail;
   tooltip: string;
   active?: boolean;
+  disabled?: boolean;
 };
 
 export type TabItem<T extends string> = {

@@ -182,18 +182,43 @@ export function createCircleButtonPrimitive(
   parent: Container,
   options: CircleButtonOptions,
 ): Container {
+  const disabled = options.disabled ?? false;
   const button = new Container();
   button.x = options.x;
   button.y = options.y;
 
   const box = new Graphics();
-  box.rect(-options.radius, -options.radius, options.radius * 2, options.radius * 2)
-    .fill({ color: options.active ? 0xe0c46f : 0x2d2f23, alpha: options.active ? 1 : 0.9 });
+  const fillColor = disabled
+    ? 0x34362e
+    : options.active
+      ? 0xe0c46f
+      : 0x2d2f23;
+  const fillAlpha = disabled
+    ? 0.72
+    : options.active
+      ? 1
+      : 0.92;
+  box.circle(0, 0, options.radius)
+    .fill({ color: fillColor, alpha: fillAlpha });
   button.addChild(box);
 
+  const border = new Graphics();
+  border.circle(0, 0, options.radius)
+    .stroke({ color: disabled ? 0x595d52 : options.active ? 0xf3e0a2 : 0x45493a, width: 1.5, alpha: 0.9 });
+  button.addChild(border);
+
   const icon = host.drawIcon(button, options.iconId, 0, 0, options.radius * 1.08);
-  icon.alpha = options.active ? 0.92 : 1;
-  host.bindAction(button, options.detail);
+  icon.alpha = disabled ? 0.45 : options.active ? 0.92 : 1;
+  if (!disabled) {
+    host.bindAction(button, options.detail);
+  } else {
+    button.eventMode = "static";
+    button.cursor = "not-allowed";
+    button.on("pointerdown", (event) => {
+      event.stopPropagation();
+      host.consumeHostClick();
+    });
+  }
   host.bindTooltip(button, options.tooltip);
   parent.addChild(button);
   return button;

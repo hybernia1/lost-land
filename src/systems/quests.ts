@@ -18,6 +18,7 @@ import type {
   DecisionQuestId,
   DecisionHistoryEntry,
   GameState,
+  ObjectiveQuestId,
   ResourceBag,
   ResourceId,
   QuestState,
@@ -84,6 +85,7 @@ export function createInitialQuestState(): QuestState {
     objectives: objectiveQuestDefinitions.map((definition) => ({
       definitionId: definition.id,
       completedAt: null,
+      rewardClaimedAt: null,
     })),
     activeDecision: null,
     resolvedDecisionCount: 0,
@@ -98,13 +100,20 @@ export function createInitialQuestState(): QuestState {
 
 export function normalizeQuestState(state: GameState): void {
   const existingObjectives = new Map(
-    state.quests?.objectives?.map((quest) => [quest.definitionId, quest.completedAt]) ?? [],
+    state.quests?.objectives?.map((quest) => [
+      quest.definitionId,
+      {
+        completedAt: quest.completedAt ?? null,
+        rewardClaimedAt: quest.rewardClaimedAt ?? null,
+      },
+    ]) ?? [],
   );
 
   state.quests = {
     objectives: objectiveQuestDefinitions.map((definition) => ({
       definitionId: definition.id,
-      completedAt: existingObjectives.get(definition.id) ?? null,
+      completedAt: existingObjectives.get(definition.id)?.completedAt ?? null,
+      rewardClaimedAt: existingObjectives.get(definition.id)?.rewardClaimedAt ?? null,
     })),
     activeDecision: normalizeActiveDecision(state.quests?.activeDecision ?? null),
     resolvedDecisionCount: Math.max(0, Math.floor(state.quests?.resolvedDecisionCount ?? 0)),
@@ -123,6 +132,20 @@ export function normalizeQuestState(state: GameState): void {
       .filter((id): id is SuddenQuestId => id in suddenQuestById)
       .slice(0, RECENT_SUDDEN_MEMORY),
   };
+
+  for (const objective of state.quests.objectives) {
+    if (objective.completedAt === null) {
+      objective.rewardClaimedAt = null;
+    }
+
+    if (
+      objective.completedAt !== null &&
+      objective.rewardClaimedAt !== null &&
+      objective.rewardClaimedAt < objective.completedAt
+    ) {
+      objective.rewardClaimedAt = objective.completedAt;
+    }
+  }
 }
 
 export function tickQuests(state: GameState): void {
@@ -211,7 +234,7 @@ export function getObjectiveQuestProgress(
 
 export function getActiveObjectiveQuests(state: GameState) {
   return state.quests.objectives.filter((quest) => {
-    if (quest.completedAt !== null) {
+    if (quest.completedAt !== null && quest.rewardClaimedAt !== null) {
       return false;
     }
 
@@ -343,13 +366,72 @@ function completeObjectiveQuests(state: GameState): void {
     }
 
     quest.completedAt = state.elapsedSeconds;
-    addResources(state.resources, definition.reward, state.capacities);
+    quest.rewardClaimedAt = null;
     pushLogEntry(state, {
       source: "questUi",
       key: "logObjectiveCompleted",
       params: { questId: definition.id },
     });
   }
+}
+
+export function canClaimObjectiveReward(
+  state: GameState,
+  objectiveQuestId: ObjectiveQuestId,
+): boolean {
+  const objectiveState = state.quests.objectives.find(
+    (objective) => objective.definitionId === objectiveQuestId,
+  );
+  const definition = objectiveQuestById[objectiveQuestId];
+  if (!objectiveState || !definition) {
+    return false;
+  }
+
+  if (objectiveState.completedAt === null || objectiveState.rewardClaimedAt !== null) {
+    return false;
+  }
+
+  return Object.entries(definition.reward).some(([resourceId, amount]) => {
+    if ((amount ?? 0) <= 0) {
+      return false;
+    }
+
+    const typedResourceId = resourceId as ResourceId;
+    const current = state.resources[typedResourceId];
+    const capacity = typedResourceId === "morale" ? 100 : state.capacities[typedResourceId];
+    return current < capacity;
+  });
+}
+
+export function claimObjectiveQuestReward(
+  state: GameState,
+  objectiveQuestId: ObjectiveQuestId,
+): boolean {
+  const objectiveState = state.quests.objectives.find(
+    (objective) => objective.definitionId === objectiveQuestId,
+  );
+  const definition = objectiveQuestById[objectiveQuestId];
+  if (!objectiveState || !definition) {
+    return false;
+  }
+
+  if (
+    objectiveState.completedAt === null ||
+    objectiveState.rewardClaimedAt !== null ||
+    !canClaimObjectiveReward(state, objectiveQuestId)
+  ) {
+    return false;
+  }
+
+  addResources(state.resources, definition.reward, state.capacities);
+  objectiveState.rewardClaimedAt = state.elapsedSeconds;
+  pushLogEntry(state, {
+    source: "questUi",
+    key: "logObjectiveRewardClaimed",
+    params: { questId: objectiveQuestId },
+    severity: "positive",
+  });
+  return true;
 }
 
 function areObjectivePrerequisitesComplete(

@@ -1,4 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
+import { objectiveQuestById } from "../../../data/quests";
 import {
   ENVIRONMENT_MAX_INTENSITY,
   getEnvironmentDefinition,
@@ -8,6 +9,8 @@ import { formatGameClock, GAME_HOUR_REAL_SECONDS, getGameDay } from "../../../ga
 import type {
   EnvironmentConditionId,
   GameState,
+  ObjectiveQuestId,
+  ResourceBag,
   ResourceId,
 } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
@@ -25,9 +28,13 @@ import {
 import {
   getAssignedResourceSiteWorkerCount,
   getResourceSiteAssaultTroopCount,
+  getTravelTilesToSite,
 } from "../../../systems/resourceSites";
 import {
+  canClaimObjectiveReward,
   decisionProfileAxes,
+  getActiveObjectiveQuests,
+  getObjectiveQuestProgress,
   getDecisionProfileAxisValue,
   getDecisionProfileKind,
 } from "../../../systems/quests";
@@ -74,10 +81,29 @@ type InfoPanelsHost = {
   drawText: DrawTextFn;
   drawIcon: DrawIconFn;
   drawTabs: <T extends string>(parent: Container, tabs: Array<TabItem<T>>, options: TabOptions<T>) => void;
+  createModalButton: (
+    parent: Container,
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    detail: PixiActionDetail,
+    disabled?: boolean,
+    tooltip?: string,
+  ) => Container;
   bindLocalAction: (target: Container, onTap: () => void) => void;
+  bindAction: (target: Container, detail: PixiActionDetail) => void;
   bindTooltip: (target: Container, text: string) => void;
   measureWrappedTextHeight: MeasureWrappedTextHeightFn;
   drawDecisionImpactChips: (parent: Container, impacts: EffectLine[], rightX: number, y: number) => void;
+  drawRewardLine: (
+    parent: Container,
+    bag: ResourceBag,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+  ) => number;
   getTroopHousingCapacity: (state: GameState) => number;
   getDecisionHistoryScrollY: () => number;
   setDecisionHistoryScrollY: (value: number) => void;
@@ -124,7 +150,299 @@ export function drawInfoPanel(
     return;
   }
 
-  drawResourceBreakdownPanel(host, state, translations, width, height, infoPanel);
+  if (infoPanel === "oasisOverview") {
+    drawOasisOverviewPanel(host, state, translations, width, height);
+    return;
+  }
+
+  if (infoPanel === "questLog") {
+    drawQuestLogPanel(host, state, translations, width, height);
+    return;
+  }
+
+  if (infoPanel.startsWith("objective:")) {
+    const objectiveQuestId = infoPanel.slice("objective:".length) as ObjectiveQuestId;
+    drawObjectiveQuestPanel(host, state, translations, width, height, objectiveQuestId);
+    return;
+  }
+
+  drawResourceBreakdownPanel(host, state, translations, width, height, infoPanel as ResourceId);
+}
+
+function drawObjectiveQuestPanel(
+  host: InfoPanelsHost,
+  state: GameState,
+  translations: TranslationPack,
+  width: number,
+  height: number,
+  objectiveQuestId: ObjectiveQuestId,
+): void {
+  const objectiveDefinition = objectiveQuestById[objectiveQuestId];
+  const objectiveCopy = translations.quests.objectives[objectiveQuestId];
+  if (!objectiveDefinition || !objectiveCopy) {
+    return;
+  }
+
+  const overlay = new Container();
+  host.hudLayer.addChild(overlay);
+  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
+
+  const panelWidth = Math.min(620, width - 48);
+  const panelHeight = Math.max(300, Math.min(520, height - 72));
+  const panel = new Container();
+  panel.x = (width - panelWidth) / 2;
+  panel.y = Math.max(36, (height - panelHeight) / 2);
+  panel.eventMode = "static";
+  overlay.addChild(panel);
+  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+
+  const progress = getObjectiveQuestProgress(state, objectiveDefinition);
+  const objectiveState = state.quests.objectives.find((quest) => quest.definitionId === objectiveQuestId) ?? null;
+  const completedAt = objectiveState?.completedAt ?? null;
+  const rewardClaimedAt = objectiveState?.rewardClaimedAt ?? null;
+  const canClaimReward = canClaimObjectiveReward(state, objectiveQuestId);
+  const progressLabel = `${progress.current}/${progress.required}`;
+
+  const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
+    iconId: "build",
+    title: objectiveCopy.title,
+    rightText: progressLabel,
+    closeAction: { action: "close-village-modal" },
+  });
+
+  let cursorY = headerBottom + 8;
+  if (completedAt !== null) {
+    const completedLabel = `${translations.ui.day ?? "Day"} ${getGameDay(completedAt)} / ${formatGameClock(completedAt)}`;
+    host.drawText(panel, completedLabel, 24, cursorY, {
+      fill: 0x9ed99b,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    cursorY += 22;
+  }
+
+  host.drawText(panel, objectiveCopy.description, 24, cursorY, {
+    fill: 0xd7ddd8,
+    fontSize: 13,
+    fontWeight: "700",
+    wordWrap: true,
+    wordWrapWidth: panelWidth - 48,
+  });
+
+  const descriptionHeight = host.measureWrappedTextHeight(
+    objectiveCopy.description,
+    13,
+    "700",
+    panelWidth - 48,
+  );
+  cursorY += descriptionHeight + 18;
+
+  const progressToken = new Container();
+  progressToken.x = 24;
+  progressToken.y = cursorY + 2;
+  panel.addChild(progressToken);
+  host.drawIcon(progressToken, "build", 8, 8, 14);
+  const progressText = host.drawText(progressToken, `${progress.current}/${progress.required}`, 20, 0, {
+    fill: 0xf1df9a,
+    fontSize: 12,
+    fontWeight: "900",
+  });
+  progressToken.hitArea = new Rectangle(0, -2, progressText.width + 26, 20);
+  host.bindTooltip(progressToken, `${translations.quests.ui.activeObjectives}: ${progress.current}/${progress.required}`);
+
+  host.drawRewardLine(panel, objectiveDefinition.reward, translations, 24, cursorY + 28);
+
+  if (completedAt === null) {
+    return;
+  }
+
+  const actionY = cursorY + 58;
+  if (rewardClaimedAt !== null) {
+    const claimedAtLabel = `${translations.ui.day ?? "Day"} ${getGameDay(rewardClaimedAt)} / ${formatGameClock(rewardClaimedAt)}`;
+    host.drawIcon(panel, "archive", 32, actionY + 9, 14);
+    host.drawText(panel, translations.ui.questRewardClaimed ?? "Reward claimed", 46, actionY + 2, {
+      fill: 0x9ed99b,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    const right = host.drawText(panel, claimedAtLabel, panelWidth - 28, actionY + 2, {
+      fill: 0xaeb4b8,
+      fontSize: 11,
+      fontWeight: "800",
+    });
+    right.anchor.set(1, 0);
+    return;
+  }
+
+  host.createModalButton(
+    panel,
+    translations.ui.questRewardClaim ?? "Claim reward",
+    24,
+    actionY,
+    220,
+    34,
+    {
+      action: "claim-objective-reward",
+      objectiveQuestId,
+    },
+    !canClaimReward,
+    canClaimReward ? undefined : (translations.ui.questRewardClaimBlocked ?? "No free capacity for reward resources."),
+  );
+}
+
+function drawQuestLogPanel(
+  host: InfoPanelsHost,
+  state: GameState,
+  translations: TranslationPack,
+  width: number,
+  height: number,
+): void {
+  const overlay = new Container();
+  host.hudLayer.addChild(overlay);
+  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
+
+  const panelWidth = Math.min(720, width - 48);
+  const panelHeight = Math.max(360, Math.min(620, height - 72));
+  const panel = new Container();
+  panel.x = (width - panelWidth) / 2;
+  panel.y = Math.max(36, (height - panelHeight) / 2);
+  panel.eventMode = "static";
+  overlay.addChild(panel);
+  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+
+  const activeObjectives = getActiveObjectiveQuests(state);
+  const completedObjectives = state.quests.objectives
+    .filter((quest) => quest.completedAt !== null)
+    .sort((left, right) => (right.completedAt ?? 0) - (left.completedAt ?? 0));
+  const pendingRewardObjectives = completedObjectives.filter((quest) => quest.rewardClaimedAt === null);
+  const claimedObjectives = completedObjectives.filter((quest) => quest.rewardClaimedAt !== null);
+  const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
+    iconId: "quest-log",
+    title: translations.ui.questLog ?? "Quest log",
+    rightText: `${activeObjectives.length}/${completedObjectives.length}`,
+    closeAction: { action: "close-village-modal" },
+  });
+
+  let cursorY = headerBottom + 8;
+  host.drawText(panel, translations.ui.questLogActive ?? translations.quests.ui.activeObjectives, 24, cursorY, {
+    fill: 0xd8c890,
+    fontSize: 12,
+    fontWeight: "900",
+  });
+  cursorY += 24;
+
+  if (activeObjectives.length === 0) {
+    host.drawText(panel, translations.ui.questLogNoActive ?? translations.quests.ui.objectivesEmpty, 24, cursorY, {
+      fill: 0xbfc7be,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    cursorY += 24;
+  } else {
+    activeObjectives.forEach((quest) => {
+      const objectiveDefinition = objectiveQuestById[quest.definitionId];
+      const objectiveCopy = translations.quests.objectives[quest.definitionId];
+      const progress = getObjectiveQuestProgress(state, objectiveDefinition);
+      const row = new Graphics();
+      row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x171b16, alpha: 0.78 });
+      panel.addChild(row);
+      host.drawIcon(panel, "build", 32, cursorY + 9, 14);
+      host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
+        fill: 0xf4eedf,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      const progressLabel = host.drawText(panel, `${progress.current}/${progress.required}`, panelWidth - 28, cursorY + 2, {
+        fill: 0xf1df9a,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      progressLabel.anchor.set(1, 0);
+      host.bindAction(row, {
+        action: "open-objective-quest",
+        objectiveQuestId: quest.definitionId,
+      });
+      cursorY += 34;
+    });
+  }
+
+  cursorY += 8;
+  host.drawText(panel, translations.ui.questLogCompleted ?? "Completed tasks", 24, cursorY, {
+    fill: 0xd8c890,
+    fontSize: 12,
+    fontWeight: "900",
+  });
+  cursorY += 24;
+
+  if (completedObjectives.length === 0) {
+    host.drawText(panel, translations.ui.questLogNoCompleted ?? "No completed tasks yet.", 24, cursorY, {
+      fill: 0xbfc7be,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    return;
+  }
+
+  if (pendingRewardObjectives.length > 0) {
+    host.drawText(panel, translations.ui.questRewardClaim ?? "Claim reward", 24, cursorY, {
+      fill: 0xf1df9a,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+    cursorY += 20;
+  }
+
+  pendingRewardObjectives.forEach((quest) => {
+    const objectiveCopy = translations.quests.objectives[quest.definitionId];
+    const row = new Graphics();
+    row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x202316, alpha: 0.9 });
+    panel.addChild(row);
+    host.drawIcon(panel, "quest-log", 32, cursorY + 9, 14);
+    host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
+      fill: 0xf4eedf,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+    const right = host.drawText(panel, translations.ui.questRewardClaim ?? "Claim reward", panelWidth - 28, cursorY + 2, {
+      fill: 0xf1df9a,
+      fontSize: 11,
+      fontWeight: "900",
+    });
+    right.anchor.set(1, 0);
+    host.bindAction(row, {
+      action: "open-objective-quest",
+      objectiveQuestId: quest.definitionId,
+    });
+    cursorY += 34;
+  });
+
+  const claimedRows = Math.max(0, 8 - pendingRewardObjectives.length);
+  claimedObjectives.slice(0, claimedRows).forEach((quest) => {
+    const objectiveCopy = translations.quests.objectives[quest.definitionId];
+    const row = new Graphics();
+    row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x171b16, alpha: 0.66 });
+    panel.addChild(row);
+    host.drawIcon(panel, "archive", 32, cursorY + 9, 14);
+    host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
+      fill: 0xc8ceca,
+      fontSize: 12,
+      fontWeight: "800",
+    });
+    const completedAtLabel = quest.completedAt === null
+      ? ""
+      : `${translations.ui.day ?? "Day"} ${getGameDay(quest.completedAt)} / ${formatGameClock(quest.completedAt)}`;
+    const right = host.drawText(panel, completedAtLabel, panelWidth - 28, cursorY + 2, {
+      fill: 0x9ed99b,
+      fontSize: 11,
+      fontWeight: "800",
+    });
+    right.anchor.set(1, 0);
+    host.bindAction(row, {
+      action: "open-objective-quest",
+      objectiveQuestId: quest.definitionId,
+    });
+    cursorY += 34;
+  });
 }
 
 function drawSurvivorOverviewPanel(
@@ -632,6 +950,103 @@ function getEnvironmentDescription(state: GameState, translations: TranslationPa
 
   return translations.ui.weatherStableDescription ??
     "No active weather front is present. The camp is in a relatively stable state.";
+}
+
+function drawOasisOverviewPanel(
+  host: InfoPanelsHost,
+  state: GameState,
+  translations: TranslationPack,
+  width: number,
+  height: number,
+): void {
+  const overlay = new Container();
+  host.hudLayer.addChild(overlay);
+  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
+
+  const panelWidth = Math.min(700, width - 48);
+  const panelHeight = Math.max(300, Math.min(560, height - 72));
+  const panel = new Container();
+  panel.x = (width - panelWidth) / 2;
+  panel.y = Math.max(36, (height - panelHeight) / 2);
+  panel.eventMode = "static";
+  overlay.addChild(panel);
+  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+
+  const capturedSites = state.resourceSites.filter((site) => site.captured);
+  const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
+    iconId: "oasis",
+    title: translations.ui.oasisOverview ?? "Captured oases",
+    rightText: `${capturedSites.length}`,
+    closeAction: { action: "close-village-modal" },
+  });
+  const bodyY = headerBottom + 8;
+
+  if (capturedSites.length === 0) {
+    host.drawText(panel, translations.ui.quickNoCapturedOases ?? "No captured oasis yet.", 24, bodyY + 8, {
+      fill: 0xbfc7be,
+      fontSize: 13,
+      fontWeight: "800",
+    });
+    return;
+  }
+
+  const rowHeight = 70;
+  capturedSites.forEach((site, index) => {
+    const rowY = bodyY + index * rowHeight;
+    const row = new Graphics();
+    row.rect(18, rowY, panelWidth - 36, rowHeight - 8)
+      .fill({ color: 0x161a15, alpha: 0.78 });
+    panel.addChild(row);
+
+    const resourceName = translations.resources[site.resourceId] ?? site.resourceId;
+    const travelHours = getTravelTilesToSite(site.id);
+    const yieldPerHour = site.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
+    host.drawIcon(panel, site.resourceId, 34, rowY + 31, 18);
+    host.drawText(panel, `${resourceName} ${translations.ui.resourceSiteTitle ?? "Oasis"}`, 52, rowY + 10, {
+      fill: 0xf4eedf,
+      fontSize: 14,
+      fontWeight: "900",
+    });
+    host.drawText(
+      panel,
+      `${translations.ui.resourceSiteSettlement ?? "Oasis settlement crew"}: ${site.assignedWorkers}/${site.maxWorkers} · +${formatRate(yieldPerHour)}/h · ${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h`,
+      52,
+      rowY + 30,
+      {
+        fill: 0xaeb4b8,
+        fontSize: 11,
+        fontWeight: "800",
+      },
+    );
+
+    const buttonX = panelWidth - 156;
+    const buttonY = rowY + 16;
+    const openButton = new Graphics();
+    openButton.rect(buttonX, buttonY, 122, 34)
+      .fill({ color: 0xe0c46f, alpha: 1 });
+    panel.addChild(openButton);
+    const openLabel = host.drawText(
+      panel,
+      translations.ui.openOasis ?? "Open oasis",
+      buttonX + 61,
+      buttonY + 9,
+      {
+        fill: 0x15180f,
+        fontSize: 12,
+        fontWeight: "900",
+      },
+    );
+    openLabel.anchor.set(0.5, 0);
+
+    host.bindAction(openButton, {
+      action: "open-resource-site-modal",
+      resourceSiteId: site.id,
+    });
+    host.bindTooltip(
+      openButton,
+      `${translations.ui.openOasis ?? "Open oasis"}\n${resourceName}`,
+    );
+  });
 }
 
 function drawResourceBreakdownPanel(

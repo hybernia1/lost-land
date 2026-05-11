@@ -10,6 +10,7 @@ export const quests: QuestTranslationPack = {
       hiddenConsequences: "Následky možností nejsou předem známé.",
       notEnoughSupplies: "Nedostatek zásob",
       logObjectiveCompleted: "Úkol splněn: {quest}.",
+      logObjectiveRewardClaimed: "Odměna vyzvednuta: {quest}.",
       logDecisionAppeared: "Nastala situace, která vyžaduje rozhodnutí.",
     },
     objectives: {

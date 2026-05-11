@@ -10,6 +10,7 @@ export const quests: QuestTranslationPack = {
       hiddenConsequences: "The consequences are not shown in advance.",
       notEnoughSupplies: "Not enough supplies",
       logObjectiveCompleted: "Task completed: {quest}.",
+      logObjectiveRewardClaimed: "Reward claimed: {quest}.",
       logDecisionAppeared: "A situation requires a decision.",
     },
     objectives: {

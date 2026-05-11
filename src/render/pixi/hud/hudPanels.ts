@@ -26,6 +26,7 @@ type HudPanelsHost = {
   drawIcon: DrawIconFn;
   drawText: DrawTextFn;
   drawPanel: DrawPanelFn;
+  bindAction: (target: Container, detail: PixiActionDetail) => void;
   registerHudInteractionArea: (x: number, y: number, width: number, height: number, padding?: number) => void;
   createIconButton: (
     parent: Container,
@@ -58,6 +59,7 @@ type HudPanelsHost = {
     detail: PixiActionDetail,
     tooltip: string,
     active?: boolean,
+    disabled?: boolean,
   ) => Container;
   getFormattedLogEntries: (state: GameState, translations: TranslationPack | undefined) => FormattedLogEntry[];
   wrapLogText: (text: string, fontWeight: TextStyleFontWeight, maxWidth: number) => string[];
@@ -157,9 +159,9 @@ function drawQuestPanel(
 
   const panelWidth = HUD_LEFT_PANEL_WIDTH;
   const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
-  const rowHeight = 70;
+  const rowHeight = 34;
   const panelHeight = activeObjectives.length > 0
-    ? 48 + activeObjectives.length * rowHeight
+    ? 52 + activeObjectives.length * rowHeight
     : 82;
   const layer = new Container();
   layer.x = HUD_SIDE_PANEL_MARGIN;
@@ -192,26 +194,31 @@ function drawQuestPanel(
     const definition = objectiveQuestById[quest.definitionId];
     const copy = translations.quests.objectives[quest.definitionId];
     const progress = getObjectiveQuestProgress(state, definition);
-    const rowY = 42 + index * rowHeight;
-    host.drawText(layer, copy?.title ?? quest.definitionId, 14, rowY, {
+    const isCompletedPendingClaim = quest.completedAt !== null && quest.rewardClaimedAt === null;
+    const rowY = 44 + index * rowHeight;
+    const row = new Graphics();
+    row.rect(10, rowY - 3, panelWidth - 20, rowHeight - 4)
+      .fill({ color: isCompletedPendingClaim ? 0x202316 : 0x1a1d17, alpha: isCompletedPendingClaim ? 0.9 : 0.78 });
+    layer.addChild(row);
+    host.bindAction(row, {
+      action: "open-objective-quest",
+      objectiveQuestId: quest.definitionId,
+    } satisfies PixiActionDetail);
+
+    host.drawText(layer, copy?.title ?? quest.definitionId, 18, rowY + 5, {
       fill: 0xf5efdf,
       fontSize: 12,
       fontWeight: "900",
     });
-    const progressLabel = host.drawText(layer, `${progress.current}/${progress.required}`, panelWidth - 14, rowY, {
-      fill: 0xf1df9a,
+    const progressLabelText = isCompletedPendingClaim
+      ? (translations.ui.questRewardClaim ?? "Claim reward")
+      : `${progress.current}/${progress.required}`;
+    const progressLabel = host.drawText(layer, progressLabelText, panelWidth - 18, rowY + 5, {
+      fill: isCompletedPendingClaim ? 0x9ed99b : 0xf1df9a,
       fontSize: 12,
       fontWeight: "900",
     });
     progressLabel.anchor.set(1, 0);
-    host.drawText(layer, copy?.description ?? "", 14, rowY + 18, {
-      fill: 0xaeb4b8,
-      fontSize: 10,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 42,
-    });
-    host.drawRewardLine(layer, definition.reward, translations, 14, rowY + 48);
   });
 
   host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
@@ -242,7 +249,7 @@ function drawEventLog(
 ): void {
   const layer = new Container();
   layer.x = HUD_SIDE_PANEL_MARGIN;
-  layer.y = Math.max(258, height - 374);
+  layer.y = Math.max(242, height - 390);
   host.hudLayer.addChild(layer);
 
   const width = HUD_LEFT_PANEL_WIDTH;
@@ -343,33 +350,55 @@ function drawToolbar(
   height: number,
 ): void {
   const group = new Container();
-  group.x = width - 244;
-  group.y = height - 72;
+  group.x = width - 214;
+  group.y = height - 40;
   host.hudLayer.addChild(group);
-  host.drawPanel(group, 0, 0, 216, 48);
 
-  host.createIconButton(group, state.paused ? "play" : "pause", 8, 8, 40, 32, { action: "pause" }, state.paused ? translations?.ui.resume : translations?.ui.pause);
-  host.createHudButton(group, translations?.ui.speedNormal ?? "1x", 56, 8, 44, 32, { speed: 1 }, state.speed === 1);
-  host.createHudButton(group, translations?.ui.speedFast ?? "24x", 108, 8, 52, 32, { speed: 24 }, state.speed === 24);
-  host.createIconButton(group, "home", 168, 8, 40, 32, { action: "home" }, translations?.ui.home);
-  host.registerHudInteractionArea(group.x, group.y, 216, 48, 6);
+  host.createIconButton(
+    group,
+    state.paused ? "play" : "pause",
+    0,
+    0,
+    40,
+    32,
+    { action: "pause" },
+    state.paused ? translations?.ui.resume : translations?.ui.pause,
+  );
+  host.createHudButton(
+    group,
+    translations?.ui.speedNormal ?? "1x",
+    48,
+    0,
+    44,
+    32,
+    { speed: 1 },
+    state.speed === 1,
+  );
+  host.createHudButton(
+    group,
+    translations?.ui.speedFast ?? "24x",
+    98,
+    0,
+    52,
+    32,
+    { speed: 24 },
+    state.speed === 24,
+  );
+  host.createIconButton(group, "home", 158, 0, 40, 32, { action: "home" }, translations?.ui.home);
+  host.registerHudInteractionArea(group.x, group.y, 200, 32, 6);
 }
 
 function drawActionPanel(
   host: HudPanelsHost,
   state: GameState,
   translations: TranslationPack | undefined,
-  width: number,
+  _width: number,
   height: number,
 ): void {
-  const panelWidth = 158;
-  const panelHeight = 82;
   const group = new Container();
-  group.x = (width - panelWidth) / 2;
-  group.y = height - 116;
+  group.x = HUD_SIDE_PANEL_MARGIN + HUD_LEFT_PANEL_WIDTH / 2;
+  group.y = height - 40;
   host.hudLayer.addChild(group);
-
-  host.drawPanel(group, 0, 0, panelWidth, panelHeight);
 
   const continuousShifts = state.workMode === "continuous";
   const currentMode = continuousShifts
@@ -382,13 +411,25 @@ function drawActionPanel(
     ? translations?.ui.continuousShiftsMorale ?? "Night work lowers morale."
     : translations?.ui.dayShiftActive ?? "Production active.";
   const tooltip = `${translations?.ui.workSchedule ?? "Schedule"}: ${currentMode}\n${detail}\n${nextMode}`;
+  const marketBuilt = state.buildings.market.level > 0;
+  const marketTooltip = marketBuilt
+    ? `${translations?.buildings.market.name ?? "Market"}\n${translations?.ui.quickOpenMarket ?? "Open market exchange."}`
+    : `${translations?.buildings.market.name ?? "Market"}\n${translations?.ui.quickMarketUnavailable ?? "Build the market first."}`;
+  const capturedOases = state.resourceSites.filter((site) => site.captured).length;
+  const oasisTooltip = capturedOases > 0
+    ? `${translations?.ui.oasisOverview ?? "Captured oases"}\n${translations?.ui.quickOpenOasisOverview ?? "Open captured oasis overview."}`
+    : `${translations?.ui.oasisOverview ?? "Captured oases"}\n${translations?.ui.quickNoCapturedOases ?? "No captured oasis yet."}`;
+  const questLogTooltip = `${translations?.ui.questLog ?? "Quest log"}\n${translations?.ui.questLogTooltip ?? "Review active and completed tasks."}`;
+  const radius = 20;
+  const spacing = 52;
+  const startX = -(spacing * 2);
 
   host.createCircularActionButton(
     group,
-    "continuous-shifts",
-    panelWidth / 2 - 36,
-    40,
-    27,
+    "fist",
+    startX,
+    0,
+    radius,
     { action: "set-continuous-shifts", continuousShifts: !continuousShifts } satisfies PixiActionDetail,
     tooltip,
     continuousShifts,
@@ -398,12 +439,47 @@ function drawActionPanel(
   host.createCircularActionButton(
     group,
     "archive",
-    panelWidth / 2 + 36,
-    40,
-    27,
+    startX + spacing,
+    0,
+    radius,
     { action: "open-decision-archive" } satisfies PixiActionDetail,
     archiveTooltip,
     false,
   );
-  host.registerHudInteractionArea(group.x, group.y, panelWidth, panelHeight, 6);
+
+  host.createCircularActionButton(
+    group,
+    "market",
+    startX + spacing * 2,
+    0,
+    radius,
+    { action: "open-market" } satisfies PixiActionDetail,
+    marketTooltip,
+    false,
+    !marketBuilt,
+  );
+
+  host.createCircularActionButton(
+    group,
+    "oasis",
+    startX + spacing * 4,
+    0,
+    radius,
+    { action: "open-oasis-overview" } satisfies PixiActionDetail,
+    oasisTooltip,
+    false,
+    capturedOases <= 0,
+  );
+
+  host.createCircularActionButton(
+    group,
+    "quest-log",
+    startX + spacing * 3,
+    0,
+    radius,
+    { action: "open-quest-log" } satisfies PixiActionDetail,
+    questLogTooltip,
+    false,
+  );
+  host.registerHudInteractionArea(group.x - 134, group.y - 26, 268, 52, 6);
 }

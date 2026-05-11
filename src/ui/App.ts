@@ -311,6 +311,10 @@ export class App {
       return;
     }
 
+    if (this.isAnyModalOpen()) {
+      return;
+    }
+
     if (Date.now() < this.suppressVillageClickUntil) {
       return;
     }
@@ -349,6 +353,7 @@ export class App {
       marketAmount,
       marketFromResource,
       marketToResource,
+      objectiveQuestId,
       plot,
       questOption,
       resourceId,
@@ -404,6 +409,61 @@ export class App {
     if (action === "open-decision-archive") {
       this.villageModalPlotId = null;
       this.villageInfoPanel = "decisionArchive";
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return;
+    }
+
+    if (action === "open-objective-quest" && objectiveQuestId) {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = `objective:${objectiveQuestId}`;
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return;
+    }
+
+    if (action === "claim-objective-reward" && objectiveQuestId) {
+      this.game.claimObjectiveReward(objectiveQuestId);
+      return;
+    }
+
+    if (action === "open-market" && this.state) {
+      const marketPlotId = this.getMarketPlotId(this.state);
+      if (!marketPlotId) {
+        return;
+      }
+
+      this.villageModalPlotId = marketPlotId;
+      this.villageInfoPanel = null;
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return;
+    }
+
+    if (action === "open-oasis-overview") {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = "oasisOverview";
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return;
+    }
+
+    if (action === "open-quest-log") {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = "questLog";
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return;
+    }
+
+    if (action === "open-resource-site-modal" && resourceSiteId && this.state) {
+      const site = this.state.resourceSites.find((candidate) => candidate.id === resourceSiteId);
+      if (!site) {
+        return;
+      }
+
+      this.villageModalPlotId = site.id;
+      this.villageInfoPanel = null;
       this.requestRender();
       this.playModalTransitionSound(wasModalOpen);
       return;
@@ -763,8 +823,16 @@ export class App {
       action === "open-resource-breakdown" ||
       action === "open-survivor-overview" ||
       action === "open-decision-archive" ||
-      action === "open-weather-overview"
+      action === "open-weather-overview" ||
+      action === "open-objective-quest" ||
+      action === "open-market" ||
+      action === "open-oasis-overview" ||
+      action === "open-quest-log"
     );
+  }
+
+  private getMarketPlotId(state: GameState): string | null {
+    return state.village.plots.find((plot) => plot.buildingId === "market")?.id ?? null;
   }
 
   private updateAmbientLoop(): void {

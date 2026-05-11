@@ -10,7 +10,12 @@ import { normalizeEnvironmentState, tickEnvironment } from "../systems/environme
 import { tickHealth } from "../systems/health";
 import { normalizeLogEntries } from "../systems/log";
 import { normalizeMarketState, tickMarket, tradeAtMarket as executeMarketTrade } from "../systems/market";
-import { normalizeQuestState, resolveDecisionQuest, tickQuests } from "../systems/quests";
+import {
+  claimObjectiveQuestReward,
+  normalizeQuestState,
+  resolveDecisionQuest,
+  tickQuests,
+} from "../systems/quests";
 import {
   getResourceSiteProductionDelta,
   normalizeResourceSites,
@@ -24,7 +29,16 @@ import { convertTroopToWorker, convertWorkerToTroop, tickBarracksTraining } from
 import { gameConfig } from "./config";
 import { createInitialState } from "./createInitialState";
 import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "./time";
-import type { BuildingId, DecisionOptionId, EnvironmentConditionId, GameListener, GameSpeed, GameState, ResourceId } from "./types";
+import type {
+  BuildingId,
+  DecisionOptionId,
+  EnvironmentConditionId,
+  GameListener,
+  GameSpeed,
+  GameState,
+  ObjectiveQuestId,
+  ResourceId,
+} from "./types";
 
 export class Game {
   private state: GameState;
@@ -137,6 +151,15 @@ export class Game {
     if (resolveDecisionQuest(this.state, optionId)) {
       this.commit();
     }
+  }
+
+  claimObjectiveReward(objectiveQuestId: ObjectiveQuestId): void {
+    if (claimObjectiveQuestReward(this.state, objectiveQuestId)) {
+      this.commit();
+      return;
+    }
+
+    this.emit();
   }
 
   setPaused(paused: boolean): void {
