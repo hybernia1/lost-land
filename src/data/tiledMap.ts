@@ -181,7 +181,6 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tilesetId: tileset.name,
         atlasUrl,
         frame,
-        tintByEnvironment: getEnvironmentTint(tileId),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
       textureKeyByTileIndex.set(tileIndex, textureKey);
@@ -491,12 +490,6 @@ function getTileTransform(rawGid: number): TiledTileTransform {
   }
 
   return { rotation: 90, flipX: true };
-}
-
-function getEnvironmentTint(tileId: string): TerrainTextureDefinition["tintByEnvironment"] {
-  return tileId === "radiationSoil"
-    ? { radiation: 0xb8d96b }
-    : undefined;
 }
 
 function getStringProperty(properties: TiledProperty[] | undefined, name: string): string | null {

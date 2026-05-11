@@ -9,12 +9,6 @@
   "tilecount": 16,
   "tiledversion": "1.11.2",
   "tileheight": 128,
-  "tiles": [
-    {
-      "id": 0,
-      "properties": [{ "name": "tileId", "type": "string", "value": "tree" }]
-    }
-  ],
   "tilewidth": 128,
   "type": "tileset",
   "version": "1.10"
