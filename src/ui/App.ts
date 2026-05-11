@@ -1,5 +1,5 @@
 import type { Game } from "../game/Game";
-import { formatGameClock, getGameDay } from "../game/time";
+import { formatGameClock, getDaylightState, getGameDay } from "../game/time";
 import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
@@ -7,6 +7,12 @@ import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
 import type { ConquestResultPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
 import type { GodModeController } from "../dev/godMode";
+import modalOpenSoundUrl from "../assets/audio/modal-open.wav";
+import modalCloseSoundUrl from "../assets/audio/modal-close.wav";
+import tabSwitchSoundUrl from "../assets/audio/ui-tab-rustle.wav";
+import decisionQuestAlertSoundUrl from "../assets/audio/quest-decision-alert.wav";
+import dayAmbientLoopSoundUrl from "../assets/audio/ambient-day-birds.ogg";
+import nightAmbientLoopSoundUrl from "../assets/audio/ambient-night-crickets.mp3";
 
 type AppMode = "menu" | "new-game" | "load-game" | "settings" | "game";
 
@@ -21,11 +27,19 @@ export class App {
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
   private conquestResultPreview: ConquestResultPreview | null = null;
   private topLogSignature = "";
+  private lastActiveDecisionId: string | null = null;
   private hasReceivedInitialState = false;
   private renderQueued = false;
   private tooltipTarget: HTMLElement | null = null;
   private suppressVillageClickUntil = 0;
   private readonly handleWindowKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
+  private readonly modalOpenAudio = this.createUiAudio(modalOpenSoundUrl);
+  private readonly modalCloseAudio = this.createUiAudio(modalCloseSoundUrl);
+  private readonly tabSwitchAudio = this.createUiAudio(tabSwitchSoundUrl);
+  private readonly decisionQuestAlertAudio = this.createUiAudio(decisionQuestAlertSoundUrl);
+  private readonly dayAmbientLoopAudio = this.createLoopingAudio(dayAmbientLoopSoundUrl, 0.24);
+  private readonly nightAmbientLoopAudio = this.createLoopingAudio(nightAmbientLoopSoundUrl, 0.28);
+  private activeAmbientLoop: "day" | "night" | null = null;
   private godMode: GodModeController | null = null;
 
   constructor(
@@ -43,22 +57,37 @@ export class App {
     window.addEventListener("keydown", this.handleWindowKeyDown);
     window.addEventListener("resize", () => this.requestRender());
     this.game.subscribe((state) => {
+      const wasModalOpen = this.isAnyModalOpen();
+      const previousActiveDecisionId = this.lastActiveDecisionId;
       const previousSignature = this.topLogSignature;
       const nextSignature = this.getTopLogSignature(state);
+      const nextActiveDecisionId = state.quests.activeDecision?.id ?? null;
       this.state = state;
 
       if (!this.hasReceivedInitialState) {
         this.hasReceivedInitialState = true;
         this.topLogSignature = nextSignature;
+        this.lastActiveDecisionId = nextActiveDecisionId;
+        this.updateAmbientLoop();
         this.requestRender();
         return;
       }
+
+      const hasNewDecisionQuest =
+        previousActiveDecisionId !== nextActiveDecisionId &&
+        Boolean(nextActiveDecisionId);
 
       if (state.quests.activeDecision) {
         this.resolvedDecisionPreview = null;
       }
       this.maybeShowConquestResultModal(state, previousSignature, nextSignature);
+      this.updateAmbientLoop();
+      if (hasNewDecisionQuest) {
+        this.playUiSound(this.decisionQuestAlertAudio);
+      }
+      this.playModalTransitionSound(wasModalOpen);
       this.topLogSignature = nextSignature;
+      this.lastActiveDecisionId = nextActiveDecisionId;
       this.requestRender();
     });
   }
@@ -249,7 +278,11 @@ export class App {
       throw new Error("Missing scene hosts.");
     }
 
-    this.villageRenderer = new PixiVillageRenderer(villageScene, () => this.requestRender());
+    this.villageRenderer = new PixiVillageRenderer(
+      villageScene,
+      () => this.requestRender(),
+      () => this.playUiSound(this.tabSwitchAudio),
+    );
     villageScene.addEventListener("click", (event) => this.handleCanvasClick(event));
     const handlePixiAction = (event: Event) => {
       this.handlePixiAction(event as CustomEvent<PixiActionDetail>);
@@ -279,6 +312,7 @@ export class App {
     }
 
     if (this.villageRenderer) {
+      const wasModalOpen = this.isAnyModalOpen();
       const plotId = this.villageRenderer.hitTest(event.clientX, event.clientY);
 
       if (plotId) {
@@ -289,6 +323,7 @@ export class App {
         this.villageModalPlotId = plotId;
         this.villageInfoPanel = null;
         this.requestRender();
+        this.playModalTransitionSound(wasModalOpen);
       }
 
       return;
@@ -301,6 +336,7 @@ export class App {
   }
 
   private handleGameAction(detail: PixiActionDetail): void {
+    const wasModalOpen = this.isAnyModalOpen();
     const {
       action,
       building,
@@ -317,6 +353,10 @@ export class App {
       speed,
       troopCount,
     } = detail;
+
+    if (this.isTabSwitchAction(action)) {
+      this.playUiSound(this.tabSwitchAudio);
+    }
 
     if (action === "consume-pointer") {
       return;
@@ -341,6 +381,7 @@ export class App {
       this.villageModalPlotId = null;
       this.villageInfoPanel = resourceId;
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -348,6 +389,7 @@ export class App {
       this.villageModalPlotId = null;
       this.villageInfoPanel = "survivors";
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -355,6 +397,7 @@ export class App {
       this.villageModalPlotId = null;
       this.villageInfoPanel = "decisionArchive";
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -362,6 +405,7 @@ export class App {
       this.villageModalPlotId = null;
       this.villageInfoPanel = "weather";
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -386,18 +430,21 @@ export class App {
       }
 
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
     if (action === "close-decision-result") {
       this.resolvedDecisionPreview = null;
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
     if (action === "close-conquest-result") {
       this.conquestResultPreview = null;
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -405,6 +452,7 @@ export class App {
       this.villageModalPlotId = null;
       this.villageInfoPanel = null;
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -412,6 +460,7 @@ export class App {
       this.villageModalPlotId = this.state.village.selectedPlotId;
       this.villageInfoPanel = null;
       this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
       return;
     }
 
@@ -420,6 +469,7 @@ export class App {
         this.villageModalPlotId = null;
         this.villageInfoPanel = null;
         this.requestRender();
+        this.playModalTransitionSound(wasModalOpen);
       }
       return;
     }
@@ -638,7 +688,9 @@ export class App {
     this.mode = "game";
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
+    this.lastActiveDecisionId = this.state?.quests.activeDecision?.id ?? null;
     this.game.start();
+    this.updateAmbientLoop();
     this.requestRender();
   }
 
@@ -651,22 +703,136 @@ export class App {
   }
 
   private returnHome(): void {
+    const wasModalOpen = this.isAnyModalOpen();
     this.mode = "menu";
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
+    this.lastActiveDecisionId = null;
     this.godMode?.destroy();
     this.godMode = null;
     this.game.stop();
     this.destroyVillageRenderer();
     this.shellReady = false;
+    this.stopAmbientLoops();
     this.requestRender();
+    this.playModalTransitionSound(wasModalOpen);
   }
 
   private destroyVillageRenderer(): void {
     this.villageRenderer?.destroy();
     this.villageRenderer = null;
+  }
+
+  private isAnyModalOpen(): boolean {
+    return Boolean(
+      this.villageModalPlotId ||
+      this.villageInfoPanel ||
+      this.resolvedDecisionPreview ||
+      this.conquestResultPreview,
+    );
+  }
+
+  private playModalTransitionSound(previousOpen: boolean): void {
+    const nextOpen = this.isAnyModalOpen();
+
+    if (!previousOpen && nextOpen) {
+      this.playUiSound(this.modalOpenAudio);
+      return;
+    }
+
+    if (previousOpen && !nextOpen) {
+      this.playUiSound(this.modalCloseAudio);
+    }
+  }
+
+  private isTabSwitchAction(action: string | undefined): boolean {
+    return (
+      action === "open-resource-breakdown" ||
+      action === "open-survivor-overview" ||
+      action === "open-decision-archive" ||
+      action === "open-weather-overview"
+    );
+  }
+
+  private updateAmbientLoop(): void {
+    if (this.mode !== "game" || !this.state) {
+      this.stopAmbientLoops();
+      return;
+    }
+
+    const phase = getDaylightState(this.state.elapsedSeconds).phase;
+    const targetLoop = phase === "night" || phase === "dawn" ? "night" : "day";
+
+    if (this.activeAmbientLoop === targetLoop) {
+      return;
+    }
+
+    const nextAudio =
+      targetLoop === "day" ? this.dayAmbientLoopAudio : this.nightAmbientLoopAudio;
+    const previousAudio =
+      targetLoop === "day" ? this.nightAmbientLoopAudio : this.dayAmbientLoopAudio;
+
+    if (previousAudio) {
+      previousAudio.pause();
+      previousAudio.currentTime = 0;
+    }
+
+    this.activeAmbientLoop = targetLoop;
+    if (nextAudio) {
+      nextAudio.currentTime = 0;
+      void nextAudio.play().catch(() => undefined);
+    }
+  }
+
+  private stopAmbientLoops(): void {
+    if (this.dayAmbientLoopAudio) {
+      this.dayAmbientLoopAudio.pause();
+      this.dayAmbientLoopAudio.currentTime = 0;
+    }
+
+    if (this.nightAmbientLoopAudio) {
+      this.nightAmbientLoopAudio.pause();
+      this.nightAmbientLoopAudio.currentTime = 0;
+    }
+
+    this.activeAmbientLoop = null;
+  }
+
+  private playUiSound(audio: HTMLAudioElement | null): void {
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = 0;
+    void audio.play().catch(() => undefined);
+  }
+
+  private createUiAudio(source: string): HTMLAudioElement | null {
+    if (typeof Audio === "undefined") {
+      return null;
+    }
+
+    const audio = new Audio(source);
+    audio.preload = "auto";
+    audio.volume = 0.45;
+    return audio;
+  }
+
+  private createLoopingAudio(
+    source: string,
+    volume: number,
+  ): HTMLAudioElement | null {
+    const audio = this.createUiAudio(source);
+
+    if (!audio) {
+      return null;
+    }
+
+    audio.loop = true;
+    audio.volume = volume;
+    return audio;
   }
 
   private escapeHtml(value: string): string {
