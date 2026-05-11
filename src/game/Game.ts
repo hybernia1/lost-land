@@ -20,10 +20,10 @@ import {
 } from "../systems/resourceSites";
 import { addResources } from "../systems/resources";
 import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
-import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
+import { convertTroopToWorker, convertWorkerToTroop, tickBarracksTraining } from "../systems/survivors";
 import { gameConfig } from "./config";
 import { createInitialState } from "./createInitialState";
-import { GAME_HOUR_REAL_SECONDS } from "./time";
+import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "./time";
 import type { BuildingId, DecisionOptionId, EnvironmentConditionId, GameListener, GameSpeed, GameState, ResourceId } from "./types";
 
 export class Game {
@@ -245,12 +245,15 @@ export class Game {
       return;
     }
 
+    const previousElapsedSeconds = this.state.elapsedSeconds;
     const scaledDelta = deltaSeconds * this.state.speed;
     this.state.elapsedSeconds += scaledDelta;
+    this.autoDisableContinuousShiftsAtDayStart(previousElapsedSeconds, this.state.elapsedSeconds);
     tickBuildings(this.state, scaledDelta);
     tickMarket(this.state, scaledDelta);
     tickQuests(this.state);
     tickResourceSites(this.state, scaledDelta);
+    tickBarracksTraining(this.state, scaledDelta);
     tickEnvironment(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
     addResources(
@@ -261,6 +264,22 @@ export class Game {
     tickHealth(this.state, scaledDelta);
     this.autosaveIfDue();
     this.emit();
+  }
+
+  private autoDisableContinuousShiftsAtDayStart(
+    previousElapsedSeconds: number,
+    nextElapsedSeconds: number,
+  ): void {
+    if (this.state.workMode !== "continuous") {
+      return;
+    }
+
+    const wasDaytime = isDaylightHour(previousElapsedSeconds);
+    const isDaytime = isDaylightHour(nextElapsedSeconds);
+
+    if (!wasDaytime && isDaytime) {
+      this.state.workMode = "day";
+    }
   }
 
   private commit(): void {
@@ -309,4 +328,9 @@ function normalizeGameState(state: GameState): void {
     building.workers = Math.max(0, building.workers);
     building.constructionWorkers = Math.max(0, building.constructionWorkers);
   }
+
+  state.survivors.barracksTrainingProgress = Math.max(
+    0,
+    state.survivors.barracksTrainingProgress ?? 0,
+  );
 }

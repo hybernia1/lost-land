@@ -1,4 +1,5 @@
 import type { GameState } from "../game/types";
+import { getAcademyProductionBonus } from "./academy";
 
 const MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS = 0.05;
 const MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS = 0.07;
@@ -35,6 +36,8 @@ export function getMoraleProductionMultiplier(morale: number): number {
 }
 
 export function getGlobalProductionMultiplier(state: GameState): number {
-  return (1 + getMainBuildingProductionBonus(state.buildings.mainBuilding.level)) *
+  return (1 +
+    getMainBuildingProductionBonus(state.buildings.mainBuilding.level) +
+    getAcademyProductionBonus(state.buildings.academy.level)) *
     getMoraleProductionMultiplier(state.resources.morale);
 }

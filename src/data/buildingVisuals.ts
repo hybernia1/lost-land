@@ -168,6 +168,7 @@ export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisua
   market: singleFrameAtlas("market-atlas", marketAtlasUrl, "market"),
   watchtower: singleFrameAtlas("watchtower-atlas", watchtowerAtlasUrl, "watchtower"),
   barracks: singleFrameAtlas("barracks-atlas", barracksAtlasUrl, "barracks"),
+  academy: singleFrameAtlas("storage-atlas", storageAtlasUrl, "storage"),
   clinic: singleFrameAtlas("clinic-atlas", clinicAtlasUrl, "clinic"),
 };
 

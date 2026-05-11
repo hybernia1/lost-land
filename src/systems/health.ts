@@ -5,7 +5,10 @@ import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
 import { removeOneResourceSiteWorker } from "./resourceSites";
 
-const CLINIC_FOOD_PER_TREATMENT = 2;
+const CLINIC_BASE_FOOD_PER_TREATMENT = 2;
+const CLINIC_BASE_WATER_PER_TREATMENT = 1;
+const CLINIC_FOOD_PER_LEVEL_STEP = 0.2;
+const CLINIC_WATER_PER_LEVEL_STEP = 0.15;
 const INCIDENT_BASE_DELAY_SECONDS = 600;
 const INCIDENT_DELAY_RANGE_SECONDS = 420;
 const STARVATION_DEATH_SECONDS = 360;
@@ -68,12 +71,29 @@ export function getClinicTreatmentRatePerGameHour(level: number): number {
   return Math.max(0, level);
 }
 
-export function getClinicFoodPerTreatment(): number {
-  return CLINIC_FOOD_PER_TREATMENT;
+export function getClinicFoodPerTreatment(level: number): number {
+  if (level <= 0) {
+    return 0;
+  }
+
+  return CLINIC_BASE_FOOD_PER_TREATMENT +
+    (Math.floor(level) - 1) * CLINIC_FOOD_PER_LEVEL_STEP;
+}
+
+export function getClinicWaterPerTreatment(level: number): number {
+  if (level <= 0) {
+    return 0;
+  }
+
+  return CLINIC_BASE_WATER_PER_TREATMENT +
+    (Math.floor(level) - 1) * CLINIC_WATER_PER_LEVEL_STEP;
 }
 
 function tickClinicTreatment(state: GameState, deltaSeconds: number): void {
   const treatmentRate = getClinicTreatmentRate(state);
+  const clinicLevel = state.buildings.clinic.level;
+  const foodPerTreatment = getClinicFoodPerTreatment(clinicLevel);
+  const waterPerTreatment = getClinicWaterPerTreatment(clinicLevel);
 
   if (treatmentRate <= 0 || state.health.injured <= 0) {
     state.health.treatmentProgress = 0;
@@ -86,16 +106,21 @@ function tickClinicTreatment(state: GameState, deltaSeconds: number): void {
   while (
     state.health.treatmentProgress >= 1 &&
     state.health.injured > 0 &&
-    state.resources.food >= CLINIC_FOOD_PER_TREATMENT
+    state.resources.food >= foodPerTreatment &&
+    state.resources.water >= waterPerTreatment
   ) {
-    state.resources.food -= CLINIC_FOOD_PER_TREATMENT;
+    state.resources.food -= foodPerTreatment;
+    state.resources.water -= waterPerTreatment;
     state.health.injured -= 1;
     state.survivors.workers += 1;
     state.health.treatmentProgress -= 1;
     pushLocalizedLog(state, "logClinicTreated");
   }
 
-  if (state.resources.food < CLINIC_FOOD_PER_TREATMENT) {
+  if (
+    state.resources.food < foodPerTreatment ||
+    state.resources.water < waterPerTreatment
+  ) {
     state.health.treatmentProgress = Math.min(state.health.treatmentProgress, 1);
   }
 }

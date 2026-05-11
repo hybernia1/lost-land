@@ -16,6 +16,7 @@ export type BuildingId =
   | "market"
   | "watchtower"
   | "barracks"
+  | "academy"
   | "clinic"
   | "palisade";
 
@@ -51,6 +52,7 @@ export type BuildingDefinition = {
   housing?: number;
   defense?: number;
   requiredMainBuildingLevel?: number;
+  requiredMainBuildingLevelByUpgradeLevel?: number[];
 };
 
 export type BuildingState = {
@@ -75,6 +77,7 @@ export type ResourceDefinition = {
 export type SurvivorRoles = {
   workers: number;
   troops: number;
+  barracksTrainingProgress: number;
 };
 
 export type MarketResourceId = Exclude<ResourceId, "morale">;

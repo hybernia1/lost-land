@@ -3,6 +3,7 @@ import { buildingById } from "../../../data/buildings";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
+import { getAcademyProductionBonus } from "../../../systems/academy";
 import {
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
@@ -27,6 +28,7 @@ import {
   marketResourceIds,
 } from "../../../systems/market";
 import { canAfford } from "../../../systems/resources";
+import { getBarracksTrainingRatePerGameHour } from "../../../systems/survivors";
 import { buildCategoryOrder, BUILDING_PREVIEW_RENDER_SCALE } from "../core/constants";
 import type {
   Bounds,
@@ -524,7 +526,7 @@ export function drawBuildingDetail(
       : undefined,
   );
   host.drawIcon(content, "clock", modalWidth - 172, footerY + 88, 14);
-  host.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 154, footerY + 80, {
+  host.drawText(content, `${Math.ceil(getBuildingBuildSeconds(state, buildingId, level))}s`, modalWidth - 154, footerY + 80, {
     fill: 0xaeb4b8,
     fontSize: 11,
     fontWeight: "700",
@@ -610,6 +612,26 @@ function getBuildingProductionMetric(
       value: `${tradeLimit}`,
       fill: tradeLimit > 0 ? 0xf1df9a : 0xd7ddd8,
       tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"}: ${tradeLimit}`,
+    };
+  }
+  if (buildingId === "barracks") {
+    const trainingRate = getBarracksTrainingRatePerGameHour(level);
+    return {
+      iconId: "scout",
+      label: translations.ui.troopTraining ?? translations.roles.troops,
+      value: `+${formatRate(trainingRate)}/h`,
+      fill: getRateColor(trainingRate / GAME_HOUR_REAL_SECONDS),
+      tooltip: `${translations.ui.troopTraining ?? "Troop training"}: +${formatRate(trainingRate)}/h`,
+    };
+  }
+  if (buildingId === "academy") {
+    const productionBonus = getAcademyProductionBonus(level);
+    return {
+      iconId: "build",
+      label: translations.ui.production,
+      value: formatPercentBonus(productionBonus),
+      fill: productionBonus > 0 ? 0xf1df9a : 0xd7ddd8,
+      tooltip: `${translations.ui.production}: ${formatPercentBonus(productionBonus)}`,
     };
   }
 

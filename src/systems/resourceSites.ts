@@ -8,6 +8,7 @@ import type {
 } from "../game/types";
 import { pushLocalizedLog } from "./log";
 import { getGlobalProductionMultiplier } from "./production";
+import { getAcademyExpeditionDeathRiskMultiplier } from "./academy";
 
 const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
 const resourceSiteById = new Map(resourceSiteDefinitions.map((site) => [site.id, site]));
@@ -270,7 +271,15 @@ function resolveResourceSiteAssault(
     return;
   }
 
-  const deaths = rollDeaths(assault.troops, site.captureBaseDeathRisk, site.captureMinTroops);
+  const academyRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(
+    state.buildings.academy.level,
+  );
+  const deaths = rollDeaths(
+    assault.troops,
+    site.captureBaseDeathRisk,
+    site.captureMinTroops,
+    academyRiskMultiplier,
+  );
   const returningTroops = assault.troops - deaths;
 
   if (returningTroops <= 0) {
@@ -295,11 +304,12 @@ function rollDeaths(
   troops: number,
   baseDeathRisk: number,
   captureMinTroops: number,
+  riskMultiplier: number,
 ): number {
   const riskScale = captureMinTroops / Math.max(captureMinTroops, troops);
   const perTroopRisk = Math.max(
     0.08,
-    Math.min(0.92, baseDeathRisk * riskScale * randomBetween(0.85, 1.25)),
+    Math.min(0.92, baseDeathRisk * riskScale * riskMultiplier * randomBetween(0.85, 1.25)),
   );
   let deaths = 0;
 
