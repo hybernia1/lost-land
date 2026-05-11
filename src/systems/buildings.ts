@@ -13,7 +13,18 @@ import type {
 import { maybeInjureFromConstruction } from "./health";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
+import {
+  getGlobalProductionMultiplier,
+  getMainBuildingProductionBonus,
+  getMoraleProductionMultiplier,
+} from "./production";
 import { addResources, canAfford, spendResources } from "./resources";
+
+export {
+  getGlobalProductionMultiplier,
+  getMainBuildingProductionBonus,
+  getMoraleProductionMultiplier,
+} from "./production";
 
 const BASE_CAPACITY: Record<ResourceId, number> = {
   food: 180,
@@ -30,9 +41,6 @@ const COAL_MINE_BASE_COAL_RATE = 0.28;
 const HOMELESS_MORALE_PENALTY_PER_HOUR = 1;
 const CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR = 1.25;
 const CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR = 6;
-const MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS = 0.05;
-const MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS = 0.07;
-const MAIN_BUILDING_MAX_PRODUCTION_BONUS = 0.5;
 const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
 const villagePlotDefinitions = defaultVillageLayout.plots;
 const villagePlotDefinitionById = new Map(villagePlotDefinitions.map((plot) => [plot.id, plot]));
@@ -56,7 +64,8 @@ export type ResourceBreakdownLine = {
     | "continuousShifts"
     | "environment"
     | "mainBuildingBonus"
-    | "moraleProductionPenalty";
+    | "moraleProductionPenalty"
+    | "resourceSite";
   resourceId: ResourceId;
   ratePerSecond: number;
   buildingId?: BuildingId;
@@ -221,24 +230,6 @@ function getStaffedBuildingWorkerRatio(level: number, workers: number): number {
   return Math.min(workers, workerLimit) / workerLimit;
 }
 
-export function getMainBuildingProductionBonus(level: number): number {
-  if (level <= 1) {
-    return 0;
-  }
-
-  if (level === 2) {
-    return MAIN_BUILDING_LEVEL_2_PRODUCTION_BONUS;
-  }
-
-  if (level >= 20) {
-    return MAIN_BUILDING_MAX_PRODUCTION_BONUS;
-  }
-
-  return MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS +
-    (level - 3) *
-      ((MAIN_BUILDING_MAX_PRODUCTION_BONUS - MAIN_BUILDING_LEVEL_3_PRODUCTION_BONUS) / 17);
-}
-
 export function getMainBuildingMoraleRate(level: number): number {
   if (level <= 0) {
     return 0;
@@ -250,23 +241,6 @@ export function getMainBuildingMoraleRate(level: number): number {
       ((MAIN_BUILDING_MAX_MORALE_PER_HOUR - MAIN_BUILDING_BASE_MORALE_PER_HOUR) / 19);
 
   return moralePerHour / GAME_HOUR_REAL_SECONDS;
-}
-
-export function getGlobalProductionMultiplier(state: GameState): number {
-  return (1 + getMainBuildingProductionBonus(state.buildings.mainBuilding.level)) *
-    getMoraleProductionMultiplier(state.resources.morale);
-}
-
-export function getMoraleProductionMultiplier(morale: number): number {
-  if (morale >= 75) {
-    return 1;
-  }
-
-  if (morale >= 50) {
-    return 0.8;
-  }
-
-  return 0.6;
 }
 
 export function isBuildingInactiveDueToCoal(

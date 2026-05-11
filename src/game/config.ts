@@ -21,10 +21,6 @@ export const gameConfig = {
     shelterRepeatDeadlineHours: 4,
     devConditionDurationHours: 8,
   },
-  scouting: {
-    durationHours: 12,
-    carryPerTroop: 25,
-  },
   market: {
     tradeCooldownHours: 4,
   },
