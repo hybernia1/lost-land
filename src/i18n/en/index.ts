@@ -124,10 +124,12 @@ export const en: EnTranslationPack = {
     nextLevel: "Next level",
     maxLevelReached: "Maximum level reached.",
     treatment: "Treatment",
+    buildTime: "Build time",
     workers: "Workers",
     sleeping: "Idle",
     operations: "Operations",
     training: "Training",
+    troopTraining: "Troop training",
     squadSize: "Squad size",
     sendScouting: "Send",
     unlocksTroopTraining: "Unlocks troop training",
@@ -216,7 +218,7 @@ export const en: EnTranslationPack = {
     continuousShifts: "24h shifts",
     dayShiftActive: "Production runs until 22:00.",
     nightProductionPaused: "Production is paused until 08:00.",
-    continuousShiftsMorale: "Production runs all day, but fatigue drains morale and hits hard at night.",
+    continuousShiftsMorale: "Night work drains morale, and this mode turns off automatically at 08:00.",
     decisionArchive: "Decision archive",
     decisionArchiveTooltip: "Review past decisions and leadership profile.",
     leadershipProfile: "Leadership profile",
@@ -306,6 +308,10 @@ export const en: EnTranslationPack = {
     barracks: {
       name: "Barracks",
       description: "Trains workers into troops for future outside missions and camp defense.",
+    },
+    academy: {
+      name: "Academy",
+      description: "Unlocks strategic research: +5% production, safer expeditions, and faster construction.",
     },
     palisade: {
       name: "Palisade",

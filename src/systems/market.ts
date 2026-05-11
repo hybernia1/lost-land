@@ -9,6 +9,7 @@ export const marketResourceIds: MarketResourceId[] = ["food", "water", "material
 
 const MARKET_TRADE_LIMIT_BY_LEVEL = [0, 100, 120, 150, 180, 200];
 const MARKET_EXTRA_TRADE_LEVEL = 5;
+const MARKET_MIN_COOLDOWN_HOURS = 0.5;
 
 export function normalizeMarketState(state: GameState): void {
   state.market = {
@@ -41,6 +42,19 @@ export function getMarketTradeLimit(level: number): number {
 
 export function getMarketTradeSlots(level: number): number {
   return level >= MARKET_EXTRA_TRADE_LEVEL ? 2 : 1;
+}
+
+export function getMarketTradeCooldownSeconds(level: number): number {
+  if (level <= 0) {
+    return MARKET_TRADE_COOLDOWN_SECONDS;
+  }
+
+  const clampedLevel = Math.max(1, Math.min(5, Math.floor(level)));
+  const reductionProgress = (clampedLevel - 1) / 4;
+  const cooldownHours = gameConfig.market.tradeCooldownHours -
+    (gameConfig.market.tradeCooldownHours - MARKET_MIN_COOLDOWN_HOURS) * reductionProgress;
+
+  return Math.max(MARKET_MIN_COOLDOWN_HOURS, cooldownHours) * GAME_HOUR_REAL_SECONDS;
 }
 
 export function getAvailableMarketTrades(state: GameState): number {
@@ -97,6 +111,7 @@ export function tradeAtMarket(
   amount: number,
 ): boolean {
   const normalizedAmount = Math.floor(amount);
+  const marketLevel = state.buildings.market.level;
 
   if (!canTradeAtMarket(state, fromResourceId, toResourceId, normalizedAmount)) {
     return false;
@@ -107,7 +122,7 @@ export function tradeAtMarket(
   state.market.tradesUsed += 1;
 
   if (getAvailableMarketTrades(state) <= 0) {
-    state.market.cooldownRemainingSeconds = MARKET_TRADE_COOLDOWN_SECONDS;
+    state.market.cooldownRemainingSeconds = getMarketTradeCooldownSeconds(marketLevel);
     state.market.tradesUsed = 0;
   }
 

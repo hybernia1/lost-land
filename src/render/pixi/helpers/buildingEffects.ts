@@ -3,14 +3,28 @@ import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingId, GameState, ResourceBag, ResourceId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import {
+  getAcademyBuildTimeMultiplier,
+  getAcademyExpeditionDeathRiskMultiplier,
+  getAcademyProductionBonus,
+} from "../../../systems/academy";
+import {
   getCoalMineCoalRate,
   getMainBuildingMoraleRate,
   getMainBuildingProductionBonus,
   getSurvivorAttractionOnCompletedLevel,
   getWorkshopMaterialRate,
 } from "../../../systems/buildings";
-import { getClinicFoodPerTreatment, getClinicTreatmentRatePerGameHour } from "../../../systems/health";
-import { getMarketTradeLimit, getMarketTradeSlots } from "../../../systems/market";
+import {
+  getClinicFoodPerTreatment,
+  getClinicTreatmentRatePerGameHour,
+  getClinicWaterPerTreatment,
+} from "../../../systems/health";
+import {
+  getMarketTradeCooldownSeconds,
+  getMarketTradeLimit,
+  getMarketTradeSlots,
+} from "../../../systems/market";
+import { getBarracksTrainingRatePerGameHour } from "../../../systems/survivors";
 import type { CostLinePart, EffectLine } from "../core/types";
 import { formatPercentBonus, formatRate } from "./formatters";
 
@@ -81,11 +95,12 @@ export function getNextLevelEffects(
 
   if (buildingId === "clinic") {
     const treatmentPerHour = getClinicTreatmentRatePerGameHour(currentLevel + 1);
-    const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
+    const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment(currentLevel + 1);
+    const waterPerHour = treatmentPerHour * getClinicWaterPerTreatment(currentLevel + 1);
     effects.push({
       iconId: "people",
       value: `+${formatRate(treatmentPerHour)}/h`,
-      tooltip: `${translations.ui.treatment} +${formatRate(treatmentPerHour)}/h (${translations.resources.food} -${formatRate(foodPerHour)}/h)`,
+      tooltip: `${translations.ui.treatment} +${formatRate(treatmentPerHour)}/h (${translations.resources.food} -${formatRate(foodPerHour)}/h, ${translations.resources.water} -${formatRate(waterPerHour)}/h)`,
     });
   }
 
@@ -99,11 +114,49 @@ export function getNextLevelEffects(
   }
 
   if (buildingId === "barracks") {
-    effects.push({
-      iconId: "scout",
-      value: "+",
-      tooltip: translations.ui.unlocksTroopTraining,
-    });
+    const currentRate = getBarracksTrainingRatePerGameHour(currentLevel);
+    const nextRate = getBarracksTrainingRatePerGameHour(currentLevel + 1);
+    const rateDelta = nextRate - currentRate;
+
+    if (rateDelta > 0) {
+      effects.push({
+        iconId: "scout",
+        value: `+${formatRate(rateDelta)}/h`,
+        tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(rateDelta)}/h`,
+      });
+    }
+  }
+
+  if (buildingId === "academy") {
+    const currentBonus = getAcademyProductionBonus(currentLevel);
+    const nextBonus = getAcademyProductionBonus(currentLevel + 1);
+    if (nextBonus > currentBonus) {
+      effects.push({
+        iconId: "build",
+        value: formatPercentBonus(nextBonus - currentBonus),
+        tooltip: `${translations.ui.production}: ${formatPercentBonus(nextBonus - currentBonus)}`,
+      });
+    }
+
+    const currentRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel);
+    const nextRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel + 1);
+    if (nextRiskMultiplier < currentRiskMultiplier) {
+      effects.push({
+        iconId: "shield",
+        value: `-${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}%`,
+        tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}% risk`,
+      });
+    }
+
+    const currentBuildMultiplier = getAcademyBuildTimeMultiplier(currentLevel);
+    const nextBuildMultiplier = getAcademyBuildTimeMultiplier(currentLevel + 1);
+    if (nextBuildMultiplier < currentBuildMultiplier) {
+      effects.push({
+        iconId: "clock",
+        value: `-${formatRate((currentBuildMultiplier - nextBuildMultiplier) * 100)}%`,
+        tooltip: `${translations.ui.buildTime ?? "Build time"}: -${formatRate((currentBuildMultiplier - nextBuildMultiplier) * 100)}%`,
+      });
+    }
   }
 
   if (buildingId === "generator") {
@@ -149,6 +202,8 @@ export function getNextLevelEffects(
     const nextTradeLimit = getMarketTradeLimit(currentLevel + 1);
     const currentTradeSlots = getMarketTradeSlots(currentLevel);
     const nextTradeSlots = getMarketTradeSlots(currentLevel + 1);
+    const currentCooldownHours = getMarketTradeCooldownSeconds(currentLevel) / GAME_HOUR_REAL_SECONDS;
+    const nextCooldownHours = getMarketTradeCooldownSeconds(currentLevel + 1) / GAME_HOUR_REAL_SECONDS;
 
     if (nextTradeLimit > currentTradeLimit) {
       effects.push({
@@ -163,6 +218,14 @@ export function getNextLevelEffects(
         iconId: "build",
         value: `+${nextTradeSlots - currentTradeSlots}`,
         tooltip: `${translations.ui.marketTrades ?? "Trades"} +${nextTradeSlots - currentTradeSlots}`,
+      });
+    }
+
+    if (nextCooldownHours < currentCooldownHours) {
+      effects.push({
+        iconId: "clock",
+        value: `-${formatRate(currentCooldownHours - nextCooldownHours)}h`,
+        tooltip: `${translations.ui.marketCooldown ?? "Cooldown"} -${formatRate(currentCooldownHours - nextCooldownHours)}h`,
       });
     }
   }
@@ -251,11 +314,12 @@ export function getCurrentBuildingEffects(
 
   if (buildingId === "clinic") {
     const treatmentPerHour = getClinicTreatmentRatePerGameHour(level);
-    const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
+    const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment(level);
+    const waterPerHour = treatmentPerHour * getClinicWaterPerTreatment(level);
     effects.push({
       iconId: "people",
       value: `+${formatRate(treatmentPerHour)}/h`,
-      tooltip: `${translations.ui.treatment} +${formatRate(treatmentPerHour)}/h (${translations.resources.food} -${formatRate(foodPerHour)}/h)`,
+      tooltip: `${translations.ui.treatment} +${formatRate(treatmentPerHour)}/h (${translations.resources.food} -${formatRate(foodPerHour)}/h, ${translations.resources.water} -${formatRate(waterPerHour)}/h)`,
     });
   }
 
@@ -267,11 +331,55 @@ export function getCurrentBuildingEffects(
     });
   }
 
+  if (buildingId === "barracks") {
+    const trainingRate = getBarracksTrainingRatePerGameHour(level);
+    effects.push({
+      iconId: "scout",
+      value: `+${formatRate(trainingRate)}/h`,
+      tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(trainingRate)}/h`,
+    });
+  }
+
+  if (buildingId === "academy") {
+    const productionBonus = getAcademyProductionBonus(level);
+    if (productionBonus > 0) {
+      effects.push({
+        iconId: "build",
+        value: formatPercentBonus(productionBonus),
+        tooltip: `${translations.ui.production}: ${formatPercentBonus(productionBonus)}`,
+      });
+    }
+
+    const expeditionRiskReduction = (1 - getAcademyExpeditionDeathRiskMultiplier(level)) * 100;
+    if (expeditionRiskReduction > 0) {
+      effects.push({
+        iconId: "shield",
+        value: `-${formatRate(expeditionRiskReduction)}%`,
+        tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate(expeditionRiskReduction)}% risk`,
+      });
+    }
+
+    const buildTimeReduction = (1 - getAcademyBuildTimeMultiplier(level)) * 100;
+    if (buildTimeReduction > 0) {
+      effects.push({
+        iconId: "clock",
+        value: `-${formatRate(buildTimeReduction)}%`,
+        tooltip: `${translations.ui.buildTime ?? "Build time"}: -${formatRate(buildTimeReduction)}%`,
+      });
+    }
+  }
+
   if (buildingId === "market") {
     effects.push({
       iconId: "material",
       value: `${getMarketTradeLimit(level)}`,
       tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"} ${getMarketTradeLimit(level)}`,
+    });
+
+    effects.push({
+      iconId: "clock",
+      value: `${formatRate(getMarketTradeCooldownSeconds(level) / GAME_HOUR_REAL_SECONDS)}h`,
+      tooltip: `${translations.ui.marketCooldown ?? "Cooldown"} ${formatRate(getMarketTradeCooldownSeconds(level) / GAME_HOUR_REAL_SECONDS)}h`,
     });
 
     if (getMarketTradeSlots(level) > 1) {

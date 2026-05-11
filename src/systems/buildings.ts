@@ -10,6 +10,7 @@ import type {
   ResourceBag,
   ResourceId,
 } from "../game/types";
+import { getAcademyBuildTimeMultiplier } from "./academy";
 import { maybeInjureFromConstruction } from "./health";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
@@ -39,7 +40,6 @@ const BUILDING_LEVEL_GATE_LEVELS = [3, 5, 7, 10, 15] as const;
 const MAIN_BUILDING_SURVIVOR_ATTRACTION_LEVELS = new Set([2, 3, 5, 7, 10, 15, 20]);
 const COAL_MINE_BASE_COAL_RATE = 0.28;
 const HOMELESS_MORALE_PENALTY_PER_HOUR = 1;
-const CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR = 1.25;
 const CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR = 6;
 const MAIN_BUILDING_BASE_MORALE_PER_HOUR = 0.08;
 const villagePlotDefinitions = defaultVillageLayout.plots;
@@ -47,7 +47,7 @@ const villagePlotDefinitionById = new Map(villagePlotDefinitions.map((plot) => [
 const reservedBuildingIds = new Set(
   villagePlotDefinitions.flatMap((plot) => plot.allowedBuildingIds ?? []),
 );
-const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.45;
+const MAIN_BUILDING_MAX_MORALE_PER_HOUR = 0.55;
 const WORKSHOP_BASE_MATERIAL_RATE = 0.22;
 const WORKSHOP_BASE_COAL_RATE = 0.025;
 const FOOD_CONSUMPTION_PER_SURVIVOR_PER_SECOND = 0.017;
@@ -76,8 +76,14 @@ export function getUpgradeCost(buildingId: BuildingId, level: number): ResourceB
   return getNextBuildingLevelRequirement(buildingId, level).cost;
 }
 
-export function getBuildingBuildSeconds(buildingId: BuildingId, currentLevel: number): number {
-  return getNextBuildingLevelRequirement(buildingId, currentLevel).buildSeconds;
+export function getBuildingBuildSeconds(
+  state: GameState,
+  buildingId: BuildingId,
+  currentLevel: number,
+): number {
+  const baseSeconds = getNextBuildingLevelRequirement(buildingId, currentLevel).buildSeconds;
+  const academyMultiplier = getAcademyBuildTimeMultiplier(state.buildings.academy.level);
+  return Math.max(1, Math.ceil(baseSeconds * academyMultiplier));
 }
 
 export function getActiveBuildingQueue(state: GameState): BuildingId[] {
@@ -108,7 +114,8 @@ export function getSurvivorAttractionOnCompletedLevel(
   if (
     buildingId === "palisade" ||
     buildingId === "dormitory" ||
-    buildingId === "clinic"
+    buildingId === "clinic" ||
+    buildingId === "watchtower"
   ) {
     return 1;
   }
@@ -131,6 +138,13 @@ export function getMainBuildingLevelRequirement(
   buildingId: BuildingId,
   targetLevel: number,
 ): number {
+  const customLevelRequirements = buildingById[buildingId].requiredMainBuildingLevelByUpgradeLevel;
+  const customRequiredLevel = customLevelRequirements?.[targetLevel - 1];
+
+  if (typeof customRequiredLevel === "number") {
+    return Math.max(1, Math.floor(customRequiredLevel));
+  }
+
   if (buildingId === "mainBuilding") {
     return 1;
   }
@@ -271,7 +285,7 @@ export function isContinuousNightShiftActive(state: GameState): boolean {
 }
 
 export function isContinuousShiftFatigueActive(state: GameState): boolean {
-  return state.workMode === "continuous";
+  return isContinuousNightShiftActive(state);
 }
 
 export function getDormitoryHousingCapacity(state: GameState): number {
@@ -601,7 +615,7 @@ export function startBuildingConstruction(
   spendResources(state.resources, cost);
   state.survivors.workers -= constructionWorkers;
   building.constructionWorkers = constructionWorkers;
-  building.upgradingRemaining = getBuildingBuildSeconds(buildingId, 0);
+  building.upgradingRemaining = getBuildingBuildSeconds(state, buildingId, 0);
   pushLocalizedLog(state, "logConstructionStarted", {
     buildingId: definition.id,
   });
@@ -633,7 +647,7 @@ export function startBuildingUpgrade(state: GameState, buildingId: BuildingId): 
   spendResources(state.resources, cost);
   state.survivors.workers -= constructionWorkers;
   building.constructionWorkers = constructionWorkers;
-  building.upgradingRemaining = getBuildingBuildSeconds(buildingId, building.level);
+  building.upgradingRemaining = getBuildingBuildSeconds(state, buildingId, building.level);
   pushLocalizedLog(state, "logUpgradeStarted", {
     buildingId: definition.id,
   });
@@ -881,13 +895,14 @@ function createEmptyResourceDelta(): Record<ResourceId, number> {
 }
 
 function getContinuousShiftMoralePenaltyPerHour(state: GameState): number {
+  if (!isContinuousNightShiftActive(state)) {
+    return 0;
+  }
+
   const positiveMoralePerHour =
     getPositiveMoraleProductionRate(state) * GAME_HOUR_REAL_SECONDS;
-  const forcedNetLoss = isContinuousNightShiftActive(state)
-    ? CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR
-    : CONTINUOUS_SHIFT_DAY_NET_MORALE_LOSS_PER_HOUR;
 
-  return positiveMoralePerHour + forcedNetLoss;
+  return positiveMoralePerHour + CONTINUOUS_SHIFT_NIGHT_NET_MORALE_LOSS_PER_HOUR;
 }
 
 function getPositiveMoraleProductionRate(state: GameState): number {

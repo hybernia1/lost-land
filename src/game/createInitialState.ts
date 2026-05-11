@@ -54,6 +54,7 @@ export function createInitialState(
     survivors: {
       workers: 3,
       troops: 0,
+      barracksTrainingProgress: 0,
     },
     quests: createInitialQuestState(),
     resourceSites: createInitialResourceSites(),

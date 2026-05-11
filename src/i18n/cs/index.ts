@@ -126,10 +126,12 @@ export const cs: CsTranslationPack = {
     nextLevel: "Další úroveň",
     maxLevelReached: "Dosažena maximální úroveň.",
     treatment: "Léčení",
+    buildTime: "Čas stavby",
     workers: "Pracovníci",
     sleeping: "Spí",
     operations: "Provoz",
     training: "Výcvik",
+    troopTraining: "Výcvik vojáků",
     squadSize: "Velikost družstva",
     sendScouting: "Vyslat",
     unlocksTroopTraining: "Odemkne výcvik vojáků",
@@ -220,7 +222,7 @@ export const cs: CsTranslationPack = {
     continuousShifts: "24h směny",
     dayShiftActive: "Produkce běží do 22:00.",
     nightProductionPaused: "Produkce stojí do 08:00.",
-    continuousShiftsMorale: "Produkce běží pořád, ale únava trvale sráží morálku a v noci prudce.",
+    continuousShiftsMorale: "Noční práce sráží morálku a režim se v 08:00 vypne na denní směnu.",
     decisionArchive: "Archiv rozhodnutí",
     decisionArchiveTooltip: "Zobrazí minulá rozhodnutí a profil velení.",
     leadershipProfile: "Profil velení",
@@ -310,6 +312,10 @@ export const cs: CsTranslationPack = {
     barracks: {
       name: "Kasárny",
       description: "Cvičí pracovníky na vojáky pro budoucí venkovní mise a obranu tábora.",
+    },
+    academy: {
+      name: "Akademie",
+      description: "Odemyká strategický výzkum: +5 % produkce, bezpečnější výpravy a rychlejší stavbu.",
     },
     palisade: {
       name: "Palisáda",
