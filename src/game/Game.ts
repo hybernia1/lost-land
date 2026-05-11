@@ -11,13 +11,20 @@ import { tickHealth } from "../systems/health";
 import { normalizeLogEntries } from "../systems/log";
 import { normalizeMarketState, tickMarket, tradeAtMarket as executeMarketTrade } from "../systems/market";
 import { normalizeQuestState, resolveDecisionQuest, tickQuests } from "../systems/quests";
+import {
+  getResourceSiteProductionDelta,
+  normalizeResourceSites,
+  setResourceSiteWorkers as setWorkersAtResourceSite,
+  startResourceSiteAssault as startSiteAssault,
+  tickResourceSites,
+} from "../systems/resourceSites";
+import { addResources } from "../systems/resources";
 import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
-import { startScoutingMission, tickScouting } from "../systems/scouting";
 import { convertTroopToWorker, convertWorkerToTroop } from "../systems/survivors";
 import { gameConfig } from "./config";
 import { createInitialState } from "./createInitialState";
 import { GAME_HOUR_REAL_SECONDS } from "./time";
-import type { BuildingId, DecisionOptionId, EnvironmentConditionId, GameListener, GameSpeed, GameState, ResourceId, ScoutingMode } from "./types";
+import type { BuildingId, DecisionOptionId, EnvironmentConditionId, GameListener, GameSpeed, GameState, ResourceId } from "./types";
 
 export class Game {
   private state: GameState;
@@ -103,8 +110,19 @@ export class Game {
     }
   }
 
-  startScouting(mode: ScoutingMode, troopCount: number): void {
-    if (startScoutingMission(this.state, mode, troopCount)) {
+  startResourceSiteAssault(siteId: string, troopCount: number): boolean {
+    const started = startSiteAssault(this.state, siteId, troopCount);
+    if (started) {
+      this.commit();
+      return true;
+    }
+
+    this.emit();
+    return false;
+  }
+
+  setResourceSiteWorkers(siteId: string, targetWorkers: number): void {
+    if (setWorkersAtResourceSite(this.state, siteId, targetWorkers)) {
       this.commit();
     }
   }
@@ -232,9 +250,14 @@ export class Game {
     tickBuildings(this.state, scaledDelta);
     tickMarket(this.state, scaledDelta);
     tickQuests(this.state);
-    tickScouting(this.state, scaledDelta);
+    tickResourceSites(this.state, scaledDelta);
     tickEnvironment(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
+    addResources(
+      this.state.resources,
+      getResourceSiteProductionDelta(this.state, scaledDelta),
+      this.state.capacities,
+    );
     tickHealth(this.state, scaledDelta);
     this.autosaveIfDue();
     this.emit();
@@ -276,22 +299,7 @@ function normalizeGameState(state: GameState): void {
   normalizeQuestState(state);
   normalizeMarketState(state);
   normalizeEnvironmentState(state);
-  state.scouting = {
-    missions: Array.isArray(state.scouting?.missions)
-      ? state.scouting.missions
-          .filter((mission) =>
-            (mission.mode === "safe" || mission.mode === "risky") &&
-            mission.troops > 0 &&
-            mission.remainingSeconds > 0
-          )
-          .map((mission) => ({
-            id: mission.id?.trim() || `scout-${Date.now().toString(36)}`,
-            mode: mission.mode,
-            troops: Math.floor(mission.troops),
-            remainingSeconds: Math.max(0, mission.remainingSeconds),
-          }))
-      : [],
-  };
+  normalizeResourceSites(state);
 
   if (state.speed !== 24) {
     state.speed = 1;

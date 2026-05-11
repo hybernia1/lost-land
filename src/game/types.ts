@@ -77,19 +77,6 @@ export type SurvivorRoles = {
   troops: number;
 };
 
-export type ScoutingMode = "safe" | "risky";
-
-export type ScoutingMission = {
-  id: string;
-  mode: ScoutingMode;
-  troops: number;
-  remainingSeconds: number;
-};
-
-export type ScoutingState = {
-  missions: ScoutingMission[];
-};
-
 export type MarketResourceId = Exclude<ResourceId, "morale">;
 
 export type MarketState = {
@@ -130,6 +117,26 @@ export type EnvironmentState = {
   endsAt: number;
   nextConditionAt: number;
   activeCrisis: EnvironmentCrisisState | null;
+};
+
+export type ResourceSiteResourceId = "food" | "water" | "coal" | "material";
+
+export type ResourceSiteAssaultState = {
+  troops: number;
+  remainingSeconds: number;
+  travelTiles: number;
+};
+
+export type ResourceSiteState = {
+  id: string;
+  resourceId: ResourceSiteResourceId;
+  captured: boolean;
+  assignedWorkers: number;
+  maxWorkers: number;
+  yieldPerWorker: number;
+  captureMinTroops: number;
+  captureBaseDeathRisk: number;
+  assault: ResourceSiteAssaultState | null;
 };
 
 export type ObjectiveQuestId =
@@ -216,7 +223,7 @@ export type GameState = {
   capacities: Record<ResourceId, number>;
   survivors: SurvivorRoles;
   quests: QuestState;
-  scouting: ScoutingState;
+  resourceSites: ResourceSiteState[];
   market: MarketState;
   health: HealthState;
   environment: EnvironmentState;

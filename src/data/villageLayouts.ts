@@ -1,7 +1,7 @@
 import woodlandCampMapRaw from "../maps/woodland-camp-01.tmj?raw";
 import { createVillageLayoutFromTiled } from "./tiledMap";
 import type { TerrainTextureDefinition, TerrainTextureKey, TerrainTileId } from "./terrainTiles";
-import type { VillagePlotDefinition } from "./villagePlots";
+import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "./villagePlots";
 
 export type TerrainTilePlacement = {
   x: number;
@@ -54,6 +54,7 @@ export type VillageLayoutDefinition = {
   tileLayers: TerrainTileLayerDefinition[];
   objectLayers: VillageObjectLayerDefinition[];
   plots: VillagePlotDefinition[];
+  resourceSites: VillageResourceSiteDefinition[];
 };
 
 export const defaultVillageLayout = createVillageLayoutFromTiled(

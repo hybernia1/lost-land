@@ -6,6 +6,7 @@ import { findFirstPlotIdForBuilding } from "../data/villagePlots";
 import { recalculateCapacities } from "../systems/buildings";
 import { getLocalizedInitialLogEntries } from "../systems/log";
 import { createInitialQuestState } from "../systems/quests";
+import { createInitialResourceSites } from "../systems/resourceSites";
 import { SAVE_VERSION } from "../systems/save";
 import { gameConfig } from "./config";
 import type { BuildingId, BuildingState, GameState, ResourceId } from "./types";
@@ -55,9 +56,7 @@ export function createInitialState(
       troops: 0,
     },
     quests: createInitialQuestState(),
-    scouting: {
-      missions: [],
-    },
+    resourceSites: createInitialResourceSites(),
     market: {
       cooldownRemainingSeconds: 0,
       tradesUsed: 0,

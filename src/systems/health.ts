@@ -3,6 +3,7 @@ import { getEnvironmentDefinition, getEnvironmentIntensityIndex } from "../data/
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
+import { removeOneResourceSiteWorker } from "./resourceSites";
 
 const CLINIC_FOOD_PER_TREATMENT = 2;
 const INCIDENT_BASE_DELAY_SECONDS = 600;
@@ -204,6 +205,10 @@ function injureWorker(state: GameState): boolean {
     return true;
   }
 
+  if (removeOneResourceSiteWorker(state)) {
+    return true;
+  }
+
   const activeConstruction = Object.values(state.buildings).find(
     (building) => building.constructionWorkers > 0,
   );
@@ -228,6 +233,10 @@ export function killCampSurvivor(state: GameState): boolean {
 
   if (staffedBuilding) {
     staffedBuilding.workers -= 1;
+    return true;
+  }
+
+  if (removeOneResourceSiteWorker(state)) {
     return true;
   }
 

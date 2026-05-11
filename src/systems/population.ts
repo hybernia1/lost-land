@@ -1,4 +1,5 @@
 import type { GameState } from "../game/types";
+import { getAssignedResourceSiteWorkerCount } from "./resourceSites";
 
 export function getAssignedBuildingWorkerCount(state: GameState): number {
   return Object.values(state.buildings).reduce(
@@ -15,7 +16,9 @@ export function getConstructionWorkerCount(state: GameState): number {
 }
 
 export function getUnavailableWorkerCount(state: GameState): number {
-  return getAssignedBuildingWorkerCount(state) + getConstructionWorkerCount(state);
+  return getAssignedBuildingWorkerCount(state) +
+    getConstructionWorkerCount(state) +
+    getAssignedResourceSiteWorkerCount(state);
 }
 
 export function getPopulation(state: GameState): number {

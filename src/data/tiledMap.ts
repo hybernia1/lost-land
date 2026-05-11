@@ -7,7 +7,12 @@ import type {
   VillageMapObjectDefinition,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
-import { villagePlotRulesById, type VillagePlotDefinition } from "./villagePlots";
+import type { ResourceSiteResourceId } from "../game/types";
+import {
+  villagePlotRulesById,
+  type VillagePlotDefinition,
+  type VillageResourceSiteDefinition,
+} from "./villagePlots";
 
 type TiledProperty = {
   name: string;
@@ -91,6 +96,16 @@ type TiledMap = {
   properties?: TiledProperty[];
 };
 
+const DEFAULT_RESOURCE_SITE_CAPTURE_MIN_TROOPS = 5;
+const DEFAULT_RESOURCE_SITE_CAPTURE_BASE_DEATH_RISK = 0.42;
+const DEFAULT_RESOURCE_SITE_MAX_WORKERS = 3;
+const DEFAULT_RESOURCE_SITE_YIELD_PER_WORKER: Record<ResourceSiteResourceId, number> = {
+  food: 0.08,
+  water: 0.075,
+  coal: 0.07,
+  material: 0.06,
+};
+
 type GidTileReference = {
   tileId: TerrainTileId;
   textureKey: TerrainTextureKey;
@@ -129,6 +144,7 @@ export function createVillageLayoutFromTiled(
     tileLayers: getTileLayers(map, registry.gidToTile),
     objectLayers: getObjectLayers(map, registry.gidToTile),
     plots: getVillagePlots(map),
+    resourceSites: getResourceSites(map),
   };
 }
 
@@ -334,6 +350,7 @@ function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
 
   const plots = (layer.objects ?? [])
     .filter((object) => object.visible !== false)
+    .filter((object) => object.type !== "resourceSite")
     .map((object) => {
       const id = getStringProperty(object.properties, "plotId") ?? object.name;
 
@@ -357,6 +374,76 @@ function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
   }
 
   return plots;
+}
+
+function getResourceSites(map: TiledMap): VillageResourceSiteDefinition[] {
+  const layer = map.layers.find((candidate): candidate is TiledObjectLayer =>
+    candidate.type === "objectgroup" && candidate.name === "plots" && candidate.visible !== false,
+  );
+
+  if (!layer) {
+    return [];
+  }
+
+  return (layer.objects ?? [])
+    .filter((object) => object.visible !== false && object.type === "resourceSite")
+    .map((object) => {
+      const id = getStringProperty(object.properties, "plotId") ?? object.name;
+
+      if (!id) {
+        throw new Error("Resource site object is missing a plotId property or name.");
+      }
+
+      const resourceId = getResourceSiteResourceId(object.properties, id);
+      const captureMinTroops = Math.max(
+        1,
+        Math.floor(
+          getNumberProperty(object.properties, "siteCaptureMinTroops") ??
+          getNumberProperty(object.properties, "captureMinTroops") ??
+          DEFAULT_RESOURCE_SITE_CAPTURE_MIN_TROOPS,
+        ),
+      );
+      const captureBaseDeathRisk = Math.max(
+        0.05,
+        Math.min(
+          0.95,
+          getNumberProperty(object.properties, "siteCaptureBaseDeathRisk") ??
+            getNumberProperty(object.properties, "captureBaseDeathRisk") ??
+            DEFAULT_RESOURCE_SITE_CAPTURE_BASE_DEATH_RISK,
+        ),
+      );
+      const maxWorkers = Math.max(
+        1,
+        Math.min(
+          3,
+          Math.floor(
+            getNumberProperty(object.properties, "siteMaxWorkers") ??
+            getNumberProperty(object.properties, "maxWorkers") ??
+            DEFAULT_RESOURCE_SITE_MAX_WORKERS,
+          ),
+        ),
+      );
+      const yieldPerWorker = Math.max(
+        0.001,
+        getNumberProperty(object.properties, "siteYieldPerWorker") ??
+          getNumberProperty(object.properties, "yieldPerWorker") ??
+          DEFAULT_RESOURCE_SITE_YIELD_PER_WORKER[resourceId],
+      );
+
+      return {
+        id,
+        x: object.x,
+        y: object.gid ? object.y - (object.height ?? 0) : object.y,
+        width: object.width ?? 0,
+        height: object.height ?? 0,
+        resourceId,
+        captureMinTroops,
+        captureBaseDeathRisk,
+        maxWorkers,
+        yieldPerWorker,
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
 }
 
 function getTileReference(rawGid: number, gidToTile: Map<number, GidTileReference>): GidTileReference | null {
@@ -415,4 +502,25 @@ function getEnvironmentTint(tileId: string): TerrainTextureDefinition["tintByEnv
 function getStringProperty(properties: TiledProperty[] | undefined, name: string): string | null {
   const property = properties?.find((candidate) => candidate.name === name);
   return typeof property?.value === "string" ? property.value : null;
+}
+
+function getNumberProperty(properties: TiledProperty[] | undefined, name: string): number | null {
+  const property = properties?.find((candidate) => candidate.name === name);
+  return typeof property?.value === "number" ? property.value : null;
+}
+
+function getResourceSiteResourceId(
+  properties: TiledProperty[] | undefined,
+  siteId: string,
+): ResourceSiteResourceId {
+  const value = getStringProperty(properties, "siteResourceId") ??
+    getStringProperty(properties, "resourceId");
+
+  if (value === "food" || value === "water" || value === "coal" || value === "material") {
+    return value;
+  }
+
+  throw new Error(
+    `Resource site "${siteId}" has invalid or missing siteResourceId/resourceId property.`,
+  );
 }

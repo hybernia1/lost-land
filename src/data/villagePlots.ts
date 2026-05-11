@@ -1,4 +1,4 @@
-import type { BuildingId } from "../game/types";
+import type { BuildingId, ResourceSiteResourceId } from "../game/types";
 
 export type VillagePlotDefinition = {
   id: string;
@@ -11,6 +11,19 @@ export type VillagePlotDefinition = {
 };
 
 export type VillagePlotRule = Pick<VillagePlotDefinition, "allowedBuildingIds" | "kind">;
+
+export type VillageResourceSiteDefinition = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  resourceId: ResourceSiteResourceId;
+  captureMinTroops: number;
+  captureBaseDeathRisk: number;
+  maxWorkers: number;
+  yieldPerWorker: number;
+};
 
 export const villagePlotRulesById: Record<string, VillagePlotRule> = {
   "plot-palisade": {

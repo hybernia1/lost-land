@@ -1,10 +1,10 @@
 import type { Game } from "../game/Game";
 import { formatGameClock, getGameDay } from "../game/time";
-import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState, ScoutingMode } from "../game/types";
+import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import type { PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
+import type { ConquestVictoryPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
 import type { GodModeController } from "../dev/godMode";
 
@@ -19,6 +19,9 @@ export class App {
   private villageModalPlotId: string | null = null;
   private villageInfoPanel: VillageInfoPanel | null = null;
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
+  private conquestVictoryPreview: ConquestVictoryPreview | null = null;
+  private topLogSignature = "";
+  private hasReceivedInitialState = false;
   private renderQueued = false;
   private tooltipTarget: HTMLElement | null = null;
   private suppressVillageClickUntil = 0;
@@ -40,10 +43,22 @@ export class App {
     window.addEventListener("keydown", this.handleWindowKeyDown);
     window.addEventListener("resize", () => this.requestRender());
     this.game.subscribe((state) => {
+      const previousSignature = this.topLogSignature;
+      const nextSignature = this.getTopLogSignature(state);
       this.state = state;
+
+      if (!this.hasReceivedInitialState) {
+        this.hasReceivedInitialState = true;
+        this.topLogSignature = nextSignature;
+        this.requestRender();
+        return;
+      }
+
       if (state.quests.activeDecision) {
         this.resolvedDecisionPreview = null;
       }
+      this.maybeShowConquestVictoryModal(state, previousSignature, nextSignature);
+      this.topLogSignature = nextSignature;
       this.requestRender();
     });
   }
@@ -207,6 +222,7 @@ export class App {
       this.villageModalPlotId,
       this.villageInfoPanel,
       this.resolvedDecisionPreview,
+      this.conquestVictoryPreview,
     );
 
     this.updateShellMode();
@@ -266,7 +282,10 @@ export class App {
       const plotId = this.villageRenderer.hitTest(event.clientX, event.clientY);
 
       if (plotId) {
-        this.game.selectVillagePlot(plotId);
+        const isVillagePlot = this.state.village.plots.some((plot) => plot.id === plotId);
+        if (isVillagePlot) {
+          this.game.selectVillagePlot(plotId);
+        }
         this.villageModalPlotId = plotId;
         this.villageInfoPanel = null;
         this.requestRender();
@@ -282,7 +301,22 @@ export class App {
   }
 
   private handleGameAction(detail: PixiActionDetail): void {
-    const { action, building, continuousShifts, delta, marketAmount, marketFromResource, marketToResource, plot, questOption, resourceId, scoutMode, scoutTroops, speed, troopCount } = detail;
+    const {
+      action,
+      building,
+      continuousShifts,
+      delta,
+      marketAmount,
+      marketFromResource,
+      marketToResource,
+      plot,
+      questOption,
+      resourceId,
+      resourceSiteId,
+      resourceSiteTroops,
+      speed,
+      troopCount,
+    } = detail;
 
     if (action === "consume-pointer") {
       return;
@@ -361,6 +395,12 @@ export class App {
       return;
     }
 
+    if (action === "close-conquest-result") {
+      this.conquestVictoryPreview = null;
+      this.requestRender();
+      return;
+    }
+
     if (action === "close-village-modal") {
       this.villageModalPlotId = null;
       this.villageInfoPanel = null;
@@ -409,8 +449,21 @@ export class App {
       return;
     }
 
-    if (action === "start-scouting" && scoutMode && scoutTroops) {
-      this.game.startScouting(scoutMode, scoutTroops);
+    if (
+      action === "resource-site-assault" &&
+      resourceSiteId &&
+      typeof resourceSiteTroops === "number" &&
+      Number.isFinite(resourceSiteTroops)
+    ) {
+      this.game.startResourceSiteAssault(resourceSiteId, resourceSiteTroops);
+      return;
+    }
+
+    if (action === "resource-site-workers" && resourceSiteId && this.state) {
+      const site = this.state.resourceSites.find((candidate) => candidate.id === resourceSiteId);
+      if (site) {
+        this.game.setResourceSiteWorkers(resourceSiteId, site.assignedWorkers + (delta ?? 0));
+      }
     }
   }
 
@@ -507,14 +560,6 @@ export class App {
       };
     }
 
-    if (action === "start-scouting" && button.dataset.scoutMode && button.dataset.scoutTroops) {
-      return {
-        action,
-        scoutMode: button.dataset.scoutMode as ScoutingMode,
-        scoutTroops: Number(button.dataset.scoutTroops),
-      };
-    }
-
     if (action === "build" && button.dataset.building && button.dataset.plot) {
       return {
         action,
@@ -591,6 +636,7 @@ export class App {
   private startGameSession(): void {
     this.mode = "game";
     this.resolvedDecisionPreview = null;
+    this.conquestVictoryPreview = null;
     this.game.start();
     this.requestRender();
   }
@@ -608,6 +654,7 @@ export class App {
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
+    this.conquestVictoryPreview = null;
     this.godMode?.destroy();
     this.godMode = null;
     this.game.stop();
@@ -694,6 +741,60 @@ export class App {
 
   private t(): TranslationPack {
     return packs[this.locale];
+  }
+
+  private getTopLogSignature(state: GameState): string {
+    const topEntry = state.log[0];
+    if (!topEntry) {
+      return "";
+    }
+
+    return `${topEntry.key}:${JSON.stringify(topEntry.params ?? {})}`;
+  }
+
+  private maybeShowConquestVictoryModal(
+    state: GameState,
+    previousSignature: string,
+    nextSignature: string,
+  ): void {
+    if (this.mode !== "game" || previousSignature === nextSignature) {
+      return;
+    }
+
+    const topEntry = state.log[0];
+    if (!topEntry || topEntry.key !== "logResourceSiteCaptured") {
+      return;
+    }
+
+    const resourceId = this.toResourceSiteResourceId(topEntry.params?.resourceId);
+    if (!resourceId) {
+      return;
+    }
+
+    this.conquestVictoryPreview = {
+      resourceId,
+      returnedTroops: this.toNonNegativeInt(topEntry.params?.count),
+      deaths: this.toNonNegativeInt(topEntry.params?.deaths),
+      resolvedAt: state.elapsedSeconds,
+    };
+  }
+
+  private toNonNegativeInt(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(value));
+  }
+
+  private toResourceSiteResourceId(
+    value: unknown,
+  ): ConquestVictoryPreview["resourceId"] | null {
+    if (value === "food" || value === "water" || value === "material" || value === "coal") {
+      return value;
+    }
+
+    return null;
   }
 
   private installGodMode(): void {
