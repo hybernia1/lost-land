@@ -4,8 +4,9 @@ import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import type { ConquestResultPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
+import type { ConquestResultPreview, GameOverPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
 import { hasSavedGame, listSavedGames } from "../systems/save";
+import { getPopulation } from "../systems/population";
 import type { GodModeController } from "../dev/godMode";
 import modalOpenSoundUrl from "../assets/audio/modal-open.wav";
 import modalCloseSoundUrl from "../assets/audio/modal-close.wav";
@@ -26,6 +27,7 @@ export class App {
   private villageInfoPanel: VillageInfoPanel | null = null;
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
   private conquestResultPreview: ConquestResultPreview | null = null;
+  private gameOverPreview: GameOverPreview | null = null;
   private topLogSignature = "";
   private lastActiveDecisionId: string | null = null;
   private hasReceivedInitialState = false;
@@ -80,6 +82,7 @@ export class App {
       if (state.quests.activeDecision) {
         this.resolvedDecisionPreview = null;
       }
+      this.maybeShowGameOverModal(state);
       this.maybeShowConquestResultModal(state, previousSignature, nextSignature);
       this.updateAmbientLoop();
       if (hasNewDecisionQuest) {
@@ -252,6 +255,7 @@ export class App {
       this.villageInfoPanel,
       this.resolvedDecisionPreview,
       this.conquestResultPreview,
+      this.gameOverPreview,
     );
 
     this.updateShellMode();
@@ -356,6 +360,10 @@ export class App {
 
     if (this.isTabSwitchAction(action)) {
       this.playUiSound(this.tabSwitchAudio);
+    }
+
+    if (this.gameOverPreview && action !== "home") {
+      return;
     }
 
     if (action === "consume-pointer") {
@@ -688,6 +696,7 @@ export class App {
     this.mode = "game";
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
+    this.gameOverPreview = null;
     this.lastActiveDecisionId = this.state?.quests.activeDecision?.id ?? null;
     this.game.start();
     this.updateAmbientLoop();
@@ -709,6 +718,7 @@ export class App {
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
+    this.gameOverPreview = null;
     this.lastActiveDecisionId = null;
     this.godMode?.destroy();
     this.godMode = null;
@@ -730,7 +740,8 @@ export class App {
       this.villageModalPlotId ||
       this.villageInfoPanel ||
       this.resolvedDecisionPreview ||
-      this.conquestResultPreview,
+      this.conquestResultPreview ||
+      this.gameOverPreview,
     );
   }
 
@@ -976,6 +987,26 @@ export class App {
         requiredTroops: this.toNonNegativeInt(topEntry.params?.required),
         resolvedAt: state.elapsedSeconds,
       };
+      return;
+    }
+  }
+
+  private maybeShowGameOverModal(state: GameState): void {
+    if (this.mode !== "game" || this.gameOverPreview || getPopulation(state) > 0) {
+      return;
+    }
+
+    this.villageModalPlotId = null;
+    this.villageInfoPanel = null;
+    this.resolvedDecisionPreview = null;
+    this.conquestResultPreview = null;
+    this.gameOverPreview = {
+      communityName: state.communityName,
+      endedAt: state.elapsedSeconds,
+    };
+
+    if (!state.paused) {
+      this.game.setPaused(true);
     }
   }
 

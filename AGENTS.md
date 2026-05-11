@@ -63,6 +63,21 @@ Keep temporary implementation notes in this file only when they are useful for
 future Codex sessions. Do not put user-facing design docs, game lore, or task
 lists here unless they are also useful as agent guidance.
 
+### Codex Refactor Checkpoint (2026-05-11)
+
+- `src/render/PixiVillageRenderer.ts` is being split into larger logical blocks, not micro-files.
+- Already extracted:
+  - `src/render/pixi/core/constants.ts`
+  - `src/render/pixi/core/types.ts`
+  - `src/render/pixi/helpers/formatters.ts`
+  - `src/render/pixi/helpers/buildingEffects.ts`
+  - `src/render/pixi/helpers/logFormatting.ts`
+  - `src/render/pixi/helpers/decisionHelpers.ts`
+  - `src/render/pixi/hud/hudPanels.ts` (active conquests, objective panel, event log, action controls, toolbar + left HUD area)
+  - `src/render/pixi/modals/resultModals.ts` (quest decision modal, conquest result modal, game-over modal)
+- `PixiVillageRenderer` now orchestrates those blocks via adapter-style host methods.
+- Build status after each step: `npm run build` passes.
+
 Before editing code, inspect the existing project shape and follow local
 patterns. Use `rg` / `rg --files` for searches when available.
 
@@ -227,3 +242,77 @@ cleanly instead of carrying compatibility branches.
 - The village screen renders through PixiJS. Keep menu, settings, and save/load
   flows in DOM for now, but avoid adding DOM fallback for in-game HUD, build
   modals, or scene overlays.
+
+## Codex checkpoints
+
+- 2026-05-11: Renderer refactor wave continued.
+  - Added `src/render/pixi/modals/infoPanels.ts` and moved info modal/panel block out of `PixiVillageRenderer`:
+    - survivor overview modal
+    - decision archive modal (including row expansion + scroll)
+    - weather overview modal
+    - resource breakdown modal (including tab + scroll state)
+  - `PixiVillageRenderer` now calls `drawInfoPanel(this.infoPanelsHost(), ...)`.
+  - Added `infoPanelsHost()` adapter in renderer for stateful scroll/tab wiring.
+  - Restored shared helpers `drawModalBackdrop` and `drawOverlayHeader` in renderer after extraction.
+  - Verification: `npm run build` passes.
+- 2026-05-11: Renderer refactor wave continued (village modal block).
+  - Added `src/render/pixi/modals/villageModals.ts`.
+  - Moved village modal orchestration and resource-site modal rendering out of `PixiVillageRenderer`:
+    - `drawVillageModal`
+    - `drawModalHeader`
+    - `drawModalClose`
+    - `drawResourceSiteModal`
+  - `PixiVillageRenderer` now calls `drawVillageModal(this.villageModalsHost(), ...)` and exposes a new `villageModalsHost()` adapter.
+  - Kept troop selector state methods (`getResourceSiteTroopCount` / `setResourceSiteTroopCount`) in renderer and wired through host.
+  - Verification: `npm run build` passes.
+- 2026-05-11: Renderer refactor wave continued (all modal blocks + cleanup).
+  - Added `src/render/pixi/modals/buildingModals.ts` for the remaining modal-heavy block:
+    - build choices list/tabs/scroll and row rendering
+    - building detail modal content
+    - market controls
+    - barracks controls
+    - shared modal tokens/metric helpers used by those blocks
+  - `villageModalsHost()` now delegates build/detail rendering through `buildingModalsHost()` into `buildingModals.ts`.
+  - Removed the old in-class modal-heavy methods from `PixiVillageRenderer.ts`.
+  - Kept shared modal shell helpers in renderer (`drawModalBackdrop`, `drawOverlayHeader`) and restored `drawRewardLine` for HUD objective rewards.
+  - Verification: `npm run build` passes.
+- 2026-05-11: Renderer refactor wave continued (camera + scene + UI primitives).
+  - Added `src/render/pixi/camera/cameraController.ts` and moved camera/input logic:
+    - wheel routing for modal scroll areas and zoom
+    - pointer drag start/move/end behavior
+    - camera animation/clamp/layout helpers
+  - Added `src/render/pixi/scene/worldRenderer.ts` and moved world scene rendering:
+    - background
+    - terrain tiles and decor objects
+    - palisade and resource site scene nodes
+    - village plot rendering
+  - Added `src/render/pixi/ui/primitives.ts` and moved reusable UI drawing primitives:
+    - text/centered text
+    - panel draw
+    - rect/circle button creation
+    - pill creation
+  - `PixiVillageRenderer.ts` now delegates through `worldRendererHost()` and primitive adapters.
+  - Verification: `npm run build` passes.
+- 2026-05-11: Renderer refactor wave continued (ambient/weather + texture animations).
+  - Added `src/render/pixi/ambient/ambientEffects.ts` with `AmbientEffectsController`.
+  - Moved out of `PixiVillageRenderer.ts`:
+    - full ambient overlay rendering (rain/snow/radiation/daylight)
+    - ambient animation loop lifecycle
+    - texture animation binding/frame update lifecycle
+    - noise helpers used by ambient and texture animation phases
+  - `PixiVillageRenderer.ts` now delegates ambient and texture animation responsibilities to `ambientEffects`.
+  - `worldRendererHost()` terrain sprite creation now routes through `ambientEffects.createTerrainSprite(...)`.
+  - Building animated frame resolution now routes through `ambientEffects.resolveAnimationTexture(...)`.
+  - Verification: `npm run build` passes.
+- 2026-05-11: PR cleanup pass (typing/contracts hardening).
+  - Removed `any` usage from extracted Pixi renderer modules and replaced with explicit contracts:
+    - `src/render/pixi/core/types.ts` now defines shared callback and option types (`DrawTextFn`, `DrawPanelFn`, `DrawIconFn`, `DrawOverlayHeaderFn`, `MeasureWrappedTextHeightFn`, etc.).
+    - Updated host interfaces in:
+      - `src/render/pixi/hud/hudPanels.ts`
+      - `src/render/pixi/scene/worldRenderer.ts`
+      - `src/render/pixi/modals/resultModals.ts`
+      - `src/render/pixi/modals/infoPanels.ts`
+      - `src/render/pixi/modals/villageModals.ts`
+      - `src/render/pixi/modals/buildingModals.ts`
+  - Behavioral intent unchanged; this pass improves refactor safety and future maintainability.
+  - Verification: `npm run build` passes.

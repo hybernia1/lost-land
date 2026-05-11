@@ -7,26 +7,22 @@ import {
   Text,
   TextStyle,
   Sprite,
-  type FrameObject,
   type TextStyleFontWeight,
 } from "pixi.js";
 import { resourceDefinitions } from "../data/resources";
 import { buildingById, buildingDefinitions } from "../data/buildings";
 import {
-  ENVIRONMENT_MAX_INTENSITY,
   getEnvironmentDefinition,
   getEnvironmentIntensityIndex,
 } from "../data/environment";
-import { decisionQuestById, type DecisionQuestOptionDefinition } from "../data/decisions";
-import { objectiveQuestById } from "../data/quests";
+import { decisionQuestById } from "../data/decisions";
 import { defaultVillageLayout } from "../data/villageLayouts";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
-import type { BuildingCategory, BuildingId, DecisionHistoryEntry, DecisionOptionId, EnvironmentConditionId, GameSpeed, GameState, MarketResourceId, ResourceBag, ResourceId } from "../game/types";
+import type { BuildingCategory, BuildingId, DecisionHistoryEntry, GameState, MarketResourceId, ResourceBag, ResourceId } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
-  getActiveBuildingQueue,
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
   getConstructionWorkerRequirement,
@@ -45,14 +41,13 @@ import {
   hasAvailableBuildingSlot,
   isMainBuildingRequirementMet,
   isBuildingInactiveDueToCoal,
-  MAX_ACTIVE_BUILDINGS,
   type ResourceBreakdownLine,
 } from "../systems/buildings";
 import {
   getClinicFoodPerTreatment,
   getClinicTreatmentRatePerGameHour,
 } from "../systems/health";
-import { formatLogEntry, getLogEntrySeverity } from "../systems/log";
+import { formatLogEntry } from "../systems/log";
 import {
   canTradeAtMarket,
   getAvailableMarketTrades,
@@ -73,296 +68,121 @@ import {
 } from "../systems/resourceSites";
 import { canAfford } from "../systems/resources";
 import {
-  canAffordDecisionOption,
   decisionProfileAxes,
-  getActiveObjectiveQuests,
   getDecisionProfileAxisValue,
   getDecisionProfileKind,
-  getObjectiveQuestProgress,
-  type DecisionProfileKind,
 } from "../systems/quests";
 import { getTravelTilesToSite } from "../systems/resourceSites";
+import {
+  BUILDING_PREVIEW_RENDER_SCALE,
+  HUD_DESIGN_SCALE,
+  HUD_FONT_FAMILY,
+  HUD_LEFT_PANEL_WIDTH,
+  HUD_TOP_STRIP_HEIGHT,
+  MAX_RENDER_RESOLUTION,
+  MODAL_BACKDROP_ALPHA,
+  TOOLTIP_POSITION_EPSILON,
+  VILLAGE_BUILDING_RENDER_SCALE,
+  buildCategoryOrder,
+  capitalize,
+  decisionProfileIconByKind,
+  environmentAlertIconByCondition,
+  environmentAlertToneByCondition,
+  getHudTextLineHeight,
+  nonPerimeterVillagePlots,
+  normalizeHudFontWeight,
+  palisadePlotDefinition,
+  resourceColors,
+  resourceSiteDefinitions,
+  upgradingTooltip,
+  villagePlotDefinitions,
+} from "./pixi/core/constants";
+import { drawHudLeftArea, drawHudPanels } from "./pixi/hud/hudPanels";
+import {
+  clampCamera as clampCameraState,
+  getLayout as getSceneLayout,
+  handleHostPointerDown as handlePointerDownWithCamera,
+  handleHostPointerMove as handlePointerMoveWithCamera,
+  handleHostPointerUp as handlePointerUpWithCamera,
+  handleHostWheel as handleWheelWithCamera,
+  isHudPointer as isHudPointerArea,
+  refreshCameraTransform as refreshCameraStateTransform,
+  shouldAnimateCamera as shouldAnimateCameraState,
+  type CameraDragState,
+} from "./pixi/camera/cameraController";
+import type {
+  Bounds,
+  BrandAlert,
+  BuildingMetric,
+  CircleButtonOptions,
+  ConquestResultPreview,
+  DecisionHistoryRow,
+  EffectLine,
+  FormattedLogEntry,
+  GameOverPreview,
+  PixiActionDetail,
+  RectButtonOptions,
+  ResourceBreakdownTab,
+  SceneLayout,
+  TabItem,
+  TabOptions,
+  VillageInfoPanel,
+} from "./pixi/core/types";
+import {
+  drawConquestResultModal,
+  drawGameOverModal,
+  drawQuestDecisionModal,
+} from "./pixi/modals/resultModals";
+import {
+  drawBackground as drawWorldBackground,
+  drawDecorObjects as drawWorldDecorObjects,
+  drawPalisade as drawWorldPalisade,
+  drawPlot as drawWorldPlot,
+  drawResourceSites as drawWorldResourceSites,
+  drawTerrain as drawWorldTerrain,
+} from "./pixi/scene/worldRenderer";
+import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
+import { drawInfoPanel } from "./pixi/modals/infoPanels";
+import { drawVillageModal } from "./pixi/modals/villageModals";
+import {
+  drawBuildChoices as drawBuildChoicesModal,
+  drawBuildingDetail as drawBuildingDetailModal,
+} from "./pixi/modals/buildingModals";
+import {
+  createCircleButtonPrimitive,
+  createPillPrimitive,
+  createRectButtonPrimitive,
+  drawCenteredTextPrimitive,
+  drawPanelPrimitive,
+  drawTextPrimitive,
+} from "./pixi/ui/primitives";
+import {
+  getCostLineParts,
+  getCurrentBuildingEffects,
+  getNextLevelEffects,
+} from "./pixi/helpers/buildingEffects";
+import {
+  formatPercentBonus,
+  formatRate,
+  formatScoutingRemaining,
+  formatTemplate,
+  getHourlyRateLabel,
+  getRateColor,
+} from "./pixi/helpers/formatters";
+import {
+  getDecisionHistoryOption,
+  getDecisionImpactLines,
+  getDecisionProfileOverallLabel,
+} from "./pixi/helpers/decisionHelpers";
+import { getLogEntryFillColor, getLogEntryIconId } from "./pixi/helpers/logFormatting";
 import { drawPixiIcon } from "./pixiIcons";
 import { VillageAssets } from "./villageAssets";
-
-type SceneLayout = {
-  originX: number;
-  originY: number;
-  width: number;
-  height: number;
-  scale: number;
-};
-
-type Bounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type TextureAnimationFrame = {
-  texture: FrameObject["texture"];
-  durationMs: number;
-};
-
-type TextureAnimationBinding = {
-  sprite: Sprite;
-  frames: TextureAnimationFrame[];
-  totalDurationMs: number;
-  currentFrameIndex: number;
-  phaseOffsetMs: number;
-};
-
-export type PixiActionDetail = {
-  action?: string;
-  building?: BuildingId;
-  plot?: string;
-  resourceSiteId?: string;
-  resourceSiteTroops?: number;
-  delta?: number;
-  troopCount?: number;
-  questOption?: DecisionOptionId;
-  resourceId?: ResourceId;
-  marketFromResource?: ResourceId;
-  marketToResource?: ResourceId;
-  marketAmount?: number;
-  speed?: GameSpeed;
-  continuousShifts?: boolean;
-};
-
-export type ConquestResultPreview = {
-  outcome: "victory" | "failed" | "overrun";
-  resourceId: "food" | "water" | "material" | "coal";
-  sentTroops: number;
-  returnedTroops: number;
-  deaths: number;
-  requiredTroops?: number;
-  resolvedAt: number;
-};
-
-export type VillageInfoPanel = ResourceId | "survivors" | "decisionArchive" | "weather";
-
-type EffectLine = {
-  iconId: string;
-  value: string;
-  tooltip: string;
-  negative?: boolean;
-};
-
-type BrandAlert = {
-  iconId: string;
-  label?: string;
-  tooltip?: string;
-  action?: PixiActionDetail;
-  tone: "cold" | "danger" | "warning" | "neutral";
-};
-
-type ActiveEnvironmentConditionId = Exclude<EnvironmentConditionId, "stable">;
-
-const decisionProfileIconByKind: Record<DecisionProfileKind, string> = {
-  noData: "profile-no-data",
-  balanced: "profile-balanced",
-  philanthropist: "profile-philanthropist",
-  principled: "profile-principled",
-  merciful: "profile-merciful",
-  security: "profile-security",
-  open: "profile-open",
-  cautious: "profile-cautious",
-};
-
-const decisionProfileLabelKeyByKind: Record<DecisionProfileKind, string> = {
-  noData: "profileNoData",
-  balanced: "profileBalanced",
-  philanthropist: "profilePhilanthropist",
-  principled: "profilePrincipled",
-  merciful: "profileMerciful",
-  security: "profileSecurity",
-  open: "profileOpen",
-  cautious: "profileCautious",
-};
-
-const environmentAlertIconByCondition: Record<ActiveEnvironmentConditionId, string> = {
-  rain: "crisis-rain",
-  snowFront: "crisis-snow",
-  radiation: "crisis-radiation",
-};
-
-const environmentAlertToneByCondition: Record<ActiveEnvironmentConditionId, BrandAlert["tone"]> = {
-  rain: "neutral",
-  snowFront: "cold",
-  radiation: "danger",
-};
-
-type DecisionHistoryRow = {
-  entry: DecisionHistoryEntry;
-  originalIndex: number;
-};
-
-type CostLinePart = {
-  text: string;
-  iconId: string;
-  missing: boolean;
-  tooltip: string;
-};
-
-type BuildingMetric = {
-  iconId: string;
-  label: string;
-  value: string;
-  fill?: number;
-  tooltip?: string;
-};
-
-type FormattedLogEntry = {
-  text: string;
-  fill: number;
-  iconId: string;
-};
-
-type ResourceBreakdownTab = "production" | "consumption";
-type RectButtonTone = "primary" | "secondary" | "toolbar";
-
-type RectButtonOptions = {
-  label?: string;
-  iconId?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  detail?: PixiActionDetail;
-  onTap?: () => void;
-  tooltip?: string;
-  disabled?: boolean;
-  active?: boolean;
-  tone?: RectButtonTone;
-  fontSize?: number;
-  fontWeight?: TextStyleFontWeight;
-};
-
-type CircleButtonOptions = {
-  iconId: string;
-  x: number;
-  y: number;
-  radius: number;
-  detail: PixiActionDetail;
-  tooltip: string;
-  active?: boolean;
-};
-
-type TabItem<T extends string> = {
-  id: T;
-  label: string;
-};
-
-type TabOptions<T extends string> = {
-  activeId: T;
-  x: number;
-  y: number;
-  height: number;
-  gap?: number;
-  minWidth: number;
-  maxWidth?: number;
-  maxTabWidth?: number;
-  onSelect: (id: T) => void;
-};
-
-const resourceColors: Record<ResourceId, number> = {
-  food: 0xd8b66a,
-  water: 0x66bde8,
-  material: 0xc7c9bd,
-  coal: 0x8f9589,
-  morale: 0xe9a0a0,
-};
-
-const VILLAGE_BUILDING_RENDER_SCALE = 2;
-const BUILDING_PREVIEW_BASE_RENDER_SCALE = 1.3;
-const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
-  1,
-  VILLAGE_BUILDING_RENDER_SCALE / BUILDING_PREVIEW_BASE_RENDER_SCALE,
-);
-const villagePlotDefinitions = defaultVillageLayout.plots;
-const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
-const nonPerimeterVillagePlots = villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter");
-const palisadePlotDefinition = villagePlotDefinitions.find((plot) =>
-  plot.allowedBuildingIds?.includes("palisade"),
-) ?? null;
-const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
-const HUD_DESIGN_SCALE = 1.2;
-const HUD_TOP_STRIP_HEIGHT = 68;
-const HUD_SIDE_PANEL_MARGIN = 0;
-const HUD_LEFT_PANEL_WIDTH = 366;
-const CAMERA_MIN_ZOOM = 0.75;
-const CAMERA_MAX_ZOOM = 1.75;
-const CAMERA_ZOOM_STEP = 0.0018;
-const CAMERA_SMOOTH_FACTOR = 0.2;
-const CAMERA_OFFSET_SNAP_EPSILON = 0.2;
-const CAMERA_ZOOM_SNAP_EPSILON = 0.001;
-const MAX_RENDER_RESOLUTION = 1.5;
-const MAX_VISUAL_FPS = 30;
-const VISUAL_FRAME_MIN_MS = 1000 / MAX_VISUAL_FPS;
-const MAX_TEXTURE_ANIMATION_FPS = 10;
-const TEXTURE_ANIMATION_FRAME_MIN_MS = 1000 / MAX_TEXTURE_ANIMATION_FPS;
-const MAX_WEATHER_OVERLAY_FPS = 12;
-const WEATHER_OVERLAY_FRAME_MIN_MS = 1000 / MAX_WEATHER_OVERLAY_FPS;
-const MAX_DAYLIGHT_TRANSITION_FPS = 4;
-const DAYLIGHT_TRANSITION_FRAME_MIN_MS = 1000 / MAX_DAYLIGHT_TRANSITION_FPS;
-const DAYLIGHT_DARKNESS_BUCKET_STEP = 0.015;
-const TOOLTIP_POSITION_EPSILON = 0.75;
-const MODAL_BACKDROP_ALPHA = 0.34;
-const RAIN_LAYER_A_MIN_COUNT = 540;
-const RAIN_LAYER_A_MAX_COUNT = 1300;
-const RAIN_LAYER_B_MIN_COUNT = 360;
-const RAIN_LAYER_B_MAX_COUNT = 880;
-const RADIATION_MOTE_MIN_COUNT = 260;
-const RADIATION_MOTE_MAX_COUNT = 760;
-const HUD_FONT_FAMILY = "\"Segoe UI\", \"Noto Sans\", Arial, sans-serif";
-const HUD_FONT_WEIGHT_NORMAL: TextStyleFontWeight = "400";
-const HUD_FONT_WEIGHT_BOLD: TextStyleFontWeight = "700";
-
-function getHudTextLineHeight(fontSize: number): number {
-  return Math.max(1, Math.round(fontSize * 1.35));
-}
-
-function normalizeHudFontWeight(fontWeight?: TextStyleFontWeight): TextStyleFontWeight {
-  if (typeof fontWeight === "number") {
-    return fontWeight >= 550 ? HUD_FONT_WEIGHT_BOLD : HUD_FONT_WEIGHT_NORMAL;
-  }
-
-  if (!fontWeight) {
-    return HUD_FONT_WEIGHT_BOLD;
-  }
-
-  if (fontWeight === "bold" || fontWeight === "bolder") {
-    return HUD_FONT_WEIGHT_BOLD;
-  }
-
-  if (fontWeight === "normal" || fontWeight === "lighter") {
-    return HUD_FONT_WEIGHT_NORMAL;
-  }
-
-  const numericWeight = Number.parseInt(fontWeight, 10);
-  if (!Number.isNaN(numericWeight)) {
-    return numericWeight >= 550 ? HUD_FONT_WEIGHT_BOLD : HUD_FONT_WEIGHT_NORMAL;
-  }
-
-  return HUD_FONT_WEIGHT_BOLD;
-}
-
-function upgradingTooltip(
-  name: string,
-  level: number,
-  upgradingRemaining: number,
-  levelLabel: string,
-): string {
-  const status = upgradingRemaining > 0
-    ? `${Math.ceil(upgradingRemaining)}s`
-    : `${levelLabel} ${level}`;
-  return `${name} / ${status}`;
-}
-
-function capitalize(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
-}
+export type {
+  ConquestResultPreview,
+  GameOverPreview,
+  PixiActionDetail,
+  VillageInfoPanel,
+} from "./pixi/core/types";
 
 export class PixiVillageRenderer {
   private app: Application | null = null;
@@ -433,30 +253,15 @@ export class PixiVillageRenderer {
   private cameraTargetOffsetX = 0;
   private cameraTargetOffsetY = 0;
   private cameraTargetZoom = 1;
-  private cameraDragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null;
+  private cameraDragStart: CameraDragState | null = null;
   private cameraDragMoved = false;
   private cameraDragBlocked = false;
   private lastStaticWorldKey: string | null = null;
   private lastBackgroundKey: string | null = null;
-  private ambientAnimationFrameId: number | null = null;
-  private ambientCondition: EnvironmentConditionId = "stable";
-  private ambientIntensity = 1;
-  private ambientElapsedSeconds = 0;
-  private ambientSpeed: GameSpeed = 1;
-  private ambientPaused = false;
-  private ambientSyncAtMs = 0;
-  private lastVisualFrameAtMs = 0;
-  private lastEnvironmentOverlayFrameAtMs = 0;
-  private lastDaylightOverlayFrameAtMs = 0;
-  private lastEnvironmentOverlayKey = "";
-  private lastDaylightOverlayKey = "";
-  private lastTextureAnimationFrameAtMs = 0;
+  private readonly ambientEffects: AmbientEffectsController;
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
   private lastFormattedLogEntries: FormattedLogEntry[] = [];
-  private textureAnimationBindingCounter = 0;
-  private readonly noiseSeedCache: number[] = [];
-  private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
   private canvasTooltipHeight = 0;
@@ -467,7 +272,6 @@ export class PixiVillageRenderer {
   private readonly handlePointerDown = (event: PointerEvent) => this.handleHostPointerDown(event);
   private readonly handlePointerMove = (event: PointerEvent) => this.handleHostPointerMove(event);
   private readonly handlePointerUp = (event: PointerEvent) => this.handleHostPointerUp(event);
-  private readonly handleAmbientAnimationFrame = (timestamp: number) => this.animateAmbientOverlays(timestamp);
 
   constructor(
     private readonly host: HTMLElement,
@@ -497,6 +301,14 @@ export class PixiVillageRenderer {
     this.host.addEventListener("pointermove", this.handlePointerMove);
     this.host.addEventListener("pointerup", this.handlePointerUp);
     this.host.addEventListener("pointercancel", this.handlePointerUp);
+    this.ambientEffects = new AmbientEffectsController({
+      host: this.host,
+      getApp: () => this.app,
+      environmentOverlayGraphic: this.environmentOverlayGraphic,
+      daylightOverlayGraphic: this.daylightOverlayGraphic,
+      shouldAnimateCamera: () => this.shouldAnimateCamera(),
+      refreshCameraTransform: () => this.refreshCameraTransform(),
+    });
     void this.initialize();
   }
 
@@ -507,6 +319,7 @@ export class PixiVillageRenderer {
     infoPanel?: VillageInfoPanel | null,
     resolvedDecisionPreview?: DecisionHistoryEntry | null,
     conquestResultPreview?: ConquestResultPreview | null,
+    gameOverPreview?: GameOverPreview | null,
   ): void {
     this.lastState = state;
     this.lastTranslations = translations;
@@ -516,7 +329,8 @@ export class PixiVillageRenderer {
       infoPanel ||
       state.quests.activeDecision ||
       resolvedDecisionPreview ||
-      conquestResultPreview,
+      conquestResultPreview ||
+      gameOverPreview,
     );
 
     if (!this.app) {
@@ -531,11 +345,10 @@ export class PixiVillageRenderer {
     }
 
     this.layout = this.getLayout(width, height);
-    const hudPixelScale = this.getHudPixelScale();
+    const hudPixelScale = 1;
     const hudRenderScale = HUD_DESIGN_SCALE * hudPixelScale;
     const hudWidth = width / hudRenderScale;
     const hudHeight = height / hudRenderScale;
-    const visualTime = performance.now() / 1000;
     this.hudPixelScale = hudRenderScale;
     this.clearContainerChildren(this.cameraDynamicLayer);
     this.clearContainerChildren(this.hudLayer);
@@ -555,42 +368,51 @@ export class PixiVillageRenderer {
     const staticWorldKey = this.getStaticWorldKey(state);
     if (staticWorldKey !== this.lastStaticWorldKey) {
       this.clearContainerChildren(this.cameraStaticLayer);
-      this.drawTerrain(state);
-      this.drawDecorObjects();
+      drawWorldTerrain(this.worldRendererHost(), state);
+      drawWorldDecorObjects(this.worldRendererHost());
       this.lastStaticWorldKey = staticWorldKey;
     }
     const backgroundKey = `${Math.round(width)}x${Math.round(height)}`;
     if (backgroundKey !== this.lastBackgroundKey) {
       this.clearContainerChildren(this.backgroundLayer);
-      this.drawBackground(state, width, height);
+      drawWorldBackground(this.worldRendererHost(), width, height);
       this.lastBackgroundKey = backgroundKey;
     }
-    this.drawPalisade(state, translations);
-    this.drawResourceSites(state, translations);
+    drawWorldPalisade(this.worldRendererHost(), state, translations);
+    drawWorldResourceSites(this.worldRendererHost(), state, translations);
 
     for (const plot of nonPerimeterVillagePlots) {
-      this.drawPlot(plot, state, translations, visualTime);
+      drawWorldPlot(this.worldRendererHost(), plot, state, translations);
     }
 
     this.drawHud(state, translations, hudWidth, hudHeight);
-    this.drawVillageModal(state, translations, hudWidth, hudHeight, modalPlotId ?? null);
-    this.drawInfoPanel(state, translations, hudWidth, hudHeight, infoPanel ?? null);
-    this.drawQuestDecisionModal(
+    drawVillageModal(this.villageModalsHost(), state, translations, hudWidth, hudHeight, modalPlotId ?? null);
+    drawInfoPanel(this.infoPanelsHost(), state, translations, hudWidth, hudHeight, infoPanel ?? null);
+    drawQuestDecisionModal(
+      this.resultModalsHost(),
       state,
       translations,
       hudWidth,
       hudHeight,
       resolvedDecisionPreview ?? null,
     );
-    this.drawConquestResultModal(
+    drawConquestResultModal(
+      this.resultModalsHost(),
       translations,
       hudWidth,
       hudHeight,
       conquestResultPreview ?? null,
     );
-    this.syncAmbientOverlayState(state);
-    this.refreshAmbientOverlays(performance.now(), true);
-    this.updateAmbientAnimationLoop();
+    drawGameOverModal(
+      this.resultModalsHost(),
+      translations,
+      hudWidth,
+      hudHeight,
+      gameOverPreview ?? null,
+    );
+    this.ambientEffects.syncState(state);
+    this.ambientEffects.refreshOverlays(performance.now(), true);
+    this.ambientEffects.updateAnimationLoop();
     this.applyHudPixelScale(this.hudLayer, hudRenderScale);
     this.scaleHudInteractionBounds(hudRenderScale);
     this.app.render();
@@ -600,7 +422,7 @@ export class PixiVillageRenderer {
     const children = container.removeChildren();
 
     for (const child of children) {
-      this.unregisterTextureAnimationsForNode(child as Container);
+      this.ambientEffects.unregisterTextureAnimationsForNode(child as Container);
 
       child.destroy({ children: true });
     }
@@ -637,193 +459,90 @@ export class PixiVillageRenderer {
   }
 
   private handleHostWheel(event: WheelEvent): void {
-    if (this.handleScrollableWheel(
-      event,
-      this.resourceBreakdownScrollArea,
-      this.resourceBreakdownScrollMax,
-      this.resourceBreakdownScrollY,
-      (value) => {
-        this.resourceBreakdownScrollY = value;
+    handleWheelWithCamera(
+      {
+        host: this.host,
+        hudPixelScale: this.hudPixelScale,
+        hudInteractionAreas: this.hudInteractionAreas,
+        buildChoicesScrollArea: this.buildChoicesScrollArea,
+        buildChoicesScrollMax: this.buildChoicesScrollMax,
+        buildChoicesScrollY: this.buildChoicesScrollY,
+        setBuildChoicesScrollY: (value: number) => {
+          this.buildChoicesScrollY = value;
+        },
+        resourceBreakdownScrollArea: this.resourceBreakdownScrollArea,
+        resourceBreakdownScrollMax: this.resourceBreakdownScrollMax,
+        resourceBreakdownScrollY: this.resourceBreakdownScrollY,
+        setResourceBreakdownScrollY: (value: number) => {
+          this.resourceBreakdownScrollY = value;
+        },
+        logScrollArea: this.logScrollArea,
+        logScrollMax: this.logScrollMax,
+        logScrollY: this.logScrollY,
+        setLogScrollY: (value: number) => {
+          this.logScrollY = value;
+        },
+        decisionHistoryScrollArea: this.decisionHistoryScrollArea,
+        decisionHistoryScrollMax: this.decisionHistoryScrollMax,
+        decisionHistoryScrollY: this.decisionHistoryScrollY,
+        setDecisionHistoryScrollY: (value: number) => {
+          this.decisionHistoryScrollY = value;
+        },
+        requestRender: () => this.requestRender(),
+        cameraDragBlocked: this.cameraDragBlocked,
+        cameraTargetZoom: this.cameraTargetZoom,
+        cameraTargetOffsetX: this.cameraTargetOffsetX,
+        cameraTargetOffsetY: this.cameraTargetOffsetY,
+        setCameraTarget: (zoom: number, offsetX: number, offsetY: number) => {
+          this.cameraTargetZoom = zoom;
+          this.cameraTargetOffsetX = offsetX;
+          this.cameraTargetOffsetY = offsetY;
+        },
+        clampTargetCamera: (viewportWidth: number, viewportHeight: number) =>
+          this.clampTargetCamera(viewportWidth, viewportHeight),
+        updateAmbientAnimationLoop: () => this.ambientEffects.updateAnimationLoop(),
       },
-    )) {
-      return;
-    }
-
-    if (this.handleScrollableWheel(event, this.logScrollArea, this.logScrollMax, this.logScrollY, (value) => {
-      this.logScrollY = value;
-    })) {
-      return;
-    }
-
-    if (this.handleScrollableWheel(
       event,
-      this.decisionHistoryScrollArea,
-      this.decisionHistoryScrollMax,
-      this.decisionHistoryScrollY,
-      (value) => {
-        this.decisionHistoryScrollY = value;
-      },
-    )) {
-      return;
-    }
-
-    if (this.handleBuildChoicesWheel(event)) {
-      return;
-    }
-
-    if (this.isHudPointer(event.clientX, event.clientY)) {
-      event.preventDefault();
-      return;
-    }
-
-    this.handleCameraZoom(event);
-  }
-
-  private handleBuildChoicesWheel(event: WheelEvent): boolean {
-    if (!this.buildChoicesScrollArea || this.buildChoicesScrollMax <= 0) {
-      return false;
-    }
-
-    const rect = this.host.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const area = this.buildChoicesScrollArea;
-
-    if (
-      x < area.x ||
-      x > area.x + area.width ||
-      y < area.y ||
-      y > area.y + area.height
-    ) {
-      return false;
-    }
-
-    event.preventDefault();
-    const nextScroll = Math.max(
-      0,
-      Math.min(this.buildChoicesScrollMax, this.buildChoicesScrollY + this.getLogicalWheelDelta(event)),
     );
-
-    if (nextScroll === this.buildChoicesScrollY) {
-      return true;
-    }
-
-    this.buildChoicesScrollY = nextScroll;
-    this.requestRender();
-    return true;
-  }
-
-  private handleScrollableWheel(
-    event: WheelEvent,
-    area: Bounds | null,
-    scrollMax: number,
-    scrollY: number,
-    setScrollY: (value: number) => void,
-  ): boolean {
-    if (!area || scrollMax <= 0) {
-      return false;
-    }
-
-    const rect = this.host.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    if (
-      x < area.x ||
-      x > area.x + area.width ||
-      y < area.y ||
-      y > area.y + area.height
-    ) {
-      return false;
-    }
-
-    event.preventDefault();
-    const nextScroll = Math.max(0, Math.min(scrollMax, scrollY + this.getLogicalWheelDelta(event)));
-
-    if (nextScroll === scrollY) {
-      return true;
-    }
-
-    setScrollY(nextScroll);
-    this.requestRender();
-    return true;
-  }
-
-  private handleCameraZoom(event: WheelEvent): void {
-    if (this.cameraDragBlocked || this.isHudPointer(event.clientX, event.clientY)) {
-      event.preventDefault();
-      return;
-    }
-
-    const rect = this.host.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const previousZoom = this.cameraTargetZoom;
-    const nextZoom = Math.max(
-      CAMERA_MIN_ZOOM,
-      Math.min(CAMERA_MAX_ZOOM, previousZoom * Math.exp(-event.deltaY * CAMERA_ZOOM_STEP)),
-    );
-
-    if (nextZoom === previousZoom) {
-      event.preventDefault();
-      return;
-    }
-
-    const worldX = (x - this.cameraTargetOffsetX) / previousZoom;
-    const worldY = (y - this.cameraTargetOffsetY) / previousZoom;
-    this.cameraTargetZoom = nextZoom;
-    this.cameraTargetOffsetX = x - worldX * nextZoom;
-    this.cameraTargetOffsetY = y - worldY * nextZoom;
-    this.clampTargetCamera(this.host.clientWidth, this.host.clientHeight);
-    this.updateAmbientAnimationLoop();
-    event.preventDefault();
   }
 
   private handleHostPointerDown(event: PointerEvent): void {
-    if (this.cameraDragBlocked || event.button !== 0 || this.isHudPointer(event.clientX, event.clientY)) {
+    const dragStart = handlePointerDownWithCamera(
+      this.host,
+      this.hudInteractionAreas,
+      this.cameraDragBlocked,
+      event,
+      this.cameraTargetOffsetX,
+      this.cameraTargetOffsetY,
+    );
+    if (!dragStart) {
       return;
     }
-
-    this.cameraDragStart = {
-      x: event.clientX,
-      y: event.clientY,
-      offsetX: this.cameraTargetOffsetX,
-      offsetY: this.cameraTargetOffsetY,
-    };
+    this.cameraDragStart = dragStart;
     this.cameraDragMoved = false;
-    this.host.setPointerCapture(event.pointerId);
   }
 
   private handleHostPointerMove(event: PointerEvent): void {
-    if (!this.cameraDragStart) {
+    const next = handlePointerMoveWithCamera(this.host, this.cameraDragStart, event);
+    if (!next) {
       return;
     }
-
-    const deltaX = event.clientX - this.cameraDragStart.x;
-    const deltaY = event.clientY - this.cameraDragStart.y;
-
-    if (!this.cameraDragMoved && Math.hypot(deltaX, deltaY) < 5) {
+    if (!next.moved && !this.cameraDragMoved) {
       return;
     }
-
     this.cameraDragMoved = true;
-    this.cameraTargetOffsetX = this.cameraDragStart.offsetX + deltaX;
-    this.cameraTargetOffsetY = this.cameraDragStart.offsetY + deltaY;
+    this.cameraTargetOffsetX = next.offsetX;
+    this.cameraTargetOffsetY = next.offsetY;
     this.clampTargetCamera(this.host.clientWidth, this.host.clientHeight);
-    this.updateAmbientAnimationLoop();
-    event.preventDefault();
+    this.ambientEffects.updateAnimationLoop();
   }
 
   private handleHostPointerUp(event: PointerEvent): void {
-    if (!this.cameraDragStart) {
+    if (!handlePointerUpWithCamera(this.host, this.cameraDragStart, event)) {
       return;
     }
 
     this.cameraDragStart = null;
-
-    if (this.host.hasPointerCapture(event.pointerId)) {
-      this.host.releasePointerCapture(event.pointerId);
-    }
 
     if (this.cameraDragMoved) {
       this.cameraDragMoved = false;
@@ -832,16 +551,7 @@ export class PixiVillageRenderer {
   }
 
   private isHudPointer(clientX: number, clientY: number): boolean {
-    const rect = this.host.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    return this.hudInteractionAreas.some((area) =>
-      x >= area.x &&
-      x <= area.x + area.width &&
-      y >= area.y &&
-      y <= area.y + area.height
-    );
+    return isHudPointerArea(this.host, this.hudInteractionAreas, clientX, clientY);
   }
 
   destroy(): void {
@@ -851,7 +561,7 @@ export class PixiVillageRenderer {
     this.host.removeEventListener("pointermove", this.handlePointerMove);
     this.host.removeEventListener("pointerup", this.handlePointerUp);
     this.host.removeEventListener("pointercancel", this.handlePointerUp);
-    this.stopAmbientAnimation();
+    this.ambientEffects.stopAnimation();
     this.app?.destroy(true);
     this.app = null;
   }
@@ -876,340 +586,6 @@ export class PixiVillageRenderer {
     this.requestRender();
   }
 
-  private drawBackground(_state: GameState, width: number, height: number): void {
-    const base = new Graphics();
-    base.rect(0, 0, width, height).fill({ color: 0x151812, alpha: 1 });
-    this.backgroundLayer.addChild(base);
-
-    const overlay = new Graphics();
-    overlay.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0.08 });
-    this.backgroundLayer.addChild(overlay);
-  }
-
-  private drawTerrain(state: GameState): void {
-    const layout = defaultVillageLayout;
-
-    const scale = this.layout.scale;
-    const tileSize = layout.tileSize * scale;
-    const terrainWidth = layout.width * scale;
-    const terrainHeight = layout.height * scale;
-    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
-    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-
-    for (const layer of layout.tileLayers) {
-      for (const tile of layer.tiles) {
-        const tileX = originX + tile.x * tileSize;
-        const tileY = originY + tile.y * tileSize;
-
-        const sprite = this.createTerrainSprite(tile.textureKey);
-
-        if (!sprite) {
-          continue;
-        }
-        const tileDefinition = layout.tileTextures[tile.textureKey];
-        const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
-
-        if (tint) {
-          sprite.tint = tint;
-        }
-
-        sprite.alpha = layer.opacity;
-
-        if (tile.rotation || tile.flipX || tile.flipY) {
-          sprite.anchor.set(0.5);
-          sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
-          sprite.x = tileX + tileSize / 2;
-          sprite.y = tileY + tileSize / 2;
-          sprite.scale.set(
-            (tile.flipX ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.width),
-            (tile.flipY ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.height),
-          );
-        } else {
-          sprite.x = tileX;
-          sprite.y = tileY;
-          sprite.width = tileSize + 0.5;
-          sprite.height = tileSize + 0.5;
-        }
-
-        this.cameraStaticLayer.addChild(sprite);
-      }
-    }
-  }
-
-  private drawDecorObjects(): void {
-    const layout = defaultVillageLayout;
-    const scale = this.layout.scale;
-    const terrainWidth = layout.width * scale;
-    const terrainHeight = layout.height * scale;
-    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
-    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-
-    for (const layer of layout.objectLayers.filter((candidate) => candidate.name === "decor")) {
-      const objects = [...layer.objects].sort((left, right) => left.y - right.y);
-
-      for (const object of objects) {
-        if (!object.textureKey) {
-          continue;
-        }
-
-        const objectX = originX + object.x * scale;
-        const objectY = originY + object.y * scale;
-        const objectWidth = object.width * scale;
-        const objectHeight = object.height * scale;
-
-        const sprite = this.createTerrainSprite(object.textureKey);
-
-        if (!sprite) {
-          continue;
-        }
-        sprite.anchor.set(0, 1);
-        sprite.x = objectX;
-        sprite.y = objectY;
-        sprite.width = objectWidth;
-        sprite.height = objectHeight;
-        sprite.rotation = (object.rotation * Math.PI) / 180;
-        sprite.alpha = object.opacity * layer.opacity;
-        this.cameraStaticLayer.addChild(sprite);
-      }
-    }
-  }
-
-  private drawPalisade(
-    state: GameState,
-    translations?: TranslationPack,
-  ): void {
-    const plotDefinition = palisadePlotDefinition;
-
-    if (!plotDefinition) {
-      return;
-    }
-
-    const plotId = plotDefinition.id;
-    const plot = state.village.plots.find((candidate) => candidate.id === plotId);
-    const building = plot?.buildingId ? state.buildings[plot.buildingId] : null;
-    const selected = state.village.selectedPlotId === plotId;
-
-    const bounds = this.getPlotBounds(plotDefinition);
-    const badgeX = bounds.x + bounds.width / 2;
-    const badgeY = bounds.y - 18 * this.layout.scale;
-
-    this.addPalisadeTooltip(
-      plotDefinition,
-      selected,
-      building?.level ?? 0,
-      building?.upgradingRemaining ?? 0,
-      translations?.buildings.palisade.name ?? "Palisade",
-    );
-
-    if (building) {
-      this.drawBuildingLevelBadge(
-        this.cameraDynamicLayer,
-        Math.max(1, building.level),
-        badgeX,
-        badgeY,
-        translations,
-        translations?.buildings.palisade.name ?? "Palisade",
-      );
-    }
-
-    if (building && building.upgradingRemaining > 0) {
-      this.drawConstructionCountdown(
-        this.cameraDynamicLayer,
-        building.upgradingRemaining,
-        bounds.x + bounds.width / 2,
-        bounds.y - 52 * this.layout.scale,
-        Math.max(70, 86 * this.layout.scale),
-        undefined,
-      );
-    }
-  }
-
-  private drawResourceSites(
-    state: GameState,
-    translations?: TranslationPack,
-  ): void {
-    for (const siteDefinition of resourceSiteDefinitions) {
-      this.drawResourceSite(siteDefinition, state, translations);
-    }
-  }
-
-  private drawResourceSite(
-    siteDefinition: VillageResourceSiteDefinition,
-    state: GameState,
-    translations?: TranslationPack,
-  ): void {
-    const siteState = state.resourceSites.find((candidate) => candidate.id === siteDefinition.id);
-
-    if (!siteState) {
-      return;
-    }
-
-    const bounds = this.getPlotBounds(siteDefinition);
-    const selected = this.activeModalPlotId === siteDefinition.id;
-    const layer = new Container();
-    layer.x = bounds.x + bounds.width / 2;
-    layer.y = bounds.y + bounds.height / 2;
-    layer.hitArea = {
-      contains: (x: number, y: number) =>
-        x >= -bounds.width / 2 &&
-        x <= bounds.width / 2 &&
-        y >= -bounds.height / 2 &&
-        y <= bounds.height / 2,
-    };
-    this.cameraDynamicLayer.addChild(layer);
-
-    const ring = new Graphics();
-    const radius = Math.max(16, Math.min(bounds.width, bounds.height) * 0.34);
-    const isCaptured = siteState.captured;
-    const isAssault = Boolean(siteState.assault);
-    const fill = isCaptured ? 0x14322d : isAssault ? 0x3f2e18 : 0x2b1717;
-    const stroke = isCaptured ? 0x9ed99b : isAssault ? 0xf1c17f : 0xd38a8a;
-    ring.circle(0, 0, radius).fill({ color: fill, alpha: selected ? 0.78 : 0.58 }).stroke({
-      color: stroke,
-      alpha: selected ? 1 : 0.9,
-      width: selected ? 3 : 2,
-    });
-    layer.addChild(ring);
-
-    const resourceIcon = siteState.resourceId === "food"
-      ? "food"
-      : siteState.resourceId === "coal"
-        ? "coal"
-        : "material";
-    this.drawIcon(layer, resourceIcon, 0, 0, Math.max(18, radius * 1.1));
-
-    if (siteState.assault) {
-      this.drawConstructionCountdown(
-        layer,
-        siteState.assault.remainingSeconds,
-        0,
-        -radius - 24,
-        Math.max(60, radius * 2.1),
-        undefined,
-      );
-    }
-
-    if (siteState.captured) {
-      this.drawText(
-        layer,
-        `${siteState.assignedWorkers}/${siteState.maxWorkers}`,
-        -radius * 0.55,
-        radius * 0.3,
-        {
-          fill: 0xe6f0e0,
-          fontSize: 11,
-          fontWeight: "900",
-        },
-      );
-      this.drawIcon(layer, "people", radius * 0.5, radius * 0.55, 14);
-    }
-
-    const resourceName = translations?.resources[siteState.resourceId] ?? siteState.resourceId;
-    const tooltip = siteState.assault
-      ? `${resourceName} / ${translations?.ui.resourceSiteStatusAssault ?? "Assault in progress"}`
-      : siteState.captured
-        ? `${resourceName} / ${translations?.ui.resourceSiteStatusCaptured ?? "Captured"}`
-        : `${resourceName} / ${translations?.ui.resourceSiteStatusLocked ?? "Locked"}`;
-    this.bindTooltip(layer, tooltip);
-  }
-
-  private drawPlot(
-    plot: VillagePlotDefinition,
-    state: GameState,
-    translations?: TranslationPack,
-    visualTime = 0,
-  ): void {
-    const plotState = state.village.plots.find((candidate) => candidate.id === plot.id);
-    const buildingId = plotState?.buildingId ?? null;
-    const building = buildingId ? state.buildings[buildingId] : null;
-    const definition = buildingId ? buildingById[buildingId] : null;
-    const name = buildingId && definition
-      ? translations?.buildings[buildingId].name ?? definition.name
-      : "";
-    const bounds = this.getPlotBounds(plot);
-    const selected = state.village.selectedPlotId === plot.id;
-    const isMainPlot = plot.allowedBuildingIds?.includes("mainBuilding") ?? false;
-
-    const plotLayer = new Container();
-    plotLayer.x = bounds.x + bounds.width / 2;
-    plotLayer.y = bounds.y + bounds.height / 2;
-    plotLayer.hitArea = {
-      contains: (x: number, y: number) =>
-        x >= -bounds.width / 2 &&
-        x <= bounds.width / 2 &&
-        y >= -bounds.height / 2 &&
-        y <= bounds.height / 2,
-    };
-    this.cameraDynamicLayer.addChild(plotLayer);
-
-    if (buildingId && building) {
-      const tooltip = upgradingTooltip(
-        name,
-        building.level,
-        building.upgradingRemaining,
-        translations?.ui.level ?? "Lvl",
-      );
-      this.bindTooltip(plotLayer, tooltip);
-
-      const asset = this.createBuildingSprite(buildingId, Math.max(1, building.level), building.level > 0);
-      asset.anchor.set(0.5);
-      this.fitSprite(
-        asset,
-        bounds.width * VILLAGE_BUILDING_RENDER_SCALE,
-        bounds.height * VILLAGE_BUILDING_RENDER_SCALE,
-      );
-      asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
-      plotLayer.addChild(asset);
-      if (isBuildingInactiveDueToCoal(state, buildingId)) {
-        this.drawPowerWarning(plotLayer, bounds);
-      }
-      this.drawBuildingLevelBadge(
-        plotLayer,
-        Math.max(1, building.level),
-        -bounds.width * 0.43,
-        -bounds.height * 0.5,
-        translations,
-        name,
-      );
-      this.drawBuildingWorkerBadge(plotLayer, buildingId, building.workers, getBuildingWorkerLimit(state, buildingId), bounds, translations);
-      if (building.upgradingRemaining > 0) {
-        this.drawConstructionCountdown(
-          plotLayer,
-          building.upgradingRemaining,
-          0,
-          -bounds.height * 0.72,
-          Math.max(64, Math.min(92, bounds.width * 0.82)),
-          translations,
-        );
-      }
-      return;
-    }
-
-    this.bindTooltip(plotLayer, translations?.ui.emptyPlot ?? "Empty plot");
-    const empty = new Graphics();
-    const markerSize = Math.min(bounds.width, bounds.height) * 0.42;
-    const alpha = selected ? 0.95 : 0.44;
-    empty
-      .circle(0, 0, markerSize * 0.52)
-      .fill({ color: 0x10120e, alpha: selected ? 0.24 : 0.12 })
-      .stroke({
-        color: selected ? 0xf3c85f : 0xe0c46f,
-        alpha,
-        width: selected ? 3 : 2,
-      });
-    empty
-      .moveTo(-markerSize * 0.22, 0)
-      .lineTo(markerSize * 0.22, 0)
-      .moveTo(0, -markerSize * 0.22)
-      .lineTo(0, markerSize * 0.22)
-      .stroke({
-        color: selected ? 0xf3c85f : 0xeadca0,
-        alpha: selected ? 0.95 : 0.58,
-        width: Math.max(3, 5 * this.layout.scale),
-      });
-    plotLayer.addChild(empty);
-  }
-
   private drawHud(
     state: GameState,
     translations: TranslationPack | undefined,
@@ -1222,11 +598,11 @@ export class PixiVillageRenderer {
     const population = getPopulation(state);
     const housing = getHousingStatus(state);
     const rates = this.getTotalResourceProductionRates(state);
-    const moraleRate = this.getHourlyRateLabel(rates.morale);
-    const moraleRateColor = this.getRateColor(rates.morale);
+    const moraleRate = getHourlyRateLabel(rates.morale);
+    const moraleRateColor = getRateColor(rates.morale);
 
     const profileKind = getDecisionProfileKind(state);
-    const profileLabel = t ? this.getDecisionProfileOverallLabel(state, t) : undefined;
+    const profileLabel = t ? getDecisionProfileOverallLabel(state, t) : undefined;
     const profileTooltip = t && profileLabel
       ? `${t.ui.leadershipProfile ?? "Leadership profile"}\n${profileLabel}`
       : undefined;
@@ -1234,7 +610,7 @@ export class PixiVillageRenderer {
     const topStripBottom = this.drawTopStrip(width);
     const topRowY = 8;
     const topPanelsY = topStripBottom + 10;
-    this.drawLeftHudArea(height);
+    drawHudLeftArea(this.hudPanelsHost(), height);
 
     this.drawBrand(
       state.communityName,
@@ -1273,25 +649,590 @@ export class PixiVillageRenderer {
       topRowY,
     );
     this.drawResourcePills(state, translations, width, rates, topRowY);
-    const conquestPanelHeight = this.drawActiveConquests(state, translations, width, topPanelsY);
-    this.drawQuestPanel(state, translations, width, topPanelsY + conquestPanelHeight + 10);
-    this.drawEventLog(state, translations, height);
-    this.drawActionPanel(state, translations, width, height);
-    this.drawToolbar(state, translations, width, height);
+    drawHudPanels(this.hudPanelsHost(), state, translations, width, height, topPanelsY);
   }
 
-  private drawLeftHudArea(height: number): void {
-    const areaHeight = Math.max(0, height - HUD_TOP_STRIP_HEIGHT);
+  private hudPanelsHost() {
+    return {
+      hudLayer: this.hudLayer,
+      getLogScrollY: () => this.logScrollY,
+      setLogScrollY: (value: number) => {
+        this.logScrollY = value;
+      },
+      setLogScrollMax: (value: number) => {
+        this.logScrollMax = value;
+      },
+      setLogScrollArea: (value: Bounds | null) => {
+        this.logScrollArea = value;
+      },
+      drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
+        this.drawIcon(parent, iconId, x, y, size),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      registerHudInteractionArea: (x: number, y: number, width: number, height: number, padding = 0) =>
+        this.registerHudInteractionArea(x, y, width, height, padding),
+      createIconButton: (
+        parent: Container,
+        iconId: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        tooltip?: string,
+        active = false,
+      ) => this.createIconButton(parent, iconId, x, y, width, height, detail, tooltip, active),
+      createHudButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        active = false,
+      ) => this.createHudButton(parent, label, x, y, width, height, detail, active),
+      createCircularActionButton: (
+        parent: Container,
+        iconId: string,
+        x: number,
+        y: number,
+        radius: number,
+        detail: PixiActionDetail,
+        tooltip: string,
+        active = false,
+      ) => this.createCircularActionButton(parent, iconId, x, y, radius, detail, tooltip, active),
+      getFormattedLogEntries: (state: GameState, translations: TranslationPack | undefined) =>
+        this.getFormattedLogEntries(state, translations),
+      wrapLogText: (text: string, fontWeight: TextStyleFontWeight, maxWidth: number) =>
+        this.wrapLogText(text, fontWeight, maxWidth),
+      drawRewardLine: (parent: Container, bag: ResourceBag, translations: TranslationPack, x: number, y: number) =>
+        this.drawRewardLine(parent, bag, translations, x, y),
+    };
+  }
 
-    if (areaHeight <= 0) {
-      return;
-    }
+  private resultModalsHost() {
+    return {
+      hudLayer: this.hudLayer,
+      drawModalBackdrop: (
+        overlay: Container,
+        width: number,
+        height: number,
+        closeAction?: PixiActionDetail,
+        blockClose = false,
+      ) => this.drawModalBackdrop(overlay, width, height, closeAction, blockClose),
+      measureWrappedTextHeight: (
+        text: string,
+        fontSize: number,
+        fontWeight: TextStyleFontWeight,
+        maxWidth: number,
+      ) => this.measureWrappedTextHeight(text, fontSize, fontWeight, maxWidth),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawOverlayHeader: (
+        parent: Container,
+        panelWidth: number,
+        translations: TranslationPack,
+        options: {
+          iconId: string;
+          title: string;
+          closeAction?: PixiActionDetail;
+          kicker?: string;
+          subtitle?: string;
+          rightText?: string;
+        },
+      ) => this.drawOverlayHeader(parent, panelWidth, translations, options),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      createModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        disabled = false,
+        tooltip?: string,
+      ) => this.createModalButton(parent, label, x, y, width, height, detail, disabled, tooltip),
+      drawDecisionImpactChips: (
+        parent: Container,
+        impacts: EffectLine[],
+        rightX: number,
+        y: number,
+      ) => this.drawDecisionImpactChips(parent, impacts, rightX, y),
+    };
+  }
 
-    const area = new Graphics();
-    area
-      .rect(0, HUD_TOP_STRIP_HEIGHT, HUD_LEFT_PANEL_WIDTH, areaHeight)
-      .fill({ color: 0x151812, alpha: 1 });
-    this.hudLayer.addChild(area);
+  private infoPanelsHost() {
+    return {
+      hudLayer: this.hudLayer,
+      requestRender: () => this.requestRender(),
+      drawModalBackdrop: (
+        overlay: Container,
+        width: number,
+        height: number,
+        closeAction?: PixiActionDetail,
+        blockClose = false,
+      ) => this.drawModalBackdrop(overlay, width, height, closeAction, blockClose),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawOverlayHeader: (
+        parent: Container,
+        panelWidth: number,
+        translations: TranslationPack,
+        options: {
+          iconId: string;
+          title: string;
+          closeAction?: PixiActionDetail;
+          kicker?: string;
+          subtitle?: string;
+          rightText?: string;
+        },
+      ) => this.drawOverlayHeader(parent, panelWidth, translations, options),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
+        this.drawIcon(parent, iconId, x, y, size),
+      drawTabs: <T extends string>(
+        parent: Container,
+        tabs: Array<TabItem<T>>,
+        options: TabOptions<T>,
+      ) => this.drawTabs(parent, tabs, options),
+      bindLocalAction: (target: Container, onTap: () => void) => this.bindLocalAction(target, onTap),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
+      measureWrappedTextHeight: (
+        text: string,
+        fontSize: number,
+        fontWeight: TextStyleFontWeight,
+        maxWidth: number,
+      ) => this.measureWrappedTextHeight(text, fontSize, fontWeight, maxWidth),
+      drawDecisionImpactChips: (
+        parent: Container,
+        impacts: EffectLine[],
+        rightX: number,
+        y: number,
+      ) => this.drawDecisionImpactChips(parent, impacts, rightX, y),
+      getTroopHousingCapacity: (state: GameState) => this.getTroopHousingCapacity(state),
+      getDecisionHistoryScrollY: () => this.decisionHistoryScrollY,
+      setDecisionHistoryScrollY: (value: number) => {
+        this.decisionHistoryScrollY = value;
+      },
+      setDecisionHistoryScrollMax: (value: number) => {
+        this.decisionHistoryScrollMax = value;
+      },
+      setDecisionHistoryScrollArea: (value: Bounds | null) => {
+        this.decisionHistoryScrollArea = value;
+      },
+      getSelectedDecisionHistoryIndex: () => this.selectedDecisionHistoryIndex,
+      setSelectedDecisionHistoryIndex: (value: number | null) => {
+        this.selectedDecisionHistoryIndex = value;
+      },
+      getActiveResourceBreakdownTab: () => this.activeResourceBreakdownTab,
+      setActiveResourceBreakdownTab: (value: ResourceBreakdownTab) => {
+        this.activeResourceBreakdownTab = value;
+      },
+      getResourceBreakdownScrollY: () => this.resourceBreakdownScrollY,
+      setResourceBreakdownScrollY: (value: number) => {
+        this.resourceBreakdownScrollY = value;
+      },
+      setResourceBreakdownScrollMax: (value: number) => {
+        this.resourceBreakdownScrollMax = value;
+      },
+      setResourceBreakdownScrollArea: (value: Bounds | null) => {
+        this.resourceBreakdownScrollArea = value;
+      },
+      getResourceBreakdownScrollResourceId: () => this.resourceBreakdownScrollResourceId,
+      setResourceBreakdownScrollResourceId: (value: ResourceId | null) => {
+        this.resourceBreakdownScrollResourceId = value;
+      },
+      getResourceBreakdownScrollTab: () => this.resourceBreakdownScrollTab,
+      setResourceBreakdownScrollTab: (value: ResourceBreakdownTab) => {
+        this.resourceBreakdownScrollTab = value;
+      },
+    };
+  }
+
+  private villageModalsHost() {
+    return {
+      hudLayer: this.hudLayer,
+      drawModalBackdrop: (
+        overlay: Container,
+        width: number,
+        height: number,
+        closeAction?: PixiActionDetail,
+        blockClose = false,
+      ) => this.drawModalBackdrop(overlay, width, height, closeAction, blockClose),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawOverlayHeader: (
+        parent: Container,
+        panelWidth: number,
+        translations: TranslationPack,
+        options: {
+          iconId: string;
+          title: string;
+          closeAction?: PixiActionDetail;
+          kicker?: string;
+          subtitle?: string;
+          rightText?: string;
+        },
+      ) => this.drawOverlayHeader(parent, panelWidth, translations, options),
+      createIconButton: (
+        parent: Container,
+        iconId: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        tooltip?: string,
+        active = false,
+      ) => this.createIconButton(parent, iconId, x, y, width, height, detail, tooltip, active),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      drawCenteredText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+        },
+      ) => this.drawCenteredText(parent, text, x, y, options),
+      createLocalModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        onTap: () => void,
+        disabled = false,
+      ) => this.createLocalModalButton(parent, label, x, y, width, height, onTap, disabled),
+      createRectButton: (parent: Container, options: RectButtonOptions) => this.createRectButton(parent, options),
+      drawBuildChoices: (
+        parent: Container,
+        plotId: string,
+        buildableBuildings: BuildingId[],
+        state: GameState,
+        translations: TranslationPack,
+        modalWidth: number,
+        modalHeight: number,
+      ) => drawBuildChoicesModal(
+        this.buildingModalsHost(),
+        parent,
+        plotId,
+        buildableBuildings,
+        state,
+        translations,
+        modalWidth,
+        modalHeight,
+      ),
+      drawBuildingDetail: (
+        parent: Container,
+        buildingId: BuildingId,
+        level: number,
+        upgradingRemaining: number,
+        maxLevel: number,
+        state: GameState,
+        translations: TranslationPack,
+        modalWidth: number,
+        modalHeight: number,
+      ) => drawBuildingDetailModal(
+        this.buildingModalsHost(),
+        parent,
+        buildingId,
+        level,
+        upgradingRemaining,
+        maxLevel,
+        state,
+        translations,
+        modalWidth,
+        modalHeight,
+      ),
+      getResourceSiteTroopCount: (siteId: string, availableTroops: number, minimumTroops: number) =>
+        this.getResourceSiteTroopCount(siteId, availableTroops, minimumTroops),
+      setResourceSiteTroopCount: (
+        siteId: string,
+        nextValue: number,
+        availableTroops: number,
+        minimumTroops: number,
+      ) => this.setResourceSiteTroopCount(siteId, nextValue, availableTroops, minimumTroops),
+    };
+  }
+
+  private buildingModalsHost() {
+    return {
+      requestRender: () => this.requestRender(),
+      playTabSwitchSound: () => this.playTabSwitchSound(),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      drawCenteredText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+        },
+      ) => this.drawCenteredText(parent, text, x, y, options),
+      drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
+        this.drawIcon(parent, iconId, x, y, size),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawTabs: <T extends string>(
+        parent: Container,
+        tabs: Array<TabItem<T>>,
+        options: TabOptions<T>,
+      ) => this.drawTabs(parent, tabs, options),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
+      createRectButton: (parent: Container, options: RectButtonOptions) => this.createRectButton(parent, options),
+      createModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        disabled = false,
+        tooltip?: string,
+      ) => this.createModalButton(parent, label, x, y, width, height, detail, disabled, tooltip),
+      createLocalModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        onTap: () => void,
+        disabled = false,
+      ) => this.createLocalModalButton(parent, label, x, y, width, height, onTap, disabled),
+      createBuildingSprite: (buildingId: BuildingId, level: number, built: boolean) =>
+        this.createBuildingSprite(buildingId, level, built),
+      fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => this.fitSprite(sprite, maxWidth, maxHeight),
+
+      getBuildChoicesScrollPlotId: () => this.buildChoicesScrollPlotId,
+      setBuildChoicesScrollPlotId: (value: string | null) => {
+        this.buildChoicesScrollPlotId = value;
+      },
+      getBuildChoicesScrollY: () => this.buildChoicesScrollY,
+      setBuildChoicesScrollY: (value: number) => {
+        this.buildChoicesScrollY = value;
+      },
+      setBuildChoicesScrollMax: (value: number) => {
+        this.buildChoicesScrollMax = value;
+      },
+      setBuildChoicesScrollArea: (value: Bounds | null) => {
+        this.buildChoicesScrollArea = value;
+      },
+      getActiveBuildCategory: () => this.activeBuildCategory,
+      setActiveBuildCategory: (value: BuildingCategory) => {
+        this.activeBuildCategory = value;
+      },
+
+      getMarketFromResource: () => this.marketFromResource,
+      setMarketFromResource: (value: MarketResourceId) => {
+        this.marketFromResource = value;
+      },
+      getMarketToResource: () => this.marketToResource,
+      setMarketToResource: (value: MarketResourceId) => {
+        this.marketToResource = value;
+      },
+      getMarketAmount: () => this.marketAmount,
+      setMarketAmount: (value: number) => {
+        this.marketAmount = value;
+      },
+      getBarracksTroopCount: () => this.barracksTroopCount,
+      setBarracksTroopCount: (value: number) => {
+        this.barracksTroopCount = value;
+      },
+    };
+  }
+
+  private worldRendererHost() {
+    return {
+      cameraStaticLayer: this.cameraStaticLayer,
+      cameraDynamicLayer: this.cameraDynamicLayer,
+      backgroundLayer: this.backgroundLayer,
+      layout: this.layout,
+      activeModalPlotId: this.activeModalPlotId,
+      drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
+        this.drawIcon(parent, iconId, x, y, size),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
+      createTerrainSprite: (textureKey: string) => this.ambientEffects.createTerrainSprite(
+        textureKey,
+        (key) => this.assets.getTerrainTileAnimationFrames(key),
+        (key) => this.assets.getTerrainTileTexture(key),
+      ),
+      createBuildingSprite: (buildingId: BuildingId, level: number, built: boolean) =>
+        this.createBuildingSprite(buildingId, level, built),
+      fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => this.fitSprite(sprite, maxWidth, maxHeight),
+      getPlotBounds: (plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">) =>
+        this.getPlotBounds(plot),
+      addPalisadeTooltip: (
+        plot: VillagePlotDefinition,
+        selected: boolean,
+        level: number,
+        upgradingRemaining: number,
+        name: string,
+      ) => this.addPalisadeTooltip(plot, selected, level, upgradingRemaining, name),
+      drawBuildingLevelBadge: (
+        parent: Container,
+        level: number,
+        x: number,
+        y: number,
+        translations?: TranslationPack,
+        buildingName?: string,
+      ) => this.drawBuildingLevelBadge(parent, level, x, y, translations, buildingName),
+      drawBuildingWorkerBadge: (
+        parent: Container,
+        buildingId: BuildingId,
+        workers: number,
+        workerLimit: number,
+        bounds: Bounds,
+        translations?: TranslationPack,
+      ) => this.drawBuildingWorkerBadge(parent, buildingId, workers, workerLimit, bounds, translations),
+      drawConstructionCountdown: (
+        parent: Container,
+        remainingSeconds: number,
+        x: number,
+        y: number,
+        width: number,
+        translations?: TranslationPack,
+      ) => this.drawConstructionCountdown(parent, remainingSeconds, x, y, width, translations),
+      drawPowerWarning: (parent: Container, bounds: Bounds) => this.drawPowerWarning(parent, bounds),
+    };
   }
 
   private drawTopStrip(width: number): number {
@@ -1410,7 +1351,7 @@ export class PixiVillageRenderer {
     const crisis = state.environment.activeCrisis;
 
     if (crisis?.kind === "shelter") {
-      const remaining = this.formatScoutingRemaining(Math.max(0, crisis.deadlineAt - state.elapsedSeconds));
+      const remaining = formatScoutingRemaining(Math.max(0, crisis.deadlineAt - state.elapsedSeconds));
       const tooltip = translations
         ? `${translations.ui.shelterCrisis}: ${remaining}`
         : `Shelter crisis: ${remaining}`;
@@ -1426,7 +1367,7 @@ export class PixiVillageRenderer {
     if (condition !== "stable") {
       const definition = getEnvironmentDefinition(condition);
       const conditionLabel = translations?.ui[definition.labelKey] ?? definition.id;
-      const remaining = this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
+      const remaining = formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
       const tooltip = translations
         ? [
           `${translations.ui.environment}: ${conditionLabel}`,
@@ -1557,7 +1498,7 @@ export class PixiVillageRenderer {
         ? state.resources[resource.id] / state.capacities[resource.id]
         : 1;
       const rate = rates[resource.id];
-      const rateLabel = this.getHourlyRateLabel(rate);
+      const rateLabel = getHourlyRateLabel(rate);
       const tooltip = translations
         ? `${translations.resources[resource.id]}: ${translations.resourceDescriptions[resource.id]}`
         : resource.id;
@@ -1566,7 +1507,7 @@ export class PixiVillageRenderer {
         resource.id,
         tooltip,
         rateLabel,
-        this.getRateColor(rate),
+        getRateColor(rate),
         { action: "open-resource-breakdown", resourceId: resource.id },
         stockRatio < 0.2 ? 0xff6f7d : undefined,
         true,
@@ -1580,842 +1521,19 @@ export class PixiVillageRenderer {
     this.registerHudInteractionForContainer(group, 6);
   }
 
-  private drawSurvivorOverviewPanel(
-    state: GameState,
-    translations: TranslationPack,
-    width: number,
-    height: number,
-  ): void {
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
+  private getTotalResourceProductionRates(state: GameState): Record<ResourceId, number> {
+    const rates = getResourceProductionRates(state);
+    const multiplier = getGlobalProductionMultiplier(state);
 
-    const panelWidth = 308;
-    const panelHeight = 302;
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(36, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-
-    const housing = getHousingStatus(state);
-    const buildingWorkers = getAssignedBuildingWorkerCount(state);
-    const constructionWorkers = getConstructionWorkerCount(state);
-    const resourceSiteWorkers = getAssignedResourceSiteWorkerCount(state);
-    const conqueringTroops = getResourceSiteAssaultTroopCount(state);
-    const totalPopulation = getPopulation(state);
-
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: "people",
-      title: translations.ui.survivors,
-      rightText: `${totalPopulation}`,
-      closeAction: { action: "close-village-modal" },
-    });
-
-    const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
-      { iconId: "people", value: `${state.survivors.workers}`, label: translations.ui.availableWorkers, tooltip: translations.ui.availableWorkers },
-      { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
-      { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
-      { iconId: "people", value: `${resourceSiteWorkers}`, label: translations.ui.resourceSiteWorkers ?? "Site workers", tooltip: translations.ui.resourceSiteWorkers ?? "Site workers" },
-      { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
-      { iconId: "shield", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
-      { iconId: "crisis-injured", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
-      {
-        iconId: "crisis-shelter",
-        value: `${housing.housed}/${housing.civilianCapacity + this.getTroopHousingCapacity(state)}`,
-        label: translations.ui.housed,
-        tooltip: translations.ui.housingTooltip,
-      },
-      {
-        iconId: "crisis-homeless",
-        value: `${housing.homeless}`,
-        label: translations.ui.homeless,
-        tooltip: translations.ui.housingTooltip,
-        missing: housing.homeless > 0,
-      },
-    ];
-
-    rows.forEach((row, index) => {
-      this.drawWorkforceRow(panel, {
-        ...row,
-        x: 18,
-        y: headerBottom + 2 + index * 23,
-        width: panelWidth - 28,
-      });
-    });
-
-  }
-
-  private drawDecisionArchivePanel(
-    state: GameState,
-    translations: TranslationPack,
-    width: number,
-    height: number,
-  ): void {
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-    const panelWidth = Math.min(720, width - 48);
-    const panelHeight = Math.max(420, Math.min(620, height - 72));
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(36, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: "archive",
-      title: translations.ui.decisionArchive ?? "Decision archive",
-      closeAction: { action: "close-village-modal" },
-    });
-
-    const profileHeadingY = headerBottom + 2;
-    this.drawText(panel, translations.ui.leadershipProfile ?? "Leadership profile", 28, profileHeadingY, {
-      fill: 0xd8c890,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-    this.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, profileHeadingY + 34, 24);
-    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 62, profileHeadingY + 22, {
-      fill: 0xf1df9a,
-      fontSize: 20,
-      fontWeight: "900",
-    });
-
-    const axesStartY = profileHeadingY + 66;
-    decisionProfileAxes.forEach((axis, index) => {
-      this.drawDecisionProfileAxis(
-        panel,
-        translations.ui[axis.leftLabelKey] ?? axis.leftLabelKey,
-        translations.ui[axis.rightLabelKey] ?? axis.rightLabelKey,
-        getDecisionProfileAxisValue(state, axis.id),
-        28,
-        axesStartY + index * 48,
-        panelWidth - 56,
-      );
-    });
-
-    const historyY = axesStartY + decisionProfileAxes.length * 48 + 12;
-    this.drawText(panel, translations.ui.decisionHistory ?? "Decision history", 28, historyY, {
-      fill: 0xd8c890,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-    const viewportY = historyY + 28;
-    const viewportHeight = Math.max(84, panelHeight - viewportY - 20);
-    const content = new Container();
-    const mask = new Graphics();
-    mask.rect(28, viewportY, panelWidth - 56, viewportHeight).fill({ color: 0xffffff, alpha: 1 });
-    panel.addChild(mask);
-    content.mask = mask;
-    panel.addChild(content);
-    this.decisionHistoryScrollArea = {
-      x: panel.x + 28,
-      y: panel.y + viewportY,
-      width: panelWidth - 56,
-      height: viewportHeight,
-    };
-
-    if (
-      this.selectedDecisionHistoryIndex !== null &&
-      !state.quests.decisionHistory[this.selectedDecisionHistoryIndex]
-    ) {
-      this.selectedDecisionHistoryIndex = null;
-    }
-
-    const history = state.quests.decisionHistory
-      .map((entry, originalIndex) => ({ entry, originalIndex }))
-      .reverse();
-
-    if (history.length === 0) {
-      this.drawText(panel, translations.ui.noDecisionHistory ?? "No decisions recorded yet.", 28, historyY + 30, {
-        fill: 0xbfc7be,
-        fontSize: 14,
-      });
-      return;
-    }
-
-    const rowWidth = panelWidth - 56;
-    const rowHeights = history.map((row) => {
-      const expanded = row.originalIndex === this.selectedDecisionHistoryIndex;
-      return this.getDecisionHistoryRowHeight(row, translations, rowWidth, expanded);
-    });
-    const contentHeight = rowHeights.reduce(
-      (total, rowHeight) => total + rowHeight + 8,
-      0,
-    );
-    this.decisionHistoryScrollMax = Math.max(0, contentHeight - viewportHeight);
-    this.decisionHistoryScrollY = Math.max(
-      0,
-      Math.min(this.decisionHistoryScrollY, this.decisionHistoryScrollMax),
-    );
-    content.y = viewportY - this.decisionHistoryScrollY;
-
-    let rowY = 0;
-
-    history.forEach((row, index) => {
-      const expanded = row.originalIndex === this.selectedDecisionHistoryIndex;
-      const rowHeight = rowHeights[index];
-      this.drawDecisionHistoryRow(
-        content,
-        row,
-        translations,
-        28,
-        rowY,
-        rowWidth,
-        rowHeight,
-        expanded,
-      );
-      rowY += rowHeight + 8;
-    });
-
-    if (this.decisionHistoryScrollMax > 0) {
-      const trackHeight = viewportHeight;
-      const thumbHeight = Math.max(32, trackHeight * (viewportHeight / contentHeight));
-      const thumbY = viewportY +
-        (trackHeight - thumbHeight) *
-          (this.decisionHistoryScrollY / this.decisionHistoryScrollMax);
-      const track = new Graphics();
-      track.rect(panelWidth - 18, viewportY, 5, trackHeight)
-        .fill({ color: 0x0b0d0a, alpha: 0.72 });
-      track.rect(panelWidth - 18, thumbY, 5, thumbHeight)
-        .fill({ color: 0xe0c46f, alpha: 0.6 });
-      panel.addChild(track);
-    }
-  }
-
-  private drawDecisionHistoryRow(
-    parent: Container,
-    row: DecisionHistoryRow,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    expanded: boolean,
-  ): void {
-    const { entry } = row;
-    const definitionCopy = translations.quests.decisions[entry.definitionId];
-    const option = this.getDecisionHistoryOption(entry);
-    const optionLabel = definitionCopy?.options[entry.optionId] ?? entry.optionId;
-    const result = definitionCopy?.results[entry.optionId] ?? "";
-    const day = `${translations.ui.day ?? "Day"} ${getGameDay(entry.resolvedAt)}`;
-    const time = formatGameClock(entry.resolvedAt);
-    const rowLayer = new Container();
-    rowLayer.x = x;
-    rowLayer.y = y;
-    parent.addChild(rowLayer);
-
-    const background = new Graphics();
-    background.rect(0, 0, width, height)
-      .fill({ color: expanded ? 0x1b1f18 : 0x171a14, alpha: 0.76 });
-    rowLayer.addChild(background);
-
-    this.bindLocalAction(rowLayer, () => {
-      this.selectedDecisionHistoryIndex = expanded ? null : row.originalIndex;
-      this.requestRender();
-    });
-    rowLayer.hitArea = new Rectangle(0, 0, width, height);
-
-    this.drawText(rowLayer, `${day} ${time}`, 14, 11, {
-      fill: 0xaeb6ad,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-    this.drawText(rowLayer, definitionCopy?.title ?? entry.definitionId, 104, 7, {
-      fill: 0xf5efdf,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-    this.drawText(rowLayer, optionLabel, 104, 23, {
-      fill: 0xd7ddd8,
-      fontSize: 12,
-      fontWeight: "700",
-    });
-
-    if (option) {
-      this.drawDecisionImpactChips(
-        rowLayer,
-        this.getDecisionImpactLines(option, translations).slice(0, expanded ? 8 : 4),
-        width - 14,
-        10,
-      );
-    }
-
-    if (!expanded) {
-      return;
-    }
-
-    const bodyText = definitionCopy?.body ?? "";
-    const resultText = result;
-    const bodyWidth = width - 28;
-    const bodyLabel = this.drawText(rowLayer, bodyText, 14, 52, {
-      fill: 0xc9d0ca,
-      fontSize: 12,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: bodyWidth,
-    });
-    const resultY = bodyLabel.y + bodyLabel.height + 8;
-    this.drawText(rowLayer, resultText, 14, resultY, {
-      fill: 0xf1df9a,
-      fontSize: 12,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: bodyWidth,
-    });
-  }
-
-  private getDecisionHistoryRowHeight(
-    row: DecisionHistoryRow,
-    translations: TranslationPack,
-    width: number,
-    expanded: boolean,
-  ): number {
-    if (!expanded) {
-      return 42;
-    }
-
-    const definitionCopy = translations.quests.decisions[row.entry.definitionId];
-    const resultText = definitionCopy?.results[row.entry.optionId] ?? "";
-    const contentWidth = width - 28;
-    const bodyHeight = this.measureWrappedTextHeight(
-      definitionCopy?.body ?? "",
-      12,
-      "700",
-      contentWidth,
-    );
-    const resultHeight = this.measureWrappedTextHeight(
-      resultText,
-      12,
-      "800",
-      contentWidth,
-    );
-
-    return Math.max(96, Math.ceil(52 + bodyHeight + 8 + resultHeight + 12));
-  }
-
-  private drawDecisionImpactChips(
-    parent: Container,
-    impacts: EffectLine[],
-    rightX: number,
-    y: number,
-  ): void {
-    let cursorX = rightX;
-
-    for (const impact of [...impacts].reverse()) {
-      const chip = new Container();
-      const value = this.drawText(chip, impact.value, 24, 4, {
-        fill: impact.negative ? 0xff9c8f : 0x9ed99b,
-        fontSize: 11,
-        fontWeight: "900",
-      });
-      const chipWidth = Math.max(42, 32 + value.width);
-      const background = new Graphics();
-      background.rect(0, 0, chipWidth, 22)
-        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 });
-      chip.addChildAt(background, 0);
-      this.drawIcon(chip, impact.iconId, 13, 11, 13);
-      chip.x = cursorX - chipWidth;
-      chip.y = y;
-      parent.addChild(chip);
-      this.bindTooltip(chip, impact.tooltip);
-      cursorX -= chipWidth + 5;
-    }
-  }
-
-  private getDecisionImpactLines(
-    option: DecisionQuestOptionDefinition,
-    translations: TranslationPack,
-  ): EffectLine[] {
-    const impacts: EffectLine[] = [];
-
-    for (const [resourceId, amount] of Object.entries(option.resources ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      const value = amount ?? 0;
-
-      if (value === 0) {
+    for (const site of state.resourceSites) {
+      if (!site.captured || site.assignedWorkers <= 0) {
         continue;
       }
 
-      impacts.push({
-        iconId: typedResourceId,
-        value: this.formatSignedInteger(value),
-        tooltip: `${translations.resources[typedResourceId]} ${this.formatSignedInteger(value)}`,
-        negative: value < 0,
-      });
+      rates[site.resourceId] += site.yieldPerWorker * site.assignedWorkers * multiplier;
     }
 
-    if (option.workers) {
-      impacts.push({
-        iconId: "people",
-        value: this.formatSignedInteger(option.workers),
-        tooltip: `${translations.ui.workers} ${this.formatSignedInteger(option.workers)}`,
-        negative: option.workers < 0,
-      });
-    }
-
-    if (option.injured) {
-      impacts.push({
-        iconId: "crisis-injured",
-        value: this.formatSignedInteger(option.injured),
-        tooltip: `${translations.roles.injured} ${this.formatSignedInteger(option.injured)}`,
-        negative: option.injured > 0,
-      });
-    }
-
-    if (option.morale) {
-      impacts.push({
-        iconId: "morale",
-        value: this.formatSignedInteger(option.morale),
-        tooltip: `${translations.resources.morale} ${this.formatSignedInteger(option.morale)}`,
-        negative: option.morale < 0,
-      });
-    }
-
-    return impacts;
-  }
-
-  private getDecisionHistoryOption(entry: DecisionHistoryEntry): DecisionQuestOptionDefinition | null {
-    return decisionQuestById[entry.definitionId]?.options.find(
-      (option) => option.id === entry.optionId,
-    ) ?? null;
-  }
-
-  private formatSignedInteger(value: number): string {
-    return value > 0 ? `+${value}` : `${value}`;
-  }
-
-  private drawDecisionProfileAxis(
-    parent: Container,
-    leftLabel: string,
-    rightLabel: string,
-    value: number,
-    x: number,
-    y: number,
-    width: number,
-  ): void {
-    this.drawText(parent, leftLabel, x, y, {
-      fill: value < -15 ? 0xf1df9a : 0xbfc7be,
-      fontSize: 12,
-      fontWeight: "900",
-    });
-    const right = this.drawText(parent, rightLabel, x + width, y, {
-      fill: value > 15 ? 0xf1df9a : 0xbfc7be,
-      fontSize: 12,
-      fontWeight: "900",
-      align: "right",
-    });
-    right.anchor.x = 1;
-
-    const trackY = y + 22;
-    const track = new Graphics();
-    track.rect(x, trackY, width, 8)
-      .fill({ color: 0x0b0d0a, alpha: 0.78 });
-    const centerX = x + width / 2;
-    track.rect(centerX - 1, trackY - 4, 2, 16)
-      .fill({ color: 0xd8c890, alpha: 0.42 });
-    parent.addChild(track);
-
-    const knobX = x + ((value + 100) / 200) * width;
-    const knob = new Graphics();
-    knob.circle(knobX, trackY + 4, 7)
-      .fill({ color: 0xe0c46f, alpha: 0.95 });
-    parent.addChild(knob);
-  }
-
-  private getDecisionProfileOverallLabel(state: GameState, translations: TranslationPack): string {
-    const key = decisionProfileLabelKeyByKind[getDecisionProfileKind(state)];
-    return translations.ui[key] ?? key;
-  }
-
-  private drawActiveConquests(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    y: number,
-  ): number {
-    const panelWidth = HUD_LEFT_PANEL_WIDTH;
-    const layer = new Container();
-    layer.x = HUD_SIDE_PANEL_MARGIN;
-    layer.y = y;
-    this.hudLayer.addChild(layer);
-
-    const activeAssaults = state.resourceSites
-      .filter((site) => site.assault)
-      .slice(0, 4);
-    const panelHeight = activeAssaults.length > 0 ? 52 + activeAssaults.length * 24 : 82;
-
-    this.drawIcon(layer, "scout", 18, 22, 15);
-    this.drawText(layer, translations?.ui.activeConquests ?? "Active conquests", 34, 14, {
-      fill: 0xf3edda,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-    this.drawText(layer, `${activeAssaults.length}`, panelWidth - 28, 14, {
-      fill: 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "900",
-    }).anchor.set(1, 0);
-
-    if (activeAssaults.length === 0) {
-      this.drawText(layer, translations?.ui.noActiveConquests ?? "No active conquest teams.", 14, 48, {
-        fill: 0xaeb4b8,
-        fontSize: 11,
-        fontWeight: "800",
-      });
-      this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-      return panelHeight;
-    }
-
-    activeAssaults.forEach((site, index) => {
-      const remaining = this.formatScoutingRemaining(site.assault?.remainingSeconds ?? 0);
-      const rowY = 44 + index * 24;
-      this.drawIcon(layer, "people", 18, rowY + 10, 13);
-      this.drawText(layer, `${translations?.resources[site.resourceId] ?? site.resourceId}: ${site.assault?.troops ?? 0}`, 34, rowY + 2, {
-        fill: 0xf5efdf,
-        fontSize: 11,
-        fontWeight: "900",
-      });
-      const timer = this.drawText(layer, `${translations?.ui.returnsIn ?? "returns in"} ${remaining}`, panelWidth - 14, rowY + 2, {
-        fill: 0xd8c890,
-        fontSize: 11,
-        fontWeight: "800",
-      });
-      timer.anchor.set(1, 0);
-    });
-
-    this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-    return panelHeight;
-  }
-
-  private drawQuestPanel(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    y: number,
-  ): void {
-    if (!translations) {
-      return;
-    }
-
-    const panelWidth = HUD_LEFT_PANEL_WIDTH;
-    const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
-    const rowHeight = 70;
-    const panelHeight = activeObjectives.length > 0
-      ? 48 + activeObjectives.length * rowHeight
-      : 82;
-    const layer = new Container();
-    layer.x = HUD_SIDE_PANEL_MARGIN;
-    layer.y = y;
-    this.hudLayer.addChild(layer);
-
-    this.drawIcon(layer, "build", 18, 22, 15);
-    this.drawText(layer, translations.quests.ui.activeObjectives, 34, 14, {
-      fill: 0xf3edda,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-    this.drawText(layer, `${activeObjectives.length}`, panelWidth - 28, 14, {
-      fill: 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "900",
-    }).anchor.set(1, 0);
-
-    if (activeObjectives.length === 0) {
-      this.drawText(layer, translations.quests.ui.objectivesEmpty, 14, 48, {
-        fill: 0xaeb4b8,
-        fontSize: 11,
-        fontWeight: "800",
-      });
-      this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-      return;
-    }
-
-    activeObjectives.forEach((quest, index) => {
-      const definition = objectiveQuestById[quest.definitionId];
-      const copy = translations.quests.objectives[quest.definitionId];
-      const progress = getObjectiveQuestProgress(state, definition);
-      const rowY = 42 + index * rowHeight;
-      this.drawText(layer, copy?.title ?? quest.definitionId, 14, rowY, {
-        fill: 0xf5efdf,
-        fontSize: 12,
-        fontWeight: "900",
-      });
-      const progressLabel = this.drawText(layer, `${progress.current}/${progress.required}`, panelWidth - 14, rowY, {
-        fill: 0xf1df9a,
-        fontSize: 12,
-        fontWeight: "900",
-      });
-      progressLabel.anchor.set(1, 0);
-      this.drawText(layer, copy?.description ?? "", 14, rowY + 18, {
-        fill: 0xaeb4b8,
-        fontSize: 10,
-        fontWeight: "700",
-        wordWrap: true,
-        wordWrapWidth: panelWidth - 42,
-      });
-      this.drawRewardLine(layer, definition.reward, translations, 14, rowY + 48);
-    });
-
-    this.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-  }
-
-  private drawWorkforceRow(
-    parent: Container,
-    options: {
-      iconId: string;
-      label: string;
-      value: string;
-      tooltip: string;
-      missing?: boolean;
-      x: number;
-      y: number;
-      width: number;
-    },
-  ): void {
-    const row = new Container();
-    row.x = options.x;
-    row.y = options.y;
-    parent.addChild(row);
-
-    this.drawIcon(row, options.iconId, 8, 9, 14);
-    this.drawText(row, options.label, 28, 1, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
-      fontWeight: "800",
-    });
-    const value = this.drawText(row, options.value, options.width, 1, {
-      fill: options.missing ? 0xff6f7d : 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-    value.anchor.set(1, 0);
-
-    row.hitArea = new Rectangle(0, -2, options.width, 23);
-    this.bindTooltip(row, options.tooltip);
-  }
-
-  private drawQueue(state: GameState, translations: TranslationPack | undefined, height: number): void {
-    const queue = getActiveBuildingQueue(state);
-    const layer = new Container();
-    layer.x = HUD_SIDE_PANEL_MARGIN;
-    layer.y = height - 104;
-    this.hudLayer.addChild(layer);
-    this.drawPanel(layer, 0, 0, 308, 78, 0.76, 0);
-    this.drawIcon(layer, "build", 18, 22, 14);
-    this.drawText(layer, translations?.ui.buildingQueue ?? "Building queue", 34, 14, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
-    this.drawText(layer, `${queue.length}/${MAX_ACTIVE_BUILDINGS}`, 280, 14, { fill: 0xf1df9a, fontSize: 13, fontWeight: "800" }).anchor.set(1, 0);
-
-    if (queue.length === 0) {
-      this.drawText(layer, translations?.ui.queueEmpty ?? "No active construction.", 14, 44, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "700" });
-      this.registerHudInteractionArea(layer.x, layer.y, 308, 78, 6);
-      return;
-    }
-
-    queue.slice(0, 2).forEach((buildingId, index) => {
-      const building = state.buildings[buildingId];
-      const label = translations?.buildings[buildingId].name ?? buildingById[buildingId].name;
-      this.drawText(layer, `${label} / ${Math.ceil(building.upgradingRemaining)}s`, 14, 42 + index * 17, {
-        fill: 0xd7ddd8,
-        fontSize: 11,
-        fontWeight: "700",
-      });
-    });
-
-    this.registerHudInteractionArea(layer.x, layer.y, 308, 78, 6);
-  }
-
-  private drawEventLog(state: GameState, translations: TranslationPack | undefined, height: number): void {
-    const layer = new Container();
-    layer.x = HUD_SIDE_PANEL_MARGIN;
-    layer.y = Math.max(258, height - 374);
-    this.hudLayer.addChild(layer);
-
-    const width = HUD_LEFT_PANEL_WIDTH;
-    const panelHeight = Math.max(168, Math.min(326, height - layer.y - 48));
-    const viewportY = 42;
-    const viewportHeight = panelHeight - 54;
-    this.drawIcon(layer, "clock", 18, 22, 14);
-    this.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
-      fill: 0xf5efdf,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-
-    const entries = this.getFormattedLogEntries(state, translations);
-    const textWrapWidth = width - 58;
-
-    if (entries.length === 0) {
-      this.drawText(layer, "-", 14, viewportY, {
-        fill: 0xaeb4b8,
-        fontSize: 11,
-        fontWeight: "700",
-      });
-      this.registerHudInteractionArea(layer.x, layer.y, width, panelHeight, 6);
-      return;
-    }
-
-    const lineHeight = 15;
-    let rowCursorY = 0;
-    const rows = entries.map((entry, index) => {
-      const lines = this.wrapLogText(entry.text, index === 0 ? "800" : "700", textWrapWidth);
-      const rowHeight = Math.max(38, lines.length * lineHeight + 8);
-      const row = { entry, index, y: rowCursorY, height: rowHeight, lines };
-      rowCursorY += rowHeight;
-      return row;
-    });
-
-    const contentHeight = rowCursorY;
-    this.logScrollMax = Math.max(0, contentHeight - viewportHeight);
-    this.logScrollY = Math.max(0, Math.min(this.logScrollY, this.logScrollMax));
-    this.logScrollArea = {
-      x: layer.x + 10,
-      y: layer.y + viewportY - 4,
-      width: width - 20,
-      height: viewportHeight + 8,
-    };
-
-    const logContent = new Container();
-    logContent.y = viewportY - this.logScrollY;
-    layer.addChild(logContent);
-
-    const logMask = new Graphics();
-    logMask.eventMode = "none";
-    logMask.rect(10, viewportY, width - 30, viewportHeight)
-      .fill({ color: 0xffffff, alpha: 1 });
-    layer.addChild(logMask);
-    logContent.mask = logMask;
-
-    rows.forEach((row) => {
-      const rowY = row.y;
-      const visibleY = rowY - this.logScrollY;
-
-      if (visibleY < -row.height || visibleY > viewportHeight) {
-        return;
-      }
-
-      this.drawIcon(logContent, row.entry.iconId, 20, rowY + 9, 14);
-      row.lines.forEach((line, lineIndex) => {
-        this.drawText(logContent, line, 30, rowY + lineIndex * lineHeight, {
-          fill: row.entry.fill,
-          fontSize: 11,
-          fontWeight: row.index === 0 ? "800" : "700",
-        });
-      });
-    });
-
-    if (this.logScrollMax > 0) {
-      const trackHeight = viewportHeight;
-      const thumbHeight = Math.max(28, trackHeight * viewportHeight / contentHeight);
-      const thumbY = viewportY + (trackHeight - thumbHeight) * (this.logScrollY / this.logScrollMax);
-      const track = new Graphics();
-      track.rect(width - 18, viewportY, 5, trackHeight)
-        .fill({ color: 0x0b0d0a, alpha: 0.72 });
-      track.rect(width - 18, thumbY, 5, thumbHeight)
-        .fill({ color: 0xe0c46f, alpha: 0.6 });
-      layer.addChild(track);
-    }
-
-    this.registerHudInteractionArea(layer.x, layer.y, width, panelHeight, 6);
-  }
-
-  private drawToolbar(state: GameState, translations: TranslationPack | undefined, width: number, height: number): void {
-    const group = new Container();
-    group.x = width - 244;
-    group.y = height - 72;
-    this.hudLayer.addChild(group);
-    this.drawPanel(group, 0, 0, 216, 48);
-
-    this.createIconButton(group, state.paused ? "play" : "pause", 8, 8, 40, 32, { action: "pause" }, state.paused ? translations?.ui.resume : translations?.ui.pause);
-    this.createHudButton(group, translations?.ui.speedNormal ?? "1x", 56, 8, 44, 32, { speed: 1 }, state.speed === 1);
-    this.createHudButton(group, translations?.ui.speedFast ?? "24x", 108, 8, 52, 32, { speed: 24 }, state.speed === 24);
-    this.createIconButton(group, "home", 168, 8, 40, 32, { action: "home" }, translations?.ui.home);
-    this.registerHudInteractionArea(group.x, group.y, 216, 48, 6);
-  }
-
-  private drawActionPanel(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    height: number,
-  ): void {
-    const panelWidth = 158;
-    const panelHeight = 82;
-    const group = new Container();
-    group.x = (width - panelWidth) / 2;
-    group.y = height - 116;
-    this.hudLayer.addChild(group);
-
-    this.drawPanel(group, 0, 0, panelWidth, panelHeight);
-
-    const continuousShifts = state.workMode === "continuous";
-    const currentMode = continuousShifts
-      ? translations?.ui.continuousShifts ?? "24h shifts"
-      : translations?.ui.dayShift ?? "Day shift";
-    const nextMode = continuousShifts
-      ? translations?.ui.dayShift ?? "Day shift"
-      : translations?.ui.continuousShifts ?? "24h shifts";
-    const detail = continuousShifts
-      ? translations?.ui.continuousShiftsMorale ?? "Night work lowers morale."
-      : translations?.ui.dayShiftActive ?? "Production active.";
-    const tooltip = `${translations?.ui.workSchedule ?? "Schedule"}: ${currentMode}\n${detail}\n${nextMode}`;
-
-    this.createCircularActionButton(
-      group,
-      "continuous-shifts",
-      panelWidth / 2 - 36,
-      40,
-      27,
-      { action: "set-continuous-shifts", continuousShifts: !continuousShifts },
-      tooltip,
-      continuousShifts,
-    );
-
-    const archiveTooltip = `${translations?.ui.decisionArchive ?? "Decision archive"}\n${translations?.ui.decisionArchiveTooltip ?? "Review past decisions and leadership profile."}`;
-    this.createCircularActionButton(
-      group,
-      "archive",
-      panelWidth / 2 + 36,
-      40,
-      27,
-      { action: "open-decision-archive" },
-      archiveTooltip,
-      false,
-    );
-    this.registerHudInteractionArea(group.x, group.y, panelWidth, panelHeight, 6);
-  }
-
-  private drawInfoPanel(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    height: number,
-    infoPanel: VillageInfoPanel | null,
-  ): void {
-    if (!infoPanel || !translations) {
-      return;
-    }
-
-    if (infoPanel === "survivors") {
-      this.drawSurvivorOverviewPanel(state, translations, width, height);
-      return;
-    }
-
-    if (infoPanel === "decisionArchive") {
-      this.drawDecisionArchivePanel(state, translations, width, height);
-      return;
-    }
-
-    if (infoPanel === "weather") {
-      this.drawWeatherOverviewPanel(state, translations, width, height);
-      return;
-    }
-
-    this.drawResourceBreakdownPanel(state, translations, width, height, infoPanel);
+    return rates;
   }
 
   private drawModalBackdrop(
@@ -2516,1435 +1634,6 @@ export class PixiVillageRenderer {
     return Math.max(72, contentY);
   }
 
-  private drawWeatherOverviewPanel(
-    state: GameState,
-    translations: TranslationPack,
-    width: number,
-    height: number,
-  ): void {
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-    const panelWidth = Math.min(620, width - 48);
-    const panelHeight = 356;
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(36, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-
-    const condition = state.environment.condition;
-    const definition = getEnvironmentDefinition(condition);
-    const conditionLabel = translations.ui[definition.labelKey] ?? definition.id;
-    const intensity = Math.max(1, Math.min(ENVIRONMENT_MAX_INTENSITY, Math.floor(state.environment.intensity)));
-    const intensityIndex = getEnvironmentIntensityIndex(intensity);
-    const moralePenaltyPerHour =
-      definition.moralePenaltyPerHourByIntensity[intensityIndex] ?? 0;
-    const healthIncidentRisk =
-      definition.healthIncidentChanceByIntensity[intensityIndex] ?? 0;
-    const shelterDeadlineHours =
-      definition.shelterDeadlineHoursByIntensity?.[intensityIndex] ?? null;
-    const endsIn = condition === "stable"
-      ? translations.ui.environmentStable
-      : this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
-
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: this.getEnvironmentPanelIconId(condition),
-      title: translations.ui.weatherOverview ?? translations.ui.environment,
-      rightText: conditionLabel,
-      closeAction: { action: "close-village-modal" },
-    });
-    const descriptionLabel = this.drawText(panel, this.getEnvironmentDescription(state, translations), 24, headerBottom + 2, {
-      fill: 0xc8cabb,
-      fontSize: 13,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 48,
-    });
-    const statusY = descriptionLabel.y + descriptionLabel.height + 12;
-    this.drawText(panel, translations.ui.weatherStatus ?? "Status", 24, statusY, {
-      fill: 0xaeb4b8,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-    this.drawBreakdownRow(
-      panel,
-      translations.ui.environmentIntensity,
-      `${intensity}/${ENVIRONMENT_MAX_INTENSITY}`,
-      intensity,
-      panelWidth,
-      statusY + 32,
-    );
-    this.drawBreakdownRow(
-      panel,
-      translations.ui.environmentEndsIn,
-      endsIn,
-      condition === "stable" ? 0 : -0.01,
-      panelWidth,
-      statusY + 66,
-    );
-    const penaltiesY = statusY + 100;
-    this.drawText(panel, translations.ui.weatherPenalties ?? "Potential penalties", 24, penaltiesY, {
-      fill: 0xaeb4b8,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-    this.drawBreakdownRow(
-      panel,
-      translations.ui.weatherMoralePenalty ?? "Morale penalty",
-      `-${this.formatRate(moralePenaltyPerHour)}/h`,
-      -moralePenaltyPerHour / GAME_HOUR_REAL_SECONDS,
-      panelWidth,
-      penaltiesY + 32,
-    );
-    this.drawBreakdownRow(
-      panel,
-      translations.ui.weatherHealthRisk ?? "Health incident pressure",
-      `+${Math.round(healthIncidentRisk)}`,
-      -Math.max(0.01, healthIncidentRisk),
-      panelWidth,
-      penaltiesY + 66,
-    );
-
-    if (shelterDeadlineHours !== null) {
-      const shelterLabel = translations.ui.weatherShelterDeadline ?? "Shelter deadline";
-      const shelterValue = state.environment.activeCrisis?.kind === "shelter"
-        ? this.formatScoutingRemaining(Math.max(0, state.environment.activeCrisis.deadlineAt - state.elapsedSeconds))
-        : `${shelterDeadlineHours}h`;
-      const shelterTitle = state.environment.activeCrisis?.kind === "shelter"
-        ? translations.ui.weatherShelterDeadlineCurrent ?? shelterLabel
-        : shelterLabel;
-      this.drawBreakdownRow(
-        panel,
-        shelterTitle,
-        shelterValue,
-        -0.01,
-        panelWidth,
-        penaltiesY + 100,
-      );
-    }
-  }
-
-  private getEnvironmentPanelIconId(condition: EnvironmentConditionId): string {
-    if (condition === "rain") {
-      return "crisis-rain";
-    }
-
-    if (condition === "snowFront") {
-      return "crisis-snow";
-    }
-
-    if (condition === "radiation") {
-      return "crisis-radiation";
-    }
-
-    return "clock";
-  }
-
-  private getEnvironmentDescription(state: GameState, translations: TranslationPack): string {
-    const condition = state.environment.condition;
-
-    if (condition === "rain") {
-      return translations.ui.weatherRainDescription ??
-        "Dešťová fronta snižuje morálku a zvyšuje tlak na zdravotní incidenty.";
-    }
-
-    if (condition === "snowFront") {
-      return translations.ui.weatherSnowDescription ??
-        "Sněhová fronta zvyšuje tlak na zdraví i morálku. Bezdomovci riskují omrzliny a ztráty.";
-    }
-
-    if (condition === "radiation") {
-      return translations.ui.weatherRadiationDescription ??
-        "Radiace výrazně zatěžuje zdraví komunity a sráží morálku.";
-    }
-
-    return translations.ui.weatherStableDescription ??
-      "Aktuálně neprobíhá žádná aktivní fronta. Tábor je v relativně stabilním prostředí.";
-  }
-
-  private drawResourceBreakdownPanel(
-    state: GameState,
-    translations: TranslationPack,
-    width: number,
-    height: number,
-    resourceId: ResourceId,
-  ): void {
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-    const panelWidth = Math.min(620, width - 48);
-    const panelHeight = Math.max(320, Math.min(520, height - 72));
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(36, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-
-    const breakdown = getResourceBreakdown(state, resourceId);
-    this.appendResourceSiteBreakdownLines(state, resourceId, breakdown);
-    const totalRate = breakdown.reduce((total, line) => total + line.ratePerSecond, 0);
-    const stockLabel = resourceId === "morale"
-      ? `${Math.floor(state.resources.morale)}%`
-      : `${Math.floor(state.resources[resourceId])}/${Math.floor(state.capacities[resourceId])}`;
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: resourceId,
-      title: translations.resources[resourceId],
-      rightText: stockLabel,
-      closeAction: { action: "close-village-modal" },
-    });
-    const sectionStartY = headerBottom + 4;
-    this.drawText(panel, translations.ui.resourceBreakdown, 24, sectionStartY, {
-      fill: 0xaeb4b8,
-      fontSize: 12,
-      fontWeight: "800",
-    });
-
-    this.drawBreakdownRow(
-      panel,
-      translations.ui.resourceNetChange,
-      this.getHourlyRateLabel(totalRate),
-      totalRate,
-      panelWidth,
-      sectionStartY + 32,
-      true,
-    );
-
-    const activeTab = this.activeResourceBreakdownTab;
-    const visibleBreakdown = breakdown.filter((line) =>
-      activeTab === "production"
-        ? line.ratePerSecond > 0
-        : line.ratePerSecond < 0,
-    );
-    this.drawTabs(
-      panel,
-      [
-        { id: "production", label: translations.ui.production },
-        { id: "consumption", label: translations.ui.consumption },
-      ],
-      {
-        activeId: activeTab,
-        x: 24,
-        y: sectionStartY + 72,
-        height: 34,
-        minWidth: 116,
-        maxWidth: panelWidth - 48,
-        onSelect: (tab) => {
-          this.activeResourceBreakdownTab = tab;
-          this.resourceBreakdownScrollY = 0;
-          this.requestRender();
-        },
-      },
-    );
-
-    const rowHeight = 34;
-    const viewportY = sectionStartY + 122;
-    const viewportHeight = Math.max(88, panelHeight - viewportY - 24);
-
-    if (
-      this.resourceBreakdownScrollResourceId !== resourceId ||
-      this.resourceBreakdownScrollTab !== activeTab
-    ) {
-      this.resourceBreakdownScrollResourceId = resourceId;
-      this.resourceBreakdownScrollTab = activeTab;
-      this.resourceBreakdownScrollY = 0;
-    }
-
-    if (visibleBreakdown.length === 0) {
-      this.resourceBreakdownScrollY = 0;
-      this.resourceBreakdownScrollMax = 0;
-      this.drawText(panel, translations.ui.resourceNoActiveEffects, 24, viewportY, {
-        fill: 0xc8cabb,
-        fontSize: 13,
-        fontWeight: "700",
-      });
-      return;
-    }
-
-    const contentHeight = visibleBreakdown.length * rowHeight;
-    this.resourceBreakdownScrollMax = Math.max(0, contentHeight - viewportHeight);
-    this.resourceBreakdownScrollY = Math.max(
-      0,
-      Math.min(this.resourceBreakdownScrollY, this.resourceBreakdownScrollMax),
-    );
-    this.resourceBreakdownScrollArea = {
-      x: panel.x + 18,
-      y: panel.y + viewportY - 8,
-      width: panelWidth - 36,
-      height: viewportHeight + 16,
-    };
-
-    const content = new Container();
-    content.y = viewportY - this.resourceBreakdownScrollY;
-    panel.addChild(content);
-
-    const mask = new Graphics();
-    mask.eventMode = "none";
-    mask.rect(18, viewportY - 8, panelWidth - 36, viewportHeight + 16)
-      .fill({ color: 0xffffff, alpha: 1 });
-    panel.addChild(mask);
-    content.mask = mask;
-
-    visibleBreakdown.forEach((line, index) => {
-      this.drawBreakdownRow(
-        content,
-        this.getResourceBreakdownLabel(line, translations),
-        this.getHourlyRateLabel(line.ratePerSecond),
-        line.ratePerSecond,
-        panelWidth,
-        7 + index * rowHeight,
-      );
-    });
-
-    if (this.resourceBreakdownScrollMax > 0) {
-      const trackHeight = viewportHeight;
-      const thumbHeight = Math.max(30, trackHeight * viewportHeight / contentHeight);
-      const thumbY = viewportY +
-        (trackHeight - thumbHeight) *
-          (this.resourceBreakdownScrollY / this.resourceBreakdownScrollMax);
-      const scrollbar = new Graphics();
-      scrollbar.rect(panelWidth - 20, viewportY, 5, trackHeight)
-        .fill({ color: 0x0b0d0a, alpha: 0.76 });
-      scrollbar.rect(panelWidth - 20, thumbY, 5, thumbHeight)
-        .fill({ color: 0xe0c46f, alpha: 0.66 });
-      panel.addChild(scrollbar);
-    }
-  }
-
-  private drawBreakdownRow(
-    parent: Container,
-    label: string,
-    value: string,
-    ratePerSecond: number,
-    width: number,
-    y: number,
-    highlighted = false,
-  ): void {
-    const row = new Graphics();
-    row.rect(18, y - 7, width - 36, 28)
-      .fill({ color: highlighted ? 0x262719 : 0x0f120e, alpha: highlighted ? 0.72 : 0.38 });
-    parent.addChild(row);
-
-    this.drawText(parent, label, 32, y, {
-      fill: highlighted ? 0xf5efdf : 0xd8d2bd,
-      fontSize: 12,
-      fontWeight: highlighted ? "900" : "800",
-    });
-    const valueText = this.drawText(parent, value, width - 32, y, {
-      fill: this.getRateColor(ratePerSecond),
-      fontSize: 12,
-      fontWeight: "900",
-    });
-    valueText.anchor.set(1, 0);
-  }
-
-  private getResourceBreakdownLabel(
-    line: ResourceBreakdownLine,
-    translations: TranslationPack,
-  ): string {
-    if (line.source === "mainBuildingBonus") {
-      return translations.ui.mainBuildingProductionBonus;
-    }
-
-    if (line.source === "moraleProductionPenalty") {
-      return translations.ui.moraleProductionPenalty;
-    }
-
-    if ((line.source === "building" || line.source === "coalMine") && line.buildingId) {
-      return translations.buildings[line.buildingId].name;
-    }
-
-    if (line.source === "survivorConsumption") {
-      return `${translations.ui.survivorConsumption}${line.count ? ` (${line.count})` : ""}`;
-    }
-
-    if (line.source === "homeless") {
-      return `${translations.ui.homeless}${line.count ? ` (${line.count})` : ""}`;
-    }
-
-    if (line.source === "foodShortage") {
-      return translations.ui.moraleFoodShortage;
-    }
-
-    if (line.source === "continuousShifts") {
-      return translations.ui.moraleContinuousShifts;
-    }
-
-    if (line.source === "environment") {
-      return translations.ui.environment;
-    }
-
-    if (line.source === "resourceSite") {
-      return translations.ui.resourceSiteProduction ?? "Secured oasis production";
-    }
-
-    return translations.ui.moraleWaterShortage;
-  }
-
-  private getTotalResourceProductionRates(state: GameState): Record<ResourceId, number> {
-    const rates = getResourceProductionRates(state);
-    const multiplier = getGlobalProductionMultiplier(state);
-
-    for (const site of state.resourceSites) {
-      if (!site.captured || site.assignedWorkers <= 0) {
-        continue;
-      }
-
-      rates[site.resourceId] += site.yieldPerWorker * site.assignedWorkers * multiplier;
-    }
-
-    return rates;
-  }
-
-  private appendResourceSiteBreakdownLines(
-    state: GameState,
-    resourceId: ResourceId,
-    breakdown: ResourceBreakdownLine[],
-  ): void {
-    const multiplier = getGlobalProductionMultiplier(state);
-    let totalRate = 0;
-    let totalWorkers = 0;
-
-    for (const site of state.resourceSites) {
-      if (
-        !site.captured ||
-        site.assignedWorkers <= 0 ||
-        site.resourceId !== resourceId
-      ) {
-        continue;
-      }
-
-      totalWorkers += site.assignedWorkers;
-      totalRate += site.yieldPerWorker * site.assignedWorkers * multiplier;
-    }
-
-    if (totalRate <= 0) {
-      return;
-    }
-
-    breakdown.push({
-      source: "resourceSite",
-      resourceId,
-      ratePerSecond: totalRate,
-      count: totalWorkers,
-    });
-  }
-
-  private redrawEnvironmentOverlay(
-    graphic: Graphics,
-    condition: EnvironmentConditionId,
-    intensityRaw: number,
-    width: number,
-    height: number,
-    visualTime: number,
-  ): void {
-    graphic.clear();
-
-    if (condition === "stable") {
-      return;
-    }
-
-    const intensity = Math.max(1, Math.min(ENVIRONMENT_MAX_INTENSITY, intensityRaw));
-    const hazeColor = condition === "radiation"
-      ? 0x98cf6a
-      : condition === "snowFront"
-        ? 0xd9e6f2
-        : 0x4d7694;
-    const hazeAlpha = condition === "radiation"
-      ? 0.07 + intensity * 0.03
-      : condition === "snowFront"
-        ? 0.06 + intensity * 0.022
-        : 0.055 + intensity * 0.018;
-
-    graphic.rect(0, 0, width, height).fill({ color: hazeColor, alpha: hazeAlpha });
-
-    if (condition === "rain") {
-      const area = width * height;
-      const laneACount = Math.max(
-        RAIN_LAYER_A_MIN_COUNT,
-        Math.min(
-          RAIN_LAYER_A_MAX_COUNT,
-          Math.round((area / 4200) * (0.9 + intensity * 0.22)),
-        ),
-      );
-      const laneBCount = Math.max(
-        RAIN_LAYER_B_MIN_COUNT,
-        Math.min(
-          RAIN_LAYER_B_MAX_COUNT,
-          Math.round((area / 6000) * (0.85 + intensity * 0.18)),
-        ),
-      );
-      const travelA = height + 120;
-      const travelB = height + 110;
-      const dropLenA = 8 + intensity * 2.1;
-      const dropLenB = 6 + intensity * 1.7;
-
-      for (let index = 0; index < laneACount; index += 1) {
-        const seedX = this.getNoiseSeed(index * 5 + 11);
-        const seedY = this.getNoiseSeed(index * 5 + 17);
-        const seedWind = this.getNoiseSeed(index * 5 + 23);
-        const speed = 210 + intensity * 30 + seedY * 90;
-        const y = ((seedY * travelA) + visualTime * speed) % travelA - 54;
-        const xBase = seedX * (width + 80) - 40;
-        const windWave = this.triangleWave(visualTime * (0.46 + seedWind * 0.34) + seedX * 5.4);
-        const wind = windWave * (1.8 + intensity * 0.48);
-        const x = xBase + wind;
-        graphic.moveTo(x, y - dropLenA * 0.42);
-        graphic.lineTo(x + wind * 0.16, y + dropLenA);
-      }
-      graphic.stroke({ color: 0xbdddef, alpha: 0.2 + intensity * 0.04, width: 1.08 });
-
-      for (let index = 0; index < laneBCount; index += 1) {
-        const seedX = this.getNoiseSeed(index * 7 + 401);
-        const seedY = this.getNoiseSeed(index * 7 + 409);
-        const seedWind = this.getNoiseSeed(index * 7 + 421);
-        const speed = 170 + intensity * 24 + seedY * 70;
-        const y = ((seedY * travelB) + visualTime * speed) % travelB - 50;
-        const xBase = seedX * (width + 60) - 30;
-        const windWave = this.triangleWave(visualTime * (0.38 + seedWind * 0.29) + seedX * 4.2);
-        const wind = windWave * (1.3 + intensity * 0.35);
-        const x = xBase + wind;
-        graphic.moveTo(x, y - dropLenB * 0.35);
-        graphic.lineTo(x + wind * 0.1, y + dropLenB);
-
-        if (
-          y > height * 0.84 &&
-          this.triangleWave(visualTime * (2.4 + seedWind * 1.6) + seedX * 9.5) > 0.72
-        ) {
-          graphic.circle(x + wind * 0.2, y + dropLenB + 1.3, 0.78 + intensity * 0.12)
-            .fill({ color: 0xd8ecf7, alpha: 0.08 + intensity * 0.02 });
-        }
-      }
-      graphic.stroke({ color: 0xd8eef8, alpha: 0.12 + intensity * 0.03, width: 0.76 });
-    }
-
-    if (condition === "snowFront") {
-      const area = width * height;
-      const layerACount = Math.max(120, Math.round((area / 9000) * (0.9 + intensity * 0.18)));
-      const layerBCount = Math.max(90, Math.round((area / 14000) * (0.9 + intensity * 0.15)));
-      const travel = height + 88;
-      const windDrift = visualTime * (7 + intensity * 1.2);
-      const fallA = visualTime * (30 + intensity * 5.5);
-      const fallB = visualTime * (22 + intensity * 4.2);
-
-      for (let index = 0; index < layerACount; index += 1) {
-        const seedX = this.seededUnit(index + 11);
-        const seedY = this.seededUnit(index + 137);
-        const seedPhase = this.seededUnit(index + 307);
-        const x = ((seedX * width) + windDrift * (0.7 + seedY * 0.8)) % (width + 32) - 16;
-        const y = ((seedY * travel) + fallA * (0.9 + seedX * 0.6)) % travel - 44;
-        const flutter = Math.sin(visualTime * (1.3 + seedPhase * 0.8) + seedX * 8) * (1 + intensity * 0.18);
-        const radius = 1.25 + seedPhase * 0.9 + intensity * 0.16;
-        graphic.circle(x + flutter, y, radius).fill({
-          color: 0xffffff,
-          alpha: 0.16 + intensity * 0.04,
-        });
-      }
-
-      for (let index = 0; index < layerBCount; index += 1) {
-        const seedX = this.seededUnit(index + 503);
-        const seedY = this.seededUnit(index + 911);
-        const seedPhase = this.seededUnit(index + 1237);
-        const x = ((seedX * width) + windDrift * 1.25 * (0.7 + seedY * 0.6)) % (width + 24) - 12;
-        const y = ((seedY * travel) + fallB * (0.85 + seedX * 0.55)) % travel - 40;
-        const flutter = Math.sin(visualTime * (1.9 + seedPhase * 0.7) + seedY * 10) * (0.8 + intensity * 0.12);
-        const radius = 0.9 + seedPhase * 0.55 + intensity * 0.1;
-        graphic.circle(x + flutter, y, radius).fill({
-          color: 0xeef6ff,
-          alpha: 0.1 + intensity * 0.028,
-        });
-      }
-    }
-
-    if (condition === "radiation") {
-      const bandSpacing = Math.max(20, 34 - intensity * 3);
-      const scanOffset = (visualTime * (24 + intensity * 5)) % bandSpacing;
-      for (let y = scanOffset; y < height + bandSpacing; y += bandSpacing) {
-        const bend = this.triangleWave(y * 0.01 + visualTime * 0.48) * (3.6 + intensity);
-        graphic.moveTo(-6, y);
-        graphic.lineTo(width + 6, y + bend);
-      }
-      graphic.stroke({ color: 0xc9f187, alpha: 0.09 + intensity * 0.035, width: 1 });
-
-      const area = width * height;
-      const moteCount = Math.max(
-        RADIATION_MOTE_MIN_COUNT,
-        Math.min(
-          RADIATION_MOTE_MAX_COUNT,
-          Math.round((area / 5600) * (0.88 + intensity * 0.2)),
-        ),
-      );
-      for (let index = 0; index < moteCount; index += 1) {
-        const seedX = this.getNoiseSeed(index * 3 + 1801);
-        const seedY = this.getNoiseSeed(index * 3 + 1811);
-        const seedPhase = this.getNoiseSeed(index * 3 + 1831);
-        const x = seedX * width;
-        const y = seedY * height;
-        const jitterX = this.triangleWave(visualTime * (1.18 + seedPhase * 0.8) + seedX * 8.2) * 5.5;
-        const jitterY = this.triangleWave(visualTime * (0.96 + seedPhase * 0.7) + seedY * 7.4) * 4.8;
-        graphic.circle(x + jitterX, y + jitterY, 1 + intensity * 0.2).fill({
-          color: 0xd8f8a6,
-          alpha: 0.06 + intensity * 0.025,
-        });
-      }
-    }
-  }
-
-  private redrawDaylightOverlay(
-    graphic: Graphics,
-    elapsedSeconds: number,
-    width: number,
-    height: number,
-  ): void {
-    graphic.clear();
-
-    const daylight = getDaylightState(elapsedSeconds);
-
-    if (daylight.darkness <= 0) {
-      return;
-    }
-
-    const tint = daylight.phase === "dusk"
-      ? 0x231621
-      : daylight.phase === "dawn"
-        ? 0x152233
-        : 0x071322;
-    const skyAlpha = Math.min(0.72, daylight.darkness * 1.05);
-    const screenX = -1;
-    const screenY = -1;
-    const screenWidth = Math.ceil(width) + 2;
-    const screenHeight = Math.ceil(height) + 2;
-
-    graphic.rect(screenX, screenY, screenWidth, screenHeight)
-      .fill({ color: tint, alpha: skyAlpha });
-
-    const horizonAlpha = Math.min(0.14, daylight.darkness * 0.32);
-    const horizonColor = daylight.phase === "dusk" ? 0x7b452d : 0x37576f;
-    const horizonStart = Math.floor(height * 0.48);
-    const horizonEnd = Math.ceil(height + 1);
-    const horizonBands = 18;
-    const horizonBandHeight = Math.max(2, Math.ceil((horizonEnd - horizonStart) / horizonBands));
-
-    for (let bandIndex = 0; bandIndex < horizonBands; bandIndex += 1) {
-      const progress = (bandIndex + 1) / horizonBands;
-      const eased = progress * progress;
-      const y = horizonStart + bandIndex * horizonBandHeight;
-      const bandAlpha = horizonAlpha * eased;
-      graphic.rect(screenX, y, screenWidth, horizonBandHeight + 1)
-        .fill({ color: horizonColor, alpha: bandAlpha });
-    }
-
-    if (daylight.phase === "night") {
-      graphic.rect(screenX, screenY, screenWidth, Math.max(2, Math.ceil(height * 0.36) + 1))
-        .fill({ color: 0x040b14, alpha: Math.min(0.18, daylight.darkness * 0.24) });
-    }
-  }
-
-  private syncAmbientOverlayState(state: GameState): void {
-    this.ambientCondition = state.environment.condition;
-    this.ambientIntensity = state.environment.intensity;
-    this.ambientElapsedSeconds = state.elapsedSeconds;
-    this.ambientSpeed = state.speed;
-    this.ambientPaused = state.paused;
-    this.ambientSyncAtMs = performance.now();
-  }
-
-  private refreshAmbientOverlays(nowMs: number, force = false): void {
-    const width = this.app?.screen.width ?? this.host.clientWidth;
-    const height = this.app?.screen.height ?? this.host.clientHeight;
-
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    const visualTime = nowMs / 1000;
-    const elapsedSeconds = this.getAmbientElapsedSeconds(nowMs);
-    this.refreshEnvironmentOverlay(width, height, visualTime, nowMs, force);
-    this.refreshDaylightOverlay(width, height, elapsedSeconds, nowMs, force);
-  }
-
-  private refreshEnvironmentOverlay(
-    width: number,
-    height: number,
-    visualTime: number,
-    nowMs: number,
-    force: boolean,
-  ): void {
-    const overlayKey = `${this.ambientCondition}|${this.ambientIntensity}|${Math.round(width)}|${Math.round(height)}`;
-    const needsKeyRefresh = overlayKey !== this.lastEnvironmentOverlayKey;
-    const isAnimatedWeather = this.ambientCondition !== "stable";
-
-    if (
-      !force &&
-      !needsKeyRefresh &&
-      isAnimatedWeather &&
-      this.lastEnvironmentOverlayFrameAtMs > 0 &&
-      nowMs - this.lastEnvironmentOverlayFrameAtMs < WEATHER_OVERLAY_FRAME_MIN_MS
-    ) {
-      return;
-    }
-
-    this.redrawEnvironmentOverlay(
-      this.environmentOverlayGraphic,
-      this.ambientCondition,
-      this.ambientIntensity,
-      width,
-      height,
-      visualTime,
-    );
-    this.lastEnvironmentOverlayKey = overlayKey;
-    this.lastEnvironmentOverlayFrameAtMs = nowMs;
-  }
-
-  private refreshDaylightOverlay(
-    width: number,
-    height: number,
-    elapsedSeconds: number,
-    nowMs: number,
-    force: boolean,
-  ): void {
-    const daylight = getDaylightState(elapsedSeconds);
-    const isDaylightTransition = daylight.phase === "dusk" || daylight.phase === "dawn";
-    const darknessBucket = Math.round(daylight.darkness / DAYLIGHT_DARKNESS_BUCKET_STEP);
-    const key = `${daylight.phase}|${darknessBucket}|${Math.round(width)}|${Math.round(height)}`;
-    const needsKeyRefresh = key !== this.lastDaylightOverlayKey;
-
-    if (!force && !needsKeyRefresh) {
-      if (!isDaylightTransition) {
-        return;
-      }
-
-      if (
-        this.lastDaylightOverlayFrameAtMs > 0 &&
-        nowMs - this.lastDaylightOverlayFrameAtMs < DAYLIGHT_TRANSITION_FRAME_MIN_MS
-      ) {
-        return;
-      }
-    }
-
-    this.redrawDaylightOverlay(this.daylightOverlayGraphic, elapsedSeconds, width, height);
-    this.lastDaylightOverlayKey = key;
-    this.lastDaylightOverlayFrameAtMs = nowMs;
-  }
-
-  private getAmbientElapsedSeconds(nowMs: number): number {
-    if (this.ambientPaused) {
-      return this.ambientElapsedSeconds;
-    }
-
-    return this.ambientElapsedSeconds + ((nowMs - this.ambientSyncAtMs) / 1000) * this.ambientSpeed;
-  }
-
-  private shouldAnimateAmbientOverlays(): boolean {
-    const isEnvironmentAnimated = this.ambientCondition !== "stable";
-    const daylightPhase = getDaylightState(this.ambientElapsedSeconds).phase;
-    const isDaylightAnimated = daylightPhase === "dusk" || daylightPhase === "dawn";
-    return isEnvironmentAnimated || isDaylightAnimated;
-  }
-
-  private shouldAnimateVisuals(): boolean {
-    return this.shouldAnimateAmbientOverlays() || this.textureAnimationBindings.size > 0 || this.shouldAnimateCamera();
-  }
-
-  private updateAmbientAnimationLoop(): void {
-    if (this.shouldAnimateVisuals()) {
-      this.startAmbientAnimation();
-      return;
-    }
-
-    this.stopAmbientAnimation();
-  }
-
-  private startAmbientAnimation(): void {
-    if (this.ambientAnimationFrameId !== null) {
-      return;
-    }
-
-    this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
-  }
-
-  private stopAmbientAnimation(): void {
-    if (this.ambientAnimationFrameId === null) {
-      return;
-    }
-
-    window.cancelAnimationFrame(this.ambientAnimationFrameId);
-    this.ambientAnimationFrameId = null;
-  }
-
-  private animateAmbientOverlays(timestamp: number): void {
-    this.ambientAnimationFrameId = null;
-
-    if (!this.app) {
-      return;
-    }
-
-    if (
-      this.lastVisualFrameAtMs > 0 &&
-      timestamp - this.lastVisualFrameAtMs < VISUAL_FRAME_MIN_MS
-    ) {
-      if (this.shouldAnimateVisuals()) {
-        this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
-      }
-      return;
-    }
-    this.lastVisualFrameAtMs = timestamp;
-
-    if (this.shouldAnimateAmbientOverlays()) {
-      this.refreshAmbientOverlays(timestamp);
-    }
-
-    this.refreshTextureAnimations(timestamp);
-    this.refreshCameraTransform();
-    this.app.render();
-
-    if (this.shouldAnimateVisuals()) {
-      this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
-    }
-  }
-
-  private drawQuestDecisionModal(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    height: number,
-    resolvedDecisionPreview: DecisionHistoryEntry | null,
-  ): void {
-    const activeDecision = state.quests.activeDecision;
-
-    if (!translations || (!activeDecision && !resolvedDecisionPreview)) {
-      return;
-    }
-
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(
-      overlay,
-      width,
-      height,
-      activeDecision ? undefined : { action: "close-decision-result" },
-      Boolean(activeDecision),
-    );
-
-    const panelWidth = Math.min(560, width - 48);
-    const panelInnerWidth = panelWidth - 56;
-    let panelHeight = 348;
-
-    if (activeDecision) {
-      const definition = decisionQuestById[activeDecision.definitionId];
-      const copy = translations.quests.decisions[definition.id];
-      const bodyHeight = this.measureWrappedTextHeight(
-        copy?.body ?? "",
-        14,
-        "700",
-        panelInnerWidth,
-      );
-      const consequencesHeight = this.measureWrappedTextHeight(
-        translations.quests.ui.hiddenConsequences,
-        12,
-        "900",
-        panelInnerWidth,
-      );
-      const optionCount = definition.options.length;
-      const buttonsHeight = optionCount * 34 + Math.max(0, optionCount - 1) * 8;
-      const firstButtonY = 86 + bodyHeight + 12 + consequencesHeight + 16;
-      panelHeight = Math.ceil(firstButtonY + buttonsHeight + 24);
-    } else if (resolvedDecisionPreview) {
-      const resultDefinition = decisionQuestById[resolvedDecisionPreview.definitionId];
-      const resultCopy = translations.quests.decisions[resultDefinition.id];
-      const selectedOptionLabel =
-        resultCopy?.options[resolvedDecisionPreview.optionId] ?? resolvedDecisionPreview.optionId;
-      const decisionLine = `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`;
-      const decisionHeight = this.measureWrappedTextHeight(decisionLine, 13, "800", panelInnerWidth);
-      const resultHeight = this.measureWrappedTextHeight(
-        resultCopy?.results[resolvedDecisionPreview.optionId] ?? "",
-        13,
-        "800",
-        panelInnerWidth,
-      );
-      panelHeight = Math.ceil(94 + decisionHeight + 10 + resultHeight + 46);
-    }
-
-    panelHeight = Math.max(320, Math.min(panelHeight, Math.max(320, height - 40)));
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(34, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-
-    if (activeDecision) {
-      const definition = decisionQuestById[activeDecision.definitionId];
-      const copy = translations.quests.decisions[definition.id];
-      const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-        iconId: "people",
-        kicker: translations.quests.ui.decisionRequired,
-        title: copy?.title ?? definition.id,
-      });
-      const bodyLabel = this.drawText(panel, copy?.body ?? "", 28, headerBottom + 2, {
-        fill: 0xd7ddd8,
-        fontSize: 14,
-        fontWeight: "700",
-        wordWrap: true,
-        wordWrapWidth: panelWidth - 56,
-      });
-      const consequencesY = bodyLabel.y + bodyLabel.height + 12;
-      const consequencesLabel = this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, consequencesY, {
-        fill: 0xffc66d,
-        fontSize: 12,
-        fontWeight: "900",
-        wordWrap: true,
-        wordWrapWidth: panelWidth - 56,
-      });
-
-      const buttonWidth = panelWidth - 56;
-      const buttonBlockHeight = definition.options.length * 34 + Math.max(0, definition.options.length - 1) * 8;
-      const buttonStartY = Math.min(
-        consequencesLabel.y + consequencesLabel.height + 16,
-        panelHeight - buttonBlockHeight - 24,
-      );
-      definition.options.forEach((option, index) => {
-        const affordable = canAffordDecisionOption(state, option);
-        this.createModalButton(
-          panel,
-          copy?.options[option.id] ?? option.id,
-          28,
-          buttonStartY + index * 42,
-          buttonWidth,
-          34,
-          {
-            action: "resolve-quest-decision",
-            questOption: option.id,
-          },
-          !affordable,
-          affordable ? undefined : translations.quests.ui.notEnoughSupplies,
-        );
-      });
-      return;
-    }
-
-    const resultEntry = resolvedDecisionPreview;
-
-    if (!resultEntry) {
-      return;
-    }
-
-    const resultDefinition = decisionQuestById[resultEntry.definitionId];
-    const resultCopy = translations.quests.decisions[resultDefinition.id];
-    const resultOption = this.getDecisionHistoryOption(resultEntry);
-    const selectedOptionLabel = resultCopy?.options[resultEntry.optionId] ?? resultEntry.optionId;
-    const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(resultEntry.resolvedAt)} ${formatGameClock(resultEntry.resolvedAt)}`;
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: "archive",
-      kicker: translations.ui.decisionArchive ?? "Decision archive",
-      title: resultCopy?.title ?? resultDefinition.id,
-      subtitle: resolvedDay,
-      closeAction: { action: "close-decision-result" },
-    });
-    const decisionLabel = this.drawText(panel, `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`, 28, headerBottom + 2, {
-      fill: 0xd7ddd8,
-      fontSize: 13,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 56,
-    });
-    const resultY = decisionLabel.y + decisionLabel.height + 10;
-    const resultLabel = this.drawText(panel, resultCopy?.results[resultEntry.optionId] ?? "", 28, resultY, {
-      fill: 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 56,
-    });
-
-    if (resultOption) {
-      const chipsY = resultLabel.y + resultLabel.height + 16;
-      if (chipsY <= panelHeight - 28) {
-        this.drawDecisionImpactChips(
-          panel,
-          this.getDecisionImpactLines(resultOption, translations).slice(0, 8),
-          panelWidth - 28,
-          chipsY,
-        );
-      }
-    }
-  }
-
-  private drawConquestResultModal(
-    translations: TranslationPack | undefined,
-    width: number,
-    height: number,
-    conquestResultPreview: ConquestResultPreview | null,
-  ): void {
-    if (!translations || !conquestResultPreview) {
-      return;
-    }
-
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-conquest-result" });
-
-    const panelWidth = Math.min(520, width - 48);
-    const resourceName = translations.resources[conquestResultPreview.resourceId];
-    const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(conquestResultPreview.resolvedAt)} ${formatGameClock(conquestResultPreview.resolvedAt)}`;
-    const isVictory = conquestResultPreview.outcome === "victory";
-    const isOverrun = conquestResultPreview.outcome === "overrun";
-    const summary = isVictory
-      ? this.formatTemplate(
-          translations.ui.conquestVictorySummary ?? "{resource} oasis secured.",
-          { resource: resourceName },
-        )
-      : this.formatTemplate(
-          translations.ui.conquestDefeatSummary ?? "{resource} oasis assault failed.",
-          { resource: resourceName },
-        );
-    const sentLine = this.formatTemplate(
-      translations.ui.conquestVictorySent ?? "Assault force: {count}",
-      { count: conquestResultPreview.sentTroops },
-    );
-    const returnedLine = this.formatTemplate(
-      translations.ui.conquestVictoryReturned ?? "Returned: {count}",
-      { count: conquestResultPreview.returnedTroops },
-    );
-    const fallenLine = this.formatTemplate(
-      translations.ui.conquestVictoryFallen ?? "Fallen: {count}",
-      { count: conquestResultPreview.deaths },
-    );
-    const body = isVictory
-      ? (conquestResultPreview.deaths > 0
-          ? translations.ui.conquestVictoryBodyWithLosses ?? "The oasis is ours, but the fight cost lives."
-          : translations.ui.conquestVictoryBodyNoLosses ?? "The team secured the oasis without losses.")
-      : (isOverrun
-          ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis defenses."
-          : translations.ui.conquestDefeatBodyFailed ?? "No one returned from the assault.");
-    const summaryHeight = this.measureWrappedTextHeight(summary, 24, "900", panelWidth - 120);
-    const bodyHeight = this.measureWrappedTextHeight(body, 13, "800", panelWidth - 56);
-    const dayY = 38 + summaryHeight + 8;
-    const bodyBaseY = dayY + 22;
-    const sentBaseY = bodyBaseY + bodyHeight + 16;
-    const returnedBaseY = sentBaseY + 32;
-    const fallenBaseY = returnedBaseY + 32;
-    const requirementBaseY = fallenBaseY + 32;
-    let panelHeight = Math.ceil(
-      (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0 ? requirementBaseY : fallenBaseY) + 40,
-    );
-    panelHeight = Math.max(304, Math.min(panelHeight, Math.max(304, height - 40)));
-
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(34, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-
-    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
-      iconId: "shield",
-      kicker: isVictory
-        ? translations.ui.conquestVictoryTitle ?? "Oasis secured"
-        : translations.ui.conquestDefeatTitle ?? "Oasis assault failed",
-      title: summary,
-      subtitle: resolvedDay,
-      closeAction: { action: "close-conquest-result" },
-    });
-    const bodyY = Math.max(bodyBaseY, headerBottom + 2);
-    const bodyLabel = this.drawText(panel, body, 28, bodyY, {
-      fill: 0xd7ddd8,
-      fontSize: 13,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 56,
-    });
-    const sentY = bodyLabel.y + bodyLabel.height + 16;
-    const returnedY = sentY + 32;
-    const fallenY = returnedY + 32;
-    const requirementY = fallenY + 32;
-
-    this.drawText(panel, sentLine, 28, sentY, {
-      fill: 0xe3d7b5,
-      fontSize: 14,
-      fontWeight: "900",
-    });
-    this.drawText(panel, returnedLine, 28, returnedY, {
-      fill: conquestResultPreview.returnedTroops > 0 ? 0x9ed99b : 0xaeb4b8,
-      fontSize: 15,
-      fontWeight: "900",
-    });
-    this.drawText(panel, fallenLine, 28, fallenY, {
-      fill: conquestResultPreview.deaths > 0 ? 0xd38a8a : 0xaeb4b8,
-      fontSize: 15,
-      fontWeight: "900",
-    });
-
-    if (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0) {
-      this.drawText(
-        panel,
-        this.formatTemplate(
-          translations.ui.conquestDefeatRequirement ?? "Required minimum: {required}",
-          { required: conquestResultPreview.requiredTroops ?? 0 },
-        ),
-        28,
-        requirementY,
-        {
-          fill: 0xf1c17f,
-          fontSize: 13,
-          fontWeight: "900",
-        },
-      );
-    }
-  }
-
-  private drawVillageModal(
-    state: GameState,
-    translations: TranslationPack | undefined,
-    width: number,
-    height: number,
-    modalPlotId: string | null,
-  ): void {
-    if (!modalPlotId || !translations) {
-      return;
-    }
-
-    const selectedPlot = state.village.plots.find((plot) => plot.id === modalPlotId);
-    const selectedResourceSite = state.resourceSites.find((site) => site.id === modalPlotId);
-
-    if (!selectedPlot && !selectedResourceSite) {
-      return;
-    }
-
-    const overlay = new Container();
-    this.hudLayer.addChild(overlay);
-    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-    const isResourceSiteModal = Boolean(selectedResourceSite);
-    const isBuildChoice = selectedPlot?.buildingId === null;
-    const detailBuildingId = selectedPlot?.buildingId;
-    const modalWidth = isResourceSiteModal
-      ? Math.min(720, width - 40)
-      : isBuildChoice
-        ? Math.min(900, width - 56)
-        : Math.min(860, width - 40);
-    const modalHeight = isResourceSiteModal
-      ? Math.min(500, height - 40)
-      : isBuildChoice
-        ? Math.min(690, height - 56)
-        : Math.min(detailBuildingId === "barracks" ? 590 : 510, height - 40);
-    const panel = new Container();
-    panel.x = (width - modalWidth) / 2;
-    panel.y = (height - modalHeight) / 2;
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, modalWidth, modalHeight, 1, 0);
-
-    if (isResourceSiteModal && selectedResourceSite) {
-      this.drawModalHeader(
-        panel,
-        translations.ui.resourceSiteTitle ?? "Oasis",
-        `${translations.resources[selectedResourceSite.resourceId]} / ${translations.ui.resourceSiteStatus ?? "Status"}`,
-        modalWidth,
-        translations,
-      );
-      this.drawResourceSiteModal(
-        panel,
-        selectedResourceSite,
-        state,
-        translations,
-        modalWidth,
-        modalHeight,
-      );
-      return;
-    }
-
-    if (!selectedPlot) {
-      return;
-    }
-
-    if (selectedPlot.buildingId === null) {
-      const title = translations.ui.availableBuilds;
-      const subtitle = `${selectedPlot.id} / ${translations.ui.emptyPlot}`;
-      this.drawModalHeader(panel, title, subtitle, modalWidth, translations);
-      this.drawBuildChoices(
-        panel,
-        selectedPlot.id,
-        getAvailableBuildingsForPlot(state, selectedPlot.id),
-        state,
-        translations,
-        modalWidth,
-        modalHeight,
-      );
-      return;
-    }
-
-    this.drawModalClose(panel, modalWidth, translations);
-    const buildingId = selectedPlot.buildingId;
-    const building = state.buildings[buildingId];
-    const definition = buildingById[buildingId];
-    this.drawBuildingDetail(panel, buildingId, building.level, building.upgradingRemaining, definition.maxLevel, state, translations, modalWidth, modalHeight);
-  }
-
-  private drawModalHeader(
-    parent: Container,
-    title: string,
-    subtitle: string,
-    modalWidth: number,
-    translations: TranslationPack,
-  ): void {
-    this.drawOverlayHeader(parent, modalWidth, translations, {
-      iconId: "build",
-      title,
-      subtitle,
-      closeAction: { action: "close-village-modal" },
-    });
-  }
-
-  private drawModalClose(parent: Container, modalWidth: number, translations: TranslationPack): void {
-    this.createIconButton(parent, "close", modalWidth - 58, 18, 38, 38, { action: "close-village-modal" }, translations.ui.close);
-  }
-
-  private drawResourceSiteModal(
-    parent: Container,
-    siteState: GameState["resourceSites"][number],
-    state: GameState,
-    translations: TranslationPack,
-    modalWidth: number,
-    modalHeight: number,
-  ): void {
-    const panelX = 26;
-    const panelY = 86;
-    const panelWidth = modalWidth - 52;
-    const panelHeight = modalHeight - 112;
-    const card = new Graphics();
-    card.rect(panelX, panelY, panelWidth, panelHeight).fill({ color: 0x0f120f, alpha: 0.78 }).stroke({
-      color: 0x2b352f,
-      alpha: 0.9,
-      width: 1.5,
-    });
-    parent.addChild(card);
-
-    const resourceName = translations.resources[siteState.resourceId];
-    const yieldPerWorkerPerHour = siteState.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
-    const travelHours = getTravelTilesToSite(siteState.id);
-    const contentX = panelX + 16;
-    const contentWidth = panelWidth - 32;
-    let cursorY = panelY + 14;
-    const statusLabel = siteState.assault
-      ? translations.ui.resourceSiteStatusAssault ?? "Assault in progress"
-      : siteState.captured
-        ? translations.ui.resourceSiteStatusCaptured ?? "Secured"
-        : translations.ui.resourceSiteStatusLocked ?? "Unsecured";
-    const commodityLabel = this.drawText(parent, `${translations.ui.resourceSiteCommodity ?? "Commodity"}: ${resourceName}`, contentX, cursorY, {
-      fill: 0xf5efdf,
-      fontSize: 16,
-      fontWeight: "900",
-    });
-    cursorY = commodityLabel.y + commodityLabel.height + 6;
-    const statusText = this.drawText(parent, `${translations.ui.resourceSiteStatus ?? "Status"}: ${statusLabel}`, contentX, cursorY, {
-      fill: siteState.captured ? 0x9ed99b : siteState.assault ? 0xf1c17f : 0xd38a8a,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-    cursorY = statusText.y + statusText.height + 6;
-    const requirementText = this.drawText(
-      parent,
-      `${translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength"}: ${siteState.captureMinTroops} ${translations.ui.availableTroops?.toLowerCase() ?? "troops"}`,
-      contentX,
-      cursorY,
-      {
-        fill: 0xaeb4b8,
-        fontSize: 12,
-        fontWeight: "800",
-        wordWrap: true,
-        wordWrapWidth: contentWidth,
-      },
-    );
-    cursorY = requirementText.y + requirementText.height + 6;
-    const travelText = this.drawText(
-      parent,
-      `${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h (${travelHours} tiles)`,
-      contentX,
-      cursorY,
-      {
-        fill: 0xaeb4b8,
-        fontSize: 12,
-        fontWeight: "800",
-        wordWrap: true,
-        wordWrapWidth: contentWidth,
-      },
-    );
-    cursorY = travelText.y + travelText.height + 14;
-
-    if (siteState.assault) {
-      const runningLabel = this.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", contentX, cursorY, {
-        fill: 0xf1df9a,
-        fontSize: 13,
-        fontWeight: "900",
-        wordWrap: true,
-        wordWrapWidth: contentWidth,
-      });
-      this.drawText(
-        parent,
-        `${translations.ui.returnsIn ?? "returns in"} ${this.formatScoutingRemaining(siteState.assault.remainingSeconds)}`,
-        contentX,
-        runningLabel.y + runningLabel.height + 12,
-        {
-          fill: 0xf5efdf,
-          fontSize: 16,
-          fontWeight: "900",
-        },
-      );
-      return;
-    }
-
-    if (!siteState.captured) {
-      const selectedTroops = this.getResourceSiteTroopCount(siteState.id, state.survivors.troops, siteState.captureMinTroops);
-      this.drawText(parent, translations.ui.resourceSiteSendTroops ?? "Send troops", contentX, cursorY, {
-        fill: 0xd7ddd8,
-        fontSize: 14,
-        fontWeight: "900",
-      });
-      const controlsY = cursorY + 24;
-      this.createLocalModalButton(parent, "-", contentX, controlsY, 42, 34, () => {
-        this.setResourceSiteTroopCount(siteState.id, selectedTroops - 1, state.survivors.troops, siteState.captureMinTroops);
-      }, selectedTroops <= 1);
-      this.drawCenteredText(parent, `${selectedTroops}`, contentX + 74, controlsY + 17, {
-        fill: 0xf5efdf,
-        fontSize: 16,
-        fontWeight: "900",
-      });
-      this.createLocalModalButton(parent, "+", contentX + 106, controlsY, 42, 34, () => {
-        this.setResourceSiteTroopCount(siteState.id, selectedTroops + 1, state.survivors.troops, siteState.captureMinTroops);
-      }, selectedTroops >= Math.max(1, state.survivors.troops));
-      const canSend = selectedTroops > 0 && selectedTroops <= state.survivors.troops;
-      const sendDisabledTooltip = canSend
-        ? undefined
-        : translations.ui.notEnoughTroops ?? "Not enough available troops.";
-      const sendButtonWidth = Math.max(
-        120,
-        Math.min(194, panelX + panelWidth - (contentX + 170) - 16),
-      );
-      const sendButtonX = panelX + panelWidth - sendButtonWidth - 16;
-      this.createRectButton(parent, {
-        label: translations.ui.resourceSiteSendAssault ?? "Capture oasis",
-        x: sendButtonX,
-        y: controlsY,
-        width: sendButtonWidth,
-        height: 34,
-        detail: {
-          action: "resource-site-assault",
-          resourceSiteId: siteState.id,
-          resourceSiteTroops: selectedTroops,
-        },
-        disabled: !canSend,
-        tooltip: sendDisabledTooltip,
-        tone: "primary",
-      });
-
-      this.drawText(
-        parent,
-        this.formatTemplate(
-          translations.ui.resourceSiteTroopAvailability ?? "Available troops: {available} / selected: {selected}",
-          {
-            available: state.survivors.troops,
-            selected: selectedTroops,
-          },
-        ),
-        contentX,
-        controlsY + 68,
-        {
-          fill: canSend ? 0xaeb4b8 : 0xd38a8a,
-          fontSize: 12,
-          fontWeight: "800",
-          wordWrap: true,
-          wordWrapWidth: contentWidth,
-        },
-      );
-
-      const requirementColor = selectedTroops >= siteState.captureMinTroops ? 0x9ed99b : 0xf1c17f;
-      this.drawText(
-        parent,
-        selectedTroops >= siteState.captureMinTroops
-          ? translations.ui.resourceSiteReadyThreshold ?? "Troop minimum met."
-          : this.formatTemplate(
-              translations.ui.resourceSiteBelowThreshold ?? "Below requirement: need at least {required} troops.",
-              { required: siteState.captureMinTroops },
-            ),
-        contentX,
-        controlsY + 44,
-        {
-          fill: requirementColor,
-          fontSize: 12,
-          fontWeight: "900",
-          wordWrap: true,
-          wordWrapWidth: contentWidth,
-        },
-      );
-      return;
-    }
-
-    this.drawText(parent, translations.ui.resourceSiteSettlement ?? "Oasis settlement crew", contentX, cursorY, {
-      fill: 0xd7ddd8,
-      fontSize: 14,
-      fontWeight: "900",
-    });
-    const workerControlsY = cursorY + 24;
-    this.createRectButton(parent, {
-      label: "-",
-      x: contentX,
-      y: workerControlsY,
-      width: 42,
-      height: 34,
-      detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: -1 },
-      disabled: siteState.assignedWorkers <= 0,
-    });
-    this.drawCenteredText(
-      parent,
-      `${siteState.assignedWorkers}/${siteState.maxWorkers}`,
-      contentX + 80,
-      workerControlsY + 17,
-      {
-        fill: 0xf5efdf,
-        fontSize: 16,
-        fontWeight: "900",
-      },
-    );
-    this.createRectButton(parent, {
-      label: "+",
-      x: contentX + 120,
-      y: workerControlsY,
-      width: 42,
-      height: 34,
-      detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: 1 },
-      disabled: siteState.assignedWorkers >= siteState.maxWorkers || state.survivors.workers <= 0,
-      tooltip: state.survivors.workers <= 0
-        ? translations.ui.notEnoughWorkers
-        : undefined,
-    });
-
-    this.drawText(
-      parent,
-      this.formatTemplate(
-        translations.ui.resourceSiteWorkerYield ?? "Each worker adds +{amount}/h {resource}.",
-        {
-          amount: this.formatRate(yieldPerWorkerPerHour),
-          resource: resourceName,
-        },
-      ),
-      contentX,
-      workerControlsY + 46,
-      {
-        fill: 0x9ed99b,
-        fontSize: 12,
-        fontWeight: "900",
-        wordWrap: true,
-        wordWrapWidth: contentWidth,
-      },
-    );
-  }
-
   private getResourceSiteTroopCount(
     siteId: string,
     availableTroops: number,
@@ -3969,1309 +1658,6 @@ export class PixiVillageRenderer {
     const normalized = Math.max(1, Math.min(maxTroops, Math.floor(nextValue || fallback)));
     this.resourceSiteTroopCountById.set(siteId, normalized);
     this.requestRender();
-  }
-
-  private drawBuildChoices(
-    parent: Container,
-    plotId: string,
-    buildableBuildings: BuildingId[],
-    state: GameState,
-    translations: TranslationPack,
-    modalWidth: number,
-    modalHeight: number,
-  ): void {
-    if (buildableBuildings.length === 0) {
-      this.drawText(parent, translations.ui.alreadyBuilt, 24, 96, { fill: 0xaeb4b8, fontSize: 13 });
-      return;
-    }
-
-    if (this.buildChoicesScrollPlotId !== plotId) {
-      this.buildChoicesScrollPlotId = plotId;
-      this.buildChoicesScrollY = 0;
-    }
-
-    const availableCategories = buildCategoryOrder.filter((category) =>
-      buildableBuildings.some((buildingId) => buildingById[buildingId].category === category),
-    );
-    const activeCategory = (availableCategories.includes(this.activeBuildCategory)
-      ? this.activeBuildCategory
-      : availableCategories[0]) ?? "resource";
-    this.activeBuildCategory = activeCategory;
-
-    const filteredBuildings = buildableBuildings.filter(
-      (buildingId) => buildingById[buildingId].category === activeCategory,
-    );
-    const gap = 8;
-    const listX = 24;
-    const tabY = 88;
-    const listY = tabY + 48;
-    const availableHeight = modalHeight - listY - 24;
-    const rowHeight = modalHeight < 620 ? 96 : 104;
-    const contentHeight = filteredBuildings.length * rowHeight + gap * Math.max(0, filteredBuildings.length - 1);
-    const maxScroll = Math.max(0, contentHeight - availableHeight);
-    const needsScroll = maxScroll > 1;
-    const scrollbarGutter = needsScroll ? 22 : 0;
-    const rowWidth = modalWidth - 48 - scrollbarGutter;
-    const scrollY = Math.max(0, Math.min(maxScroll, this.buildChoicesScrollY));
-
-    this.drawBuildCategoryTabs(
-      parent,
-      availableCategories,
-      activeCategory,
-      translations,
-      listX,
-      tabY,
-      modalWidth - 48,
-    );
-
-    this.buildChoicesScrollY = scrollY;
-    this.buildChoicesScrollMax = maxScroll;
-    this.buildChoicesScrollArea = {
-      x: parent.x + listX,
-      y: parent.y + listY,
-      width: rowWidth + scrollbarGutter,
-      height: availableHeight,
-    };
-
-    const listContent = new Container();
-    listContent.x = listX;
-    listContent.y = listY - scrollY;
-    parent.addChild(listContent);
-
-    const listMask = new Graphics();
-    listMask.eventMode = "none";
-    listMask.rect(listX, listY, rowWidth, availableHeight).fill({ color: 0xffffff, alpha: 1 });
-    parent.addChild(listMask);
-    listContent.mask = listMask;
-
-    filteredBuildings.forEach((buildingId, index) => {
-      const translated = translations.buildings[buildingId];
-      const cost = getUpgradeCost(buildingId, 0);
-      const affordable = canAfford(state.resources, cost);
-      const queueAvailable = hasAvailableBuildingSlot(state);
-      const requiredWorkers = getConstructionWorkerRequirement(buildingId, 0);
-      const workersAvailable = state.survivors.workers >= requiredWorkers;
-      const mainBuildingUnlocked = isMainBuildingRequirementMet(state, buildingId, 1);
-      const requiredMainBuildingLevel = getMainBuildingLevelRequirement(buildingId, 1);
-      const disabled = !mainBuildingUnlocked || !affordable || !queueAvailable || !workersAvailable;
-      const disabledTooltip = disabled
-        ? this.getBuildActionDisabledTooltip(
-          translations,
-          cost,
-          state.resources,
-          requiredWorkers,
-          state.survivors.workers,
-          queueAvailable,
-          mainBuildingUnlocked,
-          requiredMainBuildingLevel,
-        )
-        : undefined;
-
-      this.drawBuildRow(listContent, {
-        x: 0,
-        y: index * (rowHeight + gap),
-        width: rowWidth,
-        height: rowHeight,
-        buildingId,
-        level: 1,
-        built: true,
-        title: translated.name,
-        description: translated.description,
-        cost,
-        requiredWorkers,
-        buttonLabel: translations.ui.buildHere,
-        disabled,
-        disabledTooltip,
-        action: { action: "build", building: buildingId, plot: plotId },
-        state,
-        translations,
-        effects: this.getNextLevelEffects(buildingId, 0, translations),
-      });
-    });
-
-    if (needsScroll) {
-      this.drawBuildChoicesScrollbar(
-        parent,
-        listX + rowWidth + 9,
-        listY,
-        10,
-        availableHeight,
-        scrollY,
-        maxScroll,
-        contentHeight,
-      );
-    }
-  }
-
-  private drawBuildCategoryTabs(
-    parent: Container,
-    categories: BuildingCategory[],
-    activeCategory: BuildingCategory,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    maxWidth: number,
-  ): void {
-    this.drawTabs(
-      parent,
-      categories.map((category) => ({
-        id: category,
-        label: this.getBuildCategoryLabel(category, translations),
-      })),
-      {
-        activeId: activeCategory,
-        x,
-        y,
-        height: 34,
-        minWidth: 96,
-        maxTabWidth: 148,
-        maxWidth,
-        onSelect: (category) => {
-          this.activeBuildCategory = category;
-          this.buildChoicesScrollY = 0;
-          this.requestRender();
-        },
-      },
-    );
-  }
-
-  private getBuildCategoryLabel(
-    category: BuildingCategory,
-    translations: TranslationPack,
-  ): string {
-    if (category === "resource") {
-      return translations.ui.buildingCategoryResource;
-    }
-
-    if (category === "housing") {
-      return translations.ui.buildingCategoryHousing;
-    }
-
-    if (category === "defense") {
-      return translations.ui.buildingCategoryDefense;
-    }
-
-    return translations.ui.buildingCategorySupport;
-  }
-
-  private drawBuildChoicesScrollbar(
-    parent: Container,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    scrollY: number,
-    maxScroll: number,
-    contentHeight: number,
-  ): void {
-    const track = new Graphics();
-    track.rect(x, y, width, height)
-      .fill({ color: 0x070807, alpha: 0.52 });
-    parent.addChild(track);
-
-    const thumbHeight = Math.max(46, (height / contentHeight) * height);
-    const thumbTravel = Math.max(0, height - thumbHeight - 4);
-    const thumbY = y + 2 + (maxScroll > 0 ? (scrollY / maxScroll) * thumbTravel : 0);
-    const thumb = new Graphics();
-    thumb.rect(x + 2, thumbY, width - 4, thumbHeight)
-      .fill({ color: 0xe0c46f, alpha: 0.86 });
-    parent.addChild(thumb);
-  }
-
-  private drawBuildRow(
-    parent: Container,
-    options: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      buildingId: BuildingId;
-      level: number;
-      built: boolean;
-      title: string;
-      description: string;
-      cost: ResourceBag;
-      requiredWorkers: number;
-      buttonLabel: string;
-      disabled: boolean;
-      disabledTooltip?: string;
-      action: PixiActionDetail;
-      state: GameState;
-      translations: TranslationPack;
-      effects: EffectLine[];
-    },
-  ): void {
-    const row = new Container();
-    row.x = options.x;
-    row.y = options.y;
-    parent.addChild(row);
-    this.drawPanel(row, 0, 0, options.width, options.height);
-
-    const asset = this.createBuildingSprite(options.buildingId, options.level, options.built);
-    asset.anchor.set(0.5);
-    asset.x = 72;
-    asset.y = options.height / 2;
-    this.fitSprite(
-      asset,
-      Math.min(104 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 1.42),
-      Math.min(78 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 0.96),
-    );
-    row.addChild(asset);
-
-    const textX = 150;
-    const buttonWidth = 124;
-    const buttonHeight = 34;
-    const buttonX = options.width - buttonWidth - 28;
-    const textWidth = Math.max(220, buttonX - textX - 24);
-    const compact = options.height < 66;
-    const sectionLabelY = options.height - 46;
-    const tokenY = options.height - 26;
-    const costSectionWidth = Math.max(150, Math.min(220, Math.floor(textWidth * 0.46)));
-    const effectsX = textX + costSectionWidth + 22;
-    const effectsWidth = Math.max(110, buttonX - effectsX - 18);
-
-    this.drawText(row, options.title, textX, compact ? 8 : 11, {
-      fill: 0xf5efdf,
-      fontSize: compact ? 14 : 16,
-      fontWeight: "900",
-    });
-    this.drawText(row, options.description, textX, compact ? 30 : 36, {
-      fill: 0xc8cabb,
-      fontSize: compact ? 10 : 12,
-      fontWeight: "600",
-      wordWrap: true,
-      wordWrapWidth: textWidth,
-    });
-
-    this.drawText(row, options.translations.ui.buildCosts ?? "Costs", textX, sectionLabelY, {
-      fill: 0xaeb4b8,
-      fontSize: 10,
-      fontWeight: "800",
-    });
-    this.drawText(row, options.translations.ui.buildBenefits ?? "Benefits", effectsX, sectionLabelY, {
-      fill: 0xaeb4b8,
-      fontSize: 10,
-      fontWeight: "800",
-    });
-
-    const costWidth = this.drawCostLine(row, options.cost, options.state.resources, options.translations, textX, tokenY);
-    this.drawEffects(row, options.effects, effectsX, tokenY, effectsWidth);
-
-    if (options.requiredWorkers > 0) {
-      this.drawWorkerRequirement(
-        row,
-        options.requiredWorkers,
-        options.state.survivors.workers,
-        options.translations,
-        Math.max(textX, Math.min(textX + costWidth + 8, textX + costSectionWidth - 54)),
-        tokenY,
-      );
-    }
-    this.createModalButton(
-      row,
-      options.buttonLabel,
-      buttonX,
-      (options.height - buttonHeight) / 2,
-      buttonWidth,
-      buttonHeight,
-      options.action,
-      options.disabled,
-      options.disabledTooltip,
-    );
-  }
-
-  private drawBuildingDetail(
-    parent: Container,
-    buildingId: BuildingId,
-    level: number,
-    upgradingRemaining: number,
-    maxLevel: number,
-    state: GameState,
-    translations: TranslationPack,
-    modalWidth: number,
-    modalHeight: number,
-  ): void {
-    const translated = translations.buildings[buildingId];
-    const building = state.buildings[buildingId];
-    const definition = buildingById[buildingId];
-    const cost = getUpgradeCost(buildingId, level);
-    const locked = level >= maxLevel;
-    const upgrading = upgradingRemaining > 0;
-    const affordable = canAfford(state.resources, cost);
-    const queueAvailable = hasAvailableBuildingSlot(state);
-    const requiredWorkers = getConstructionWorkerRequirement(buildingId, level);
-    const workersAvailable = state.survivors.workers >= requiredWorkers;
-    const requiredMainBuildingLevel = getMainBuildingLevelRequirement(buildingId, level + 1);
-    const mainBuildingUnlocked = locked ||
-      isMainBuildingRequirementMet(state, buildingId, level + 1);
-    const disabled = locked || upgrading || !mainBuildingUnlocked || !affordable || !queueAvailable || !workersAvailable;
-
-    const content = new Container();
-    parent.addChild(content);
-
-    const sideMargin = 28;
-    const contentTop = 34;
-    const previewWidth = 136;
-    const titleX = sideMargin + previewWidth + 22;
-    const titleWidth = modalWidth - titleX - sideMargin;
-    const bodyWidth = modalWidth - sideMargin * 2;
-
-    const asset = this.createBuildingSprite(buildingId, Math.max(1, level), level > 0);
-    asset.anchor.set(0.5);
-    asset.x = sideMargin + 54;
-    asset.y = contentTop + 50;
-    this.fitSprite(
-      asset,
-      96 * BUILDING_PREVIEW_RENDER_SCALE,
-      72 * BUILDING_PREVIEW_RENDER_SCALE,
-    );
-    content.addChild(asset);
-
-    this.drawText(content, translated.name, titleX, contentTop + 6, { fill: 0xf5efdf, fontSize: 30, fontWeight: "900" });
-    this.drawText(content, translated.description, titleX, contentTop + 48, {
-      fill: 0xc8cabb,
-      fontSize: 13,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: titleWidth,
-    });
-
-    const metricGap = 10;
-    const metricWidth = (titleWidth - metricGap * 3) / 4;
-    const metricY = contentTop + 86;
-    this.getBuildingDetailMetrics(buildingId, building, level, maxLevel, requiredWorkers, state, translations)
-      .forEach((metric, index) => {
-        this.drawMetricCard(
-          content,
-          metric,
-          titleX + index * (metricWidth + metricGap),
-          metricY,
-          metricWidth,
-          58,
-        );
-      });
-
-    const operationsY = contentTop + 166;
-    if (buildingId === "generator" || buildingId === "workshop") {
-      this.drawStaffedProductionControls(content, buildingId, state, translations, sideMargin, operationsY, bodyWidth);
-    } else if (buildingId === "market") {
-      this.drawMarketControls(content, state, translations, sideMargin, operationsY, bodyWidth);
-    } else if (buildingId === "barracks") {
-      this.drawBarracksControls(content, state, translations, sideMargin, operationsY, bodyWidth);
-    } else {
-      this.drawBuildingOperations(content, buildingId, level, translations, sideMargin, operationsY, bodyWidth);
-    }
-
-    const footerY = modalHeight - 134;
-    this.drawPanel(content, sideMargin, footerY, modalWidth - sideMargin * 2, 110);
-    this.drawText(content, locked ? translations.ui.maxLevelReached : translations.ui.nextLevel, sideMargin + 28, footerY + 26, {
-      fill: 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-
-    this.drawCostLine(content, cost, state.resources, translations, sideMargin + 28, footerY + 62);
-    this.drawWorkerRequirement(content, requiredWorkers, state.survivors.workers, translations, sideMargin + 208, footerY + 62);
-    this.drawEffects(content, this.getNextLevelEffects(buildingId, level, translations), sideMargin + 290, footerY + 62, Math.max(120, modalWidth - 580));
-
-    const warnings: string[] = [];
-    if (!queueAvailable && !upgrading) {
-      warnings.push(translations.ui.queueFull);
-    }
-    if (!workersAvailable && !upgrading) {
-      warnings.push(translations.ui.notEnoughWorkers);
-    }
-    if (!mainBuildingUnlocked && !upgrading) {
-      warnings.push(this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel));
-    }
-
-    warnings.forEach((warning, index) => {
-      this.drawText(content, warning, sideMargin + 28, footerY + 86 + index * 16, { fill: 0xff9aa2, fontSize: 11, fontWeight: "800" });
-    });
-
-    const buttonLabel = upgrading
-      ? `${Math.ceil(upgradingRemaining)}s`
-      : locked
-        ? `${level}/${maxLevel}`
-        : !mainBuildingUnlocked
-          ? this.getMainBuildingRequirementLabel(translations, requiredMainBuildingLevel)
-          : queueAvailable
-          ? translations.ui.upgrade
-          : translations.ui.queueFull;
-    this.createModalButton(
-      content,
-      buttonLabel,
-      modalWidth - 258,
-      footerY + 24,
-      210,
-      44,
-      { action: "upgrade", building: buildingId },
-      disabled,
-      !mainBuildingUnlocked
-        ? this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel)
-        : undefined,
-    );
-    this.drawIcon(content, "clock", modalWidth - 172, footerY + 88, 14);
-    this.drawText(content, `${Math.ceil(getBuildingBuildSeconds(buildingId, level))}s`, modalWidth - 154, footerY + 80, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
-      fontWeight: "700",
-    });
-  }
-
-  private getBuildingDetailMetrics(
-    buildingId: BuildingId,
-    building: GameState["buildings"][BuildingId],
-    level: number,
-    maxLevel: number,
-    requiredWorkers: number,
-    state: GameState,
-    translations: TranslationPack,
-  ): BuildingMetric[] {
-    const definition = buildingById[buildingId];
-    const defense = (definition.defense ?? 0) * level;
-
-    return [
-      {
-        iconId: "build",
-        label: translations.ui.level,
-        value: `${level}/${maxLevel}`,
-        fill: 0xf1df9a,
-        tooltip: `${translations.ui.level} ${level}/${maxLevel}`,
-      },
-      {
-        iconId: "shield",
-        label: translations.ui.defense,
-        value: `${Math.round(defense)}`,
-        fill: defense > 0 ? 0xf5efdf : 0xd7ddd8,
-        tooltip: `${translations.ui.defense}: ${Math.round(defense)}`,
-      },
-      this.getBuildingProductionMetric(buildingId, building, level, state, translations),
-      this.getBuildingCoalMetric(buildingId, building, level, state, translations),
-    ];
-  }
-
-  private getBuildingProductionMetric(
-    buildingId: BuildingId,
-    building: GameState["buildings"][BuildingId],
-    level: number,
-    state: GameState,
-    translations: TranslationPack,
-  ): BuildingMetric {
-    const definition = buildingById[buildingId];
-    const productionMultiplier = getGlobalProductionMultiplier(state);
-
-    if (buildingId === "mainBuilding") {
-      const bonus = getMainBuildingProductionBonus(level);
-      return {
-        iconId: "build",
-        label: translations.ui.production,
-        value: this.formatPercentBonus(bonus),
-        fill: bonus > 0 ? 0xf1df9a : 0xd7ddd8,
-        tooltip: `${translations.ui.production}: ${this.formatPercentBonus(bonus)}`,
-      };
-    }
-
-    if (buildingId === "generator") {
-      const rate = getCoalMineCoalRate(level, building.workers) * productionMultiplier;
-      return {
-        iconId: "coal",
-        label: translations.ui.production,
-        value: this.getHourlyRateLabel(rate),
-        fill: this.getRateColor(rate),
-        tooltip: `${translations.resources.coal}: ${this.getHourlyRateLabel(rate)}`,
-      };
-    }
-
-    if (buildingId === "workshop") {
-      const rate = getWorkshopMaterialRate(level, building.workers) * productionMultiplier;
-      return {
-        iconId: "material",
-        label: translations.ui.production,
-        value: this.getHourlyRateLabel(rate),
-        fill: this.getRateColor(rate),
-        tooltip: `${translations.resources.material}: ${this.getHourlyRateLabel(rate)}`,
-      };
-    }
-
-    if (buildingId === "market") {
-      const tradeLimit = getMarketTradeLimit(level);
-      return {
-        iconId: "material",
-        label: translations.ui.marketTradeLimit ?? translations.ui.stock,
-        value: `${tradeLimit}`,
-        fill: tradeLimit > 0 ? 0xf1df9a : 0xd7ddd8,
-        tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"}: ${tradeLimit}`,
-      };
-    }
-
-    const produced = Object.entries(definition.produces ?? {})
-      .find(([, amount]) => (amount ?? 0) > 0);
-
-    if (produced) {
-      const [resourceId, amount] = produced;
-      const typedResourceId = resourceId as ResourceId;
-      const rate = (amount ?? 0) *
-        level *
-        (typedResourceId === "morale" ? 1 : productionMultiplier);
-      return {
-        iconId: typedResourceId,
-        label: translations.ui.production,
-        value: this.getHourlyRateLabel(rate),
-        fill: this.getRateColor(rate),
-        tooltip: `${translations.resources[typedResourceId]}: ${this.getHourlyRateLabel(rate)}`,
-      };
-    }
-
-    if (definition.housing) {
-      const capacity = definition.housing * level;
-      return {
-        iconId: "home",
-        label: translations.ui.housingCapacity,
-        value: `+${capacity}`,
-        fill: capacity > 0 ? 0xf1df9a : 0xd7ddd8,
-        tooltip: `${translations.ui.housingCapacity}: ${capacity}`,
-      };
-    }
-
-    const storage = Object.entries(definition.storageBonus ?? {})
-      .find(([, amount]) => (amount ?? 0) > 0);
-
-    if (storage) {
-      const [resourceId, amount] = storage;
-      const typedResourceId = resourceId as ResourceId;
-      const capacity = Math.round((amount ?? 0) * level);
-      return {
-        iconId: typedResourceId,
-        label: translations.ui.stock,
-        value: `+${capacity}`,
-        fill: capacity > 0 ? 0xf1df9a : 0xd7ddd8,
-        tooltip: `${translations.resources[typedResourceId]} ${translations.ui.stock}: +${capacity}`,
-      };
-    }
-
-    return {
-      iconId: "build",
-      label: translations.ui.production,
-      value: "0",
-      fill: 0xd7ddd8,
-      tooltip: translations.ui.production,
-    };
-  }
-
-  private getBuildingCoalMetric(
-    buildingId: BuildingId,
-    building: GameState["buildings"][BuildingId],
-    level: number,
-    state: GameState,
-    translations: TranslationPack,
-  ): BuildingMetric {
-    const definition = buildingById[buildingId];
-    const consumption =
-      ((definition.consumes?.coal ?? 0) + (definition.alwaysConsumes?.coal ?? 0)) * level;
-    const production = buildingId === "generator"
-      ? getCoalMineCoalRate(level, building.workers) *
-        getGlobalProductionMultiplier(state)
-      : 0;
-    const staffedConsumption = buildingId === "workshop"
-      ? getWorkshopCoalRate(level, building.workers)
-      : consumption;
-    const netRate = production - staffedConsumption;
-
-    return {
-      iconId: "coal",
-      label: translations.resources.coal,
-      value: this.getHourlyRateLabel(netRate),
-      fill: this.getRateColor(netRate),
-      tooltip: `${translations.resources.coal}: ${this.getHourlyRateLabel(netRate)}`,
-    };
-  }
-
-  private getBuildingWorkerMetricValue(
-    buildingId: BuildingId,
-    building: GameState["buildings"][BuildingId],
-    requiredWorkers: number,
-    state: GameState,
-  ): string {
-    const workerLimit = getBuildingWorkerLimit(state, buildingId);
-
-    if (workerLimit > 0) {
-      return `${building.workers}/${workerLimit}`;
-    }
-
-    if (building.constructionWorkers > 0) {
-      return `${building.constructionWorkers}`;
-    }
-
-    return `${requiredWorkers}`;
-  }
-
-  private drawMetricCard(
-    parent: Container,
-    metric: BuildingMetric,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const card = new Container();
-    card.x = x;
-    card.y = y;
-    parent.addChild(card);
-
-    const box = new Graphics();
-    box.rect(0, 0, width, height)
-      .fill({ color: 0x10120e, alpha: 0.78 });
-    card.addChild(box);
-
-    this.drawIcon(card, metric.iconId, 22, height / 2, 22);
-    this.drawText(card, metric.label, 48, 12, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: width - 58,
-    });
-    this.drawText(card, metric.value, 48, 32, {
-      fill: metric.fill ?? 0xf5efdf,
-      fontSize: 17,
-      fontWeight: "900",
-      wordWrap: true,
-      wordWrapWidth: width - 58,
-    });
-
-    if (metric.tooltip) {
-      this.bindTooltip(card, metric.tooltip);
-    }
-  }
-
-  private drawSectionTitle(parent: Container, label: string, x: number, y: number): void {
-    this.drawText(parent, label, x, y, {
-      fill: 0xf1df9a,
-      fontSize: 13,
-      fontWeight: "900",
-    });
-  }
-
-  private drawBuildingOperations(
-    parent: Container,
-    buildingId: BuildingId,
-    level: number,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-  ): number {
-    const effects = this.getCurrentBuildingEffects(buildingId, level, translations);
-    const height = 112;
-
-    this.drawPanel(parent, x, y, width, height);
-    this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
-
-    if (effects.length === 0) {
-      this.drawText(parent, translations.ui.resourceNoActiveEffects ?? "-", x + 20, y + 54, {
-        fill: 0xaeb4b8,
-        fontSize: 12,
-        fontWeight: "800",
-      });
-      return y + height + 14;
-    }
-
-    this.drawEffects(parent, effects, x + 20, y + 56, width - 40);
-    return y + height + 14;
-  }
-
-  private drawStaffedProductionControls(
-    parent: Container,
-    buildingId: BuildingId,
-    state: GameState,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-  ): number {
-    const building = state.buildings[buildingId];
-    const workerLimit = getBuildingWorkerLimit(state, buildingId);
-
-    if (workerLimit <= 0) {
-      return y;
-    }
-
-    const productionResourceId: ResourceId = buildingId === "workshop" ? "material" : "coal";
-    const productionPerHour = (
-      buildingId === "workshop"
-        ? getWorkshopMaterialRate(building.level, building.workers)
-        : getCoalMineCoalRate(building.level, building.workers)
-    ) * GAME_HOUR_REAL_SECONDS;
-    const coalUsePerHour = buildingId === "workshop"
-      ? getWorkshopCoalRate(building.level, building.workers) * GAME_HOUR_REAL_SECONDS
-      : 0;
-    this.drawPanel(parent, x, y, width, 104);
-    this.drawSectionTitle(parent, translations.ui.operations ?? "Operations", x + 20, y + 18);
-    this.drawText(parent, `${translations.ui.workers}: ${building.workers}/${workerLimit}`, x + 20, y + 50, { fill: 0xf5efdf, fontSize: 13, fontWeight: "800" });
-    this.drawInfoToken(parent, {
-      iconId: productionResourceId,
-      text: `+${this.formatRate(productionPerHour)}/h`,
-      tooltip: `${translations.resources[productionResourceId]}: +${this.formatRate(productionPerHour)}/h`,
-      x: x + 20,
-      y: y + 74,
-    });
-    if (coalUsePerHour > 0) {
-      this.drawInfoToken(parent, {
-        iconId: "coal",
-        text: `-${this.formatRate(coalUsePerHour)}/h`,
-        tooltip: `${translations.resources.coal}: -${this.formatRate(coalUsePerHour)}/h`,
-        missing: true,
-        x: x + 118,
-        y: y + 74,
-      });
-    }
-    this.createModalButton(parent, "-", x + width - 96, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: -1 }, building.workers <= 0);
-    this.createModalButton(parent, "+", x + width - 48, y + 42, 36, 32, { action: "building-workers", building: buildingId, delta: 1 }, building.workers >= workerLimit || state.survivors.workers <= 0);
-    return y + 118;
-  }
-
-  private drawMarketControls(
-    parent: Container,
-    state: GameState,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-  ): number {
-    const marketLevel = state.buildings.market.level;
-
-    if (marketLevel <= 0) {
-      return y;
-    }
-
-    this.normalizeMarketSelection();
-    const tradeLimit = getMarketTradeLimit(marketLevel);
-    const tradeSlots = getMarketTradeSlots(marketLevel);
-    const availableTrades = getAvailableMarketTrades(state);
-    const tradeCapacity = getMarketTradeCapacity(
-      state,
-      this.marketFromResource,
-      this.marketToResource,
-    );
-    const maxAmount = Math.max(1, tradeCapacity);
-    this.marketAmount = Math.max(1, Math.min(this.marketAmount, maxAmount));
-
-    const cooldownRemaining = state.market.cooldownRemainingSeconds;
-    const statusText = cooldownRemaining > 0
-      ? `${translations.ui.marketCooldown ?? "Cooldown"}: ${this.formatScoutingRemaining(cooldownRemaining)}`
-      : `${translations.ui.marketTrades ?? "Trades"}: ${availableTrades}/${tradeSlots}`;
-    const disabled = !canTradeAtMarket(
-      state,
-      this.marketFromResource,
-      this.marketToResource,
-      this.marketAmount,
-    );
-    const disabledTooltip = this.getMarketTradeDisabledTooltip(
-      state,
-      translations,
-      tradeCapacity,
-    );
-
-    this.drawPanel(parent, x, y, width, 170);
-    this.drawSectionTitle(parent, translations.ui.marketExchange ?? "Exchange", x + 20, y + 18);
-    this.drawText(
-      parent,
-      `${translations.ui.marketTradeLimit ?? "Limit"}: ${tradeLimit} / ${statusText}`,
-      x + 20,
-      y + 42,
-      { fill: 0xaeb4b8, fontSize: 12, fontWeight: "800" },
-    );
-
-    this.drawMarketResourceButtons(
-      parent,
-      translations.ui.marketGive ?? "Give",
-      this.marketFromResource,
-      x + 20,
-      y + 72,
-      (resourceId) => {
-        this.marketFromResource = resourceId;
-        if (this.marketToResource === resourceId) {
-          this.marketToResource = this.getNextMarketResource(resourceId);
-        }
-        this.requestRender();
-      },
-      translations,
-    );
-    this.drawMarketResourceButtons(
-      parent,
-      translations.ui.marketReceive ?? "Receive",
-      this.marketToResource,
-      x + 20,
-      y + 116,
-      (resourceId) => {
-        this.marketToResource = resourceId;
-        if (this.marketFromResource === resourceId) {
-          this.marketFromResource = this.getNextMarketResource(resourceId);
-        }
-        this.requestRender();
-      },
-      translations,
-    );
-
-    this.drawMarketAmountStepper(
-      parent,
-      translations,
-      x + width - 238,
-      y + 72,
-      196,
-      tradeCapacity,
-    );
-    this.createModalButton(
-      parent,
-      translations.ui.marketTrade ?? "Trade",
-      x + width - 238,
-      y + 126,
-      196,
-      34,
-      {
-        action: "market-trade",
-        marketFromResource: this.marketFromResource,
-        marketToResource: this.marketToResource,
-        marketAmount: this.marketAmount,
-      },
-      disabled,
-      disabledTooltip,
-    );
-
-    return y + 184;
-  }
-
-  private drawMarketResourceButtons(
-    parent: Container,
-    label: string,
-    activeResourceId: MarketResourceId,
-    x: number,
-    y: number,
-    onSelect: (resourceId: MarketResourceId) => void,
-    translations: TranslationPack,
-  ): void {
-    this.drawText(parent, label, x, y, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-
-    let offsetX = 74;
-    for (const resourceId of marketResourceIds) {
-      this.createRectButton(parent, {
-        label: translations.resources[resourceId],
-        x: x + offsetX,
-        y: y - 8,
-        width: 66,
-        height: 30,
-        onTap: () => {
-          this.playTabSwitchSound();
-          onSelect(resourceId);
-        },
-        active: resourceId === activeResourceId,
-        tone: "secondary",
-        fontSize: 11,
-        fontWeight: "900",
-      });
-      offsetX += 72;
-    }
-  }
-
-  private drawMarketAmountStepper(
-    parent: Container,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-    tradeCapacity: number,
-  ): void {
-    const stepper = new Container();
-    stepper.x = x;
-    stepper.y = y;
-    parent.addChild(stepper);
-
-    const box = new Graphics();
-    box.rect(0, 0, width, 44)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 });
-    stepper.addChild(box);
-
-    this.drawText(stepper, translations.ui.marketAmount ?? "Amount", 12, 7, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
-      fontWeight: "800",
-    });
-    this.createLocalModalButton(stepper, "-10", width - 126, 8, 38, 28, () => {
-      this.marketAmount = Math.max(1, this.marketAmount - 10);
-      this.requestRender();
-    }, this.marketAmount <= 1);
-    this.drawCenteredText(stepper, `${this.marketAmount}`, width - 64, 22, {
-      fill: tradeCapacity > 0 ? 0xf1df9a : 0xff9aa2,
-      fontSize: 17,
-      fontWeight: "900",
-    });
-    this.createLocalModalButton(stepper, "+10", width - 42, 8, 38, 28, () => {
-      this.marketAmount = Math.min(Math.max(1, tradeCapacity), this.marketAmount + 10);
-      this.requestRender();
-    }, tradeCapacity <= 0 || this.marketAmount >= tradeCapacity);
-  }
-
-  private normalizeMarketSelection(): void {
-    if (!isMarketResourceId(this.marketFromResource)) {
-      this.marketFromResource = "material";
-    }
-
-    if (!isMarketResourceId(this.marketToResource)) {
-      this.marketToResource = "food";
-    }
-
-    if (this.marketFromResource === this.marketToResource) {
-      this.marketToResource = this.getNextMarketResource(this.marketFromResource);
-    }
-  }
-
-  private getNextMarketResource(resourceId: MarketResourceId): MarketResourceId {
-    return marketResourceIds.find((candidate) => candidate !== resourceId) ?? "food";
-  }
-
-  private getMarketTradeDisabledTooltip(
-    state: GameState,
-    translations: TranslationPack,
-    tradeCapacity: number,
-  ): string | undefined {
-    if (state.market.cooldownRemainingSeconds > 0) {
-      return `${translations.ui.marketCooldown ?? "Cooldown"}: ${this.formatScoutingRemaining(state.market.cooldownRemainingSeconds)}`;
-    }
-
-    if (getAvailableMarketTrades(state) <= 0) {
-      return translations.ui.marketNoTrades ?? "No trade slot available.";
-    }
-
-    if (this.marketFromResource === this.marketToResource) {
-      return translations.ui.marketSameResource ?? "Choose two different resources.";
-    }
-
-    if (tradeCapacity <= 0) {
-      return translations.ui.marketNoCapacity ?? "Not enough stock or storage capacity.";
-    }
-
-    return undefined;
-  }
-
-  private drawBarracksControls(parent: Container, state: GameState, translations: TranslationPack, x: number, y: number, width: number): number {
-    if (state.buildings.barracks.level <= 0) {
-      return y;
-    }
-
-    const panelHeight = 132;
-    const contentY = y + 18;
-    const selectedTroops = Math.max(1, Math.floor(this.barracksTroopCount));
-    const maxSelectableTroops = Math.max(1, Math.max(state.survivors.workers, state.survivors.troops));
-    this.barracksTroopCount = Math.min(selectedTroops, maxSelectableTroops);
-
-    this.drawPanel(parent, x, y, width, panelHeight);
-    this.drawBarracksTraining(parent, state, translations, x, contentY, width, maxSelectableTroops);
-    return y + panelHeight + 14;
-  }
-
-  private drawBarracksTraining(
-    parent: Container,
-    state: GameState,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-    width: number,
-    maxSelectableTroops: number,
-  ): void {
-    this.drawBarracksAvailabilityCard(parent, "people", translations.ui.availableWorkers, state.survivors.workers, x + 20, y, 156, 42);
-    this.drawBarracksAvailabilityCard(parent, "scout", translations.ui.availableTroops, state.survivors.troops, x + 188, y, 156, 42);
-    this.drawTroopCountStepper(
-      parent,
-      translations.ui.squadSize ?? translations.roles.troops,
-      this.barracksTroopCount,
-      maxSelectableTroops,
-      x + width - 208,
-      y,
-      188,
-    );
-
-    this.createModalButton(
-      parent,
-      translations.ui.workerToTroop,
-      x + 20,
-      y + 58,
-      156,
-      32,
-      { action: "barracks-worker-to-troop", troopCount: this.barracksTroopCount },
-      state.survivors.workers < this.barracksTroopCount,
-    );
-    this.createModalButton(
-      parent,
-      translations.ui.troopToWorker,
-      x + 188,
-      y + 58,
-      156,
-      32,
-      { action: "barracks-troop-to-worker", troopCount: this.barracksTroopCount },
-      state.survivors.troops < this.barracksTroopCount,
-    );
-  }
-
-  private drawBarracksAvailabilityCard(
-    parent: Container,
-    iconId: string,
-    label: string,
-    value: number,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const card = new Container();
-    card.x = x;
-    card.y = y;
-    parent.addChild(card);
-
-    const box = new Graphics();
-    box.rect(0, 0, width, height)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 });
-    card.addChild(box);
-    this.drawIcon(card, iconId, 22, height / 2, 20);
-    this.drawText(card, label, 48, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.drawText(card, `${value}`, 48, 26, { fill: 0xf5efdf, fontSize: 17, fontWeight: "900" });
-  }
-
-  private drawTroopCountStepper(
-    parent: Container,
-    label: string,
-    value: number,
-    maxValue: number,
-    x: number,
-    y: number,
-    width: number,
-  ): void {
-    const stepper = new Container();
-    stepper.x = x;
-    stepper.y = y;
-    parent.addChild(stepper);
-
-    const box = new Graphics();
-    box.rect(0, 0, width, 50)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 });
-    stepper.addChild(box);
-
-    this.drawText(stepper, label, 12, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
-    this.createLocalModalButton(stepper, "-", width - 108, 12, 30, 28, () => {
-      this.barracksTroopCount = Math.max(1, this.barracksTroopCount - 1);
-      this.requestRender();
-    }, value <= 1);
-    this.drawCenteredText(stepper, `${value}`, width - 58, 26, {
-      fill: 0xf1df9a,
-      fontSize: 17,
-      fontWeight: "900",
-    });
-    this.createLocalModalButton(stepper, "+", width - 38, 12, 30, 28, () => {
-      this.barracksTroopCount = Math.min(maxValue, this.barracksTroopCount + 1);
-      this.requestRender();
-    }, value >= maxValue);
-  }
-
-  private drawEffects(parent: Container, effects: EffectLine[], x: number, y: number, maxWidth: number): number {
-    let offsetX = 0;
-    let offsetY = 0;
-    let maxOffsetX = 0;
-    for (const effect of effects.slice(0, 4)) {
-      const token = this.drawInfoToken(parent, {
-        iconId: effect.iconId,
-        text: effect.value,
-        tooltip: effect.tooltip,
-        missing: effect.negative,
-        x: x + offsetX,
-        y: y + offsetY,
-      });
-
-      if (offsetX > 0 && offsetX + token.width > maxWidth) {
-        offsetX = 0;
-        offsetY += 18;
-        token.x = x;
-        token.y = y + offsetY;
-      }
-
-      offsetX += token.width + 8;
-      maxOffsetX = Math.max(maxOffsetX, offsetX);
-    }
-
-    return maxOffsetX;
-  }
-
-  private drawCostLine(parent: Container, bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack, x: number, y: number): number {
-    let offset = 0;
-    for (const part of this.getCostLineParts(bag, availableResources, translations)) {
-      const item = this.drawInfoToken(parent, {
-        iconId: part.iconId,
-        text: part.text,
-        tooltip: part.tooltip,
-        missing: part.missing,
-        x: x + offset,
-        y,
-      });
-      offset += item.width + 8;
-    }
-
-    return offset;
-  }
-
-  private drawRewardLine(
-    parent: Container,
-    bag: ResourceBag,
-    translations: TranslationPack,
-    x: number,
-    y: number,
-  ): number {
-    let offset = 0;
-
-    for (const [resourceId, amount] of Object.entries(bag)) {
-      if ((amount ?? 0) <= 0) {
-        continue;
-      }
-
-      const typedResourceId = resourceId as ResourceId;
-      const roundedAmount = Math.ceil(amount ?? 0);
-      const item = this.drawInfoToken(parent, {
-        iconId: typedResourceId,
-        text: `+${roundedAmount}`,
-        tooltip: `${translations.resources[typedResourceId]}: ${translations.resourceDescriptions[typedResourceId]}`,
-        x: x + offset,
-        y,
-      });
-      offset += item.width + 8;
-    }
-
-    return offset;
-  }
-
-  private drawWorkerRequirement(parent: Container, required: number, available: number, translations: TranslationPack, x: number, y: number): number {
-    const missing = available < required;
-    const token = this.drawInfoToken(parent, {
-      iconId: "people",
-      text: `${required}`,
-      tooltip: `${translations.ui.constructionWorkers}: ${Math.floor(available)}/${required}`,
-      missing,
-      x,
-      y,
-    });
-
-    return token.width;
-  }
-
-  private getMainBuildingRequirementLabel(
-    translations: TranslationPack,
-    requiredLevel: number,
-  ): string {
-    return this.formatTemplate(
-      translations.ui.requiresMainBuildingLevelShort ?? "Main lvl {level}",
-      { level: requiredLevel },
-    );
-  }
-
-  private getMainBuildingRequirementTooltip(
-    translations: TranslationPack,
-    requiredLevel: number,
-  ): string {
-    return this.formatTemplate(
-      translations.ui.requiresMainBuildingLevel ?? "Requires main building level {level}.",
-      { level: requiredLevel },
-    );
-  }
-
-  private getBuildActionDisabledTooltip(
-    translations: TranslationPack,
-    cost: ResourceBag,
-    resources: GameState["resources"],
-    requiredWorkers: number,
-    availableWorkers: number,
-    queueAvailable: boolean,
-    mainBuildingUnlocked: boolean,
-    requiredMainBuildingLevel: number,
-  ): string {
-    const reasons: string[] = [];
-
-    if (!mainBuildingUnlocked) {
-      reasons.push(this.getMainBuildingRequirementTooltip(translations, requiredMainBuildingLevel));
-    }
-    if (!queueAvailable) {
-      reasons.push(translations.ui.queueFull);
-    }
-    if (availableWorkers < requiredWorkers) {
-      reasons.push(translations.ui.notEnoughWorkers);
-    }
-
-    const missingResourceLabels = this.getMissingResourceLabels(cost, resources, translations);
-    if (missingResourceLabels.length > 0) {
-      reasons.push(`${translations.ui.notEnoughResources ?? "Not enough resources"}: ${missingResourceLabels.join(", ")}`);
-    }
-
-    return reasons.join("\n");
-  }
-
-  private getMissingResourceLabels(
-    bag: ResourceBag,
-    availableResources: GameState["resources"],
-    translations: TranslationPack,
-  ): string[] {
-    const labels: string[] = [];
-
-    for (const [resourceId, amount] of Object.entries(bag)) {
-      if ((amount ?? 0) <= 0) {
-        continue;
-      }
-      const typedResourceId = resourceId as ResourceId;
-      const required = Math.ceil(amount ?? 0);
-      const available = availableResources[typedResourceId] ?? 0;
-      if (available < required) {
-        labels.push(translations.resources[typedResourceId]);
-      }
-    }
-
-    return labels;
-  }
-
-  private drawInfoToken(
-    parent: Container,
-    options: {
-      iconId: string;
-      text: string;
-      tooltip: string;
-      missing?: boolean;
-      x: number;
-      y: number;
-    },
-  ): Container {
-    const token = new Container();
-    token.x = options.x;
-    token.y = options.y;
-    parent.addChild(token);
-
-    this.drawIcon(token, options.iconId, 8, 8, 14);
-    const label = this.drawText(token, options.text, 20, 0, {
-      fill: options.missing ? 0xff6f7d : 0xf1df9a,
-      fontSize: 12,
-      fontWeight: "900",
-    });
-    this.bindTooltip(token, options.tooltip);
-
-    token.hitArea = new Rectangle(0, -2, label.width + 26, 20);
-    return token;
-  }
-
-  private drawStatPill(parent: Container, iconId: string, label: string, x: number, y: number): void {
-    const pill = new Container();
-    pill.x = x;
-    pill.y = y;
-    parent.addChild(pill);
-    this.drawPanel(pill, 0, 0, 118, 30);
-    this.drawIcon(pill, iconId, 16, 15, 15);
-    this.drawText(pill, label, 32, 7, { fill: 0xf5efdf, fontSize: 12, fontWeight: "800" });
   }
 
   private createModalButton(
@@ -5300,6 +1686,45 @@ export class PixiVillageRenderer {
     });
   }
 
+  private drawRewardLine(
+    parent: Container,
+    bag: ResourceBag,
+    translations: TranslationPack,
+    x: number,
+    y: number,
+  ): number {
+    let offset = 0;
+
+    for (const [resourceId, amount] of Object.entries(bag)) {
+      if ((amount ?? 0) <= 0) {
+        continue;
+      }
+
+      const typedResourceId = resourceId as ResourceId;
+      const roundedAmount = Math.ceil(amount ?? 0);
+      const token = new Container();
+      token.x = x + offset;
+      token.y = y;
+      parent.addChild(token);
+
+      this.drawIcon(token, typedResourceId, 8, 8, 14);
+      const label = this.drawText(token, `+${roundedAmount}`, 20, 0, {
+        fill: 0xf1df9a,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+      this.bindTooltip(
+        token,
+        `${translations.resources[typedResourceId]}: ${translations.resourceDescriptions[typedResourceId]}`,
+      );
+      token.hitArea = new Rectangle(0, -2, label.width + 26, 20);
+
+      offset += token.width + 8;
+    }
+
+    return offset;
+  }
+
   private createLocalModalButton(
     parent: Container,
     label: string,
@@ -5324,308 +1749,6 @@ export class PixiVillageRenderer {
     });
   }
 
-  private getCostLineParts(bag: ResourceBag, availableResources: GameState["resources"], translations: TranslationPack): CostLinePart[] {
-    return Object.entries(bag)
-      .filter(([, amount]) => (amount ?? 0) > 0)
-      .map(([resourceId, amount]) => {
-        const typedResourceId = resourceId as ResourceId;
-        const required = Math.ceil(amount ?? 0);
-        const available = availableResources[typedResourceId] ?? required;
-        return {
-          text: `${required}`,
-          iconId: typedResourceId,
-          missing: available < required,
-          tooltip: `${translations.resources[typedResourceId]}: ${translations.resourceDescriptions[typedResourceId]} (${Math.floor(available)}/${required})`,
-        };
-      });
-  }
-
-  private getNextLevelEffects(buildingId: BuildingId, currentLevel: number, translations: TranslationPack): EffectLine[] {
-    const definition = buildingById[buildingId];
-
-    if (!definition || currentLevel >= definition.maxLevel) {
-      return [];
-    }
-
-    const effects: EffectLine[] = [];
-
-    if (buildingId === "mainBuilding") {
-      const nextBonus = getMainBuildingProductionBonus(currentLevel + 1);
-      if (nextBonus > 0) {
-        effects.push({
-          iconId: "build",
-          value: this.formatPercentBonus(nextBonus),
-          tooltip: `${translations.ui.production}: ${this.formatPercentBonus(nextBonus)}`,
-        });
-      }
-
-      const currentMoralePerHour = getMainBuildingMoraleRate(currentLevel) *
-        GAME_HOUR_REAL_SECONDS;
-      const nextMoralePerHour = getMainBuildingMoraleRate(currentLevel + 1) *
-        GAME_HOUR_REAL_SECONDS;
-      const moraleDelta = nextMoralePerHour - currentMoralePerHour;
-
-      if (moraleDelta > 0) {
-        effects.push({
-          iconId: "morale",
-          value: `+${this.formatRate(moraleDelta)}/h`,
-          tooltip: `${translations.resources.morale} +${this.formatRate(moraleDelta)}/h`,
-        });
-      }
-    }
-
-    const attractedSurvivors = getSurvivorAttractionOnCompletedLevel(
-      buildingId,
-      currentLevel + 1,
-    );
-
-    if (attractedSurvivors > 0) {
-      effects.push({
-        iconId: "people",
-        value: `+${attractedSurvivors}`,
-        tooltip: `${translations.ui.population} +${attractedSurvivors}`,
-      });
-    }
-    if (buildingId === "clinic") {
-      const treatmentPerHour = getClinicTreatmentRatePerGameHour(currentLevel + 1);
-      const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
-      effects.push({
-        iconId: "people",
-        value: `+${this.formatRate(treatmentPerHour)}/h`,
-        tooltip: `${translations.ui.treatment} +${this.formatRate(treatmentPerHour)}/h (${translations.resources.food} -${this.formatRate(foodPerHour)}/h)`,
-      });
-    }
-    if (buildingId === "dormitory") {
-      const housing = definition.housing ?? 0;
-      effects.push({
-        iconId: "home",
-        value: `+${housing}`,
-        tooltip: `${translations.ui.housingCapacity} +${housing}`,
-      });
-    }
-    if (buildingId === "barracks") {
-      effects.push({
-        iconId: "scout",
-        value: "+",
-        tooltip: translations.ui.unlocksTroopTraining,
-      });
-    }
-    if (buildingId === "generator") {
-      const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
-      const nextLimit = Math.min(4, currentLevel + 2);
-      const currentMaxRate = getCoalMineCoalRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
-      const nextMaxRate = getCoalMineCoalRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
-      if (nextLimit > currentLimit) {
-        effects.push({
-          iconId: "people",
-          value: `+${nextLimit - currentLimit}`,
-          tooltip: `${translations.ui.workers} max +${nextLimit - currentLimit}`,
-        });
-      }
-      effects.push({
-        iconId: "coal",
-        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
-        tooltip: `${translations.resources.coal} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
-      });
-    }
-    if (buildingId === "workshop") {
-      const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
-      const nextLimit = Math.min(4, currentLevel + 2);
-      const currentMaxRate = getWorkshopMaterialRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
-      const nextMaxRate = getWorkshopMaterialRate(currentLevel + 1, nextLimit) * GAME_HOUR_REAL_SECONDS;
-      if (nextLimit > currentLimit) {
-        effects.push({
-          iconId: "people",
-          value: `+${nextLimit - currentLimit}`,
-          tooltip: `${translations.ui.workers} max +${nextLimit - currentLimit}`,
-        });
-      }
-      effects.push({
-        iconId: "material",
-        value: `+${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
-        tooltip: `${translations.resources.material} max +${this.formatRate(nextMaxRate - currentMaxRate)}/h`,
-      });
-    }
-    if (buildingId === "market") {
-      const currentTradeLimit = getMarketTradeLimit(currentLevel);
-      const nextTradeLimit = getMarketTradeLimit(currentLevel + 1);
-      const currentTradeSlots = getMarketTradeSlots(currentLevel);
-      const nextTradeSlots = getMarketTradeSlots(currentLevel + 1);
-
-      if (nextTradeLimit > currentTradeLimit) {
-        effects.push({
-          iconId: "material",
-          value: `+${nextTradeLimit - currentTradeLimit}`,
-          tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"} +${nextTradeLimit - currentTradeLimit}`,
-        });
-      }
-
-      if (nextTradeSlots > currentTradeSlots) {
-        effects.push({
-          iconId: "build",
-          value: `+${nextTradeSlots - currentTradeSlots}`,
-          tooltip: `${translations.ui.marketTrades ?? "Trades"} +${nextTradeSlots - currentTradeSlots}`,
-        });
-      }
-    }
-    if (definition.defense) {
-      effects.push({
-        iconId: "shield",
-        value: `+${definition.defense}`,
-        tooltip: `${translations.ui.defense} +${definition.defense}`,
-      });
-    }
-    for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `+${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-      });
-    }
-    for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `-${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-        negative: true,
-      });
-    }
-    for (const [resourceId, amount] of Object.entries(definition.alwaysConsumes ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `-${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * GAME_HOUR_REAL_SECONDS)}/h`,
-        negative: true,
-      });
-    }
-    for (const [resourceId, amount] of Object.entries(definition.storageBonus ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `+${Math.round(amount ?? 0)}`,
-        tooltip: `${translations.resources[typedResourceId]} cap +${Math.round(amount ?? 0)}`,
-      });
-    }
-
-    return effects;
-  }
-
-  private getCurrentBuildingEffects(buildingId: BuildingId, level: number, translations: TranslationPack): EffectLine[] {
-    const definition = buildingById[buildingId];
-
-    if (!definition || level <= 0) {
-      return [];
-    }
-
-    const effects: EffectLine[] = [];
-
-    if (buildingId === "mainBuilding") {
-      const bonus = getMainBuildingProductionBonus(level);
-      if (bonus > 0) {
-        effects.push({
-          iconId: "build",
-          value: this.formatPercentBonus(bonus),
-          tooltip: `${translations.ui.production}: ${this.formatPercentBonus(bonus)}`,
-        });
-      }
-
-      const moralePerHour = getMainBuildingMoraleRate(level) * GAME_HOUR_REAL_SECONDS;
-
-      if (moralePerHour > 0) {
-        effects.push({
-          iconId: "morale",
-          value: `+${this.formatRate(moralePerHour)}/h`,
-          tooltip: `${translations.resources.morale} +${this.formatRate(moralePerHour)}/h`,
-        });
-      }
-    }
-
-    if (buildingId === "clinic") {
-      const treatmentPerHour = getClinicTreatmentRatePerGameHour(level);
-      const foodPerHour = treatmentPerHour * getClinicFoodPerTreatment();
-      effects.push({
-        iconId: "people",
-        value: `+${this.formatRate(treatmentPerHour)}/h`,
-        tooltip: `${translations.ui.treatment} +${this.formatRate(treatmentPerHour)}/h (${translations.resources.food} -${this.formatRate(foodPerHour)}/h)`,
-      });
-    }
-
-    if (buildingId === "dormitory" && definition.housing) {
-      effects.push({
-        iconId: "home",
-        value: `+${definition.housing * level}`,
-        tooltip: `${translations.ui.housingCapacity} +${definition.housing * level}`,
-      });
-    }
-
-    if (buildingId === "market") {
-      effects.push({
-        iconId: "material",
-        value: `${getMarketTradeLimit(level)}`,
-        tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"} ${getMarketTradeLimit(level)}`,
-      });
-
-      if (getMarketTradeSlots(level) > 1) {
-        effects.push({
-          iconId: "build",
-          value: `${getMarketTradeSlots(level)}x`,
-          tooltip: `${translations.ui.marketTrades ?? "Trades"} ${getMarketTradeSlots(level)}`,
-        });
-      }
-    }
-
-    if (definition.defense) {
-      effects.push({
-        iconId: "shield",
-        value: `+${definition.defense * level}`,
-        tooltip: `${translations.ui.defense} +${definition.defense * level}`,
-      });
-    }
-
-    for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `+${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} +${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-      });
-    }
-
-    for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `-${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-        negative: true,
-      });
-    }
-
-    for (const [resourceId, amount] of Object.entries(definition.alwaysConsumes ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `-${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-        tooltip: `${translations.resources[typedResourceId]} -${this.formatRate((amount ?? 0) * level * GAME_HOUR_REAL_SECONDS)}/h`,
-        negative: true,
-      });
-    }
-
-    for (const [resourceId, amount] of Object.entries(definition.storageBonus ?? {})) {
-      const typedResourceId = resourceId as ResourceId;
-      effects.push({
-        iconId: typedResourceId,
-        value: `+${Math.round((amount ?? 0) * level)}`,
-        tooltip: `${translations.resources[typedResourceId]} cap +${Math.round((amount ?? 0) * level)}`,
-      });
-    }
-
-    return effects;
-  }
-
   private createPill(
     label: string,
     iconId: string,
@@ -5636,50 +1759,26 @@ export class PixiVillageRenderer {
     labelFill = 0xe9e4d2,
     compact = false,
   ): Container {
-    const group = new Container();
-    const text = new Text({
-      text: label,
-      style: {
-        fill: labelFill,
-        fontFamily: HUD_FONT_FAMILY,
-        fontSize: compact ? 12 : 13,
-        fontWeight: normalizeHudFontWeight("800"),
+    return createPillPrimitive(
+      {
+        drawIcon: (parent, tokenIconId, x, y, size) => this.drawIcon(parent, tokenIconId, x, y, size),
+        bindTooltip: (target, text) => this.bindTooltip(target, text),
+        bindAction: (target, detail) => this.bindAction(target, detail),
+        bindLocalAction: (target, onTap) => this.bindLocalAction(target, onTap),
+        consumeHostClick: () => this.consumeHostClick(),
       },
-    });
-    const subtext = sublabel
-      ? new Text({
-        text: sublabel,
-        style: {
-          fill: sublabelFill,
-          fontFamily: HUD_FONT_FAMILY,
-          fontSize: compact ? 9 : 10,
-          fontWeight: normalizeHudFontWeight("800"),
-        },
-      })
-      : null;
-    const width = Math.max(compact ? 62 : 68, Math.max(text.width, subtext?.width ?? 0) + (compact ? 38 : 44));
-    const height = subtext ? (compact ? 38 : 46) : (compact ? 30 : 34);
-    const panel = new Graphics();
-    panel
-      .rect(0, 0, width, height)
-      .fill({ color: 0x10120e, alpha: compact ? 0.64 : 0.76 });
-    group.addChild(panel);
-    this.drawIcon(group, iconId, compact ? 15 : 17, height / 2, compact ? 14 : 16);
-    text.x = compact ? 28 : 32;
-    text.y = subtext ? (compact ? 4 : 6) : (compact ? 6 : 7);
-    group.addChild(text);
-    if (subtext) {
-      subtext.x = compact ? 28 : 32;
-      subtext.y = compact ? 22 : 25;
-      group.addChild(subtext);
-    }
-    if (tooltip) {
-      this.bindTooltip(group, tooltip);
-    }
-    if (action) {
-      this.bindAction(group, action);
-    }
-    return group;
+      drawTextPrimitive,
+      {
+        label,
+        iconId,
+        tooltip,
+        sublabel,
+        sublabelFill,
+        action,
+        labelFill,
+        compact,
+      },
+    );
   }
 
   private createHudButton(
@@ -5752,104 +1851,61 @@ export class PixiVillageRenderer {
   }
 
   private createRectButton(parent: Container, options: RectButtonOptions): Container {
-    const button = new Container();
-    button.x = options.x;
-    button.y = options.y;
-
-    const style = this.getRectButtonStyle(options.tone ?? "toolbar", options.disabled ?? false, options.active ?? false);
-    const box = new Graphics();
-    box.rect(0, 0, options.width, options.height)
-      .fill({ color: style.fill, alpha: style.fillAlpha });
-    button.addChild(box);
-
-    if (options.iconId) {
-      const icon = this.drawIcon(button, options.iconId, options.width / 2, options.height / 2, Math.min(options.width, options.height) - 14);
-      icon.alpha = options.active ? 0.9 : 1;
-    }
-
-    if (options.label) {
-      this.drawCenteredText(button, options.label, options.width / 2, options.height / 2, {
-        fill: style.textFill,
-        fontSize: options.fontSize ?? 13,
-        fontWeight: options.fontWeight ?? "900",
-      });
-    }
-
-    if (!options.disabled) {
-      if (options.detail) {
-        this.bindAction(button, options.detail);
-      } else if (options.onTap) {
-        this.bindLocalAction(button, options.onTap);
-      }
-    } else {
-      button.eventMode = "static";
-      button.cursor = "not-allowed";
-      button.on("pointerdown", (event) => {
-        event.stopPropagation();
-        this.consumeHostClick();
-      });
-    }
-
-    if (options.tooltip) {
-      this.bindTooltip(button, options.tooltip);
-    }
-
-    parent.addChild(button);
-    return button;
+    return createRectButtonPrimitive(
+      {
+        drawIcon: (tokenParent, iconId, x, y, size) => this.drawIcon(tokenParent, iconId, x, y, size),
+        bindTooltip: (target, text) => this.bindTooltip(target, text),
+        bindAction: (target, detail) => this.bindAction(target, detail),
+        bindLocalAction: (target, onTap) => this.bindLocalAction(target, onTap),
+        consumeHostClick: () => this.consumeHostClick(),
+      },
+      parent,
+      options,
+      (labelParent, text, x, y, opts) => this.drawCenteredText(labelParent, text, x, y, opts),
+    );
   }
 
   private createCircleButton(parent: Container, options: CircleButtonOptions): Container {
-    const button = new Container();
-    button.x = options.x;
-    button.y = options.y;
-
-    const box = new Graphics();
-    box.rect(-options.radius, -options.radius, options.radius * 2, options.radius * 2)
-      .fill({ color: options.active ? 0xe0c46f : 0x2d2f23, alpha: options.active ? 1 : 0.9 });
-    button.addChild(box);
-
-    const icon = this.drawIcon(button, options.iconId, 0, 0, options.radius * 1.08);
-    icon.alpha = options.active ? 0.92 : 1;
-    this.bindAction(button, options.detail);
-    this.bindTooltip(button, options.tooltip);
-    parent.addChild(button);
-    return button;
+    return createCircleButtonPrimitive(
+      {
+        drawIcon: (tokenParent, iconId, x, y, size) => this.drawIcon(tokenParent, iconId, x, y, size),
+        bindTooltip: (target, text) => this.bindTooltip(target, text),
+        bindAction: (target, detail) => this.bindAction(target, detail),
+        bindLocalAction: (target, onTap) => this.bindLocalAction(target, onTap),
+        consumeHostClick: () => this.consumeHostClick(),
+      },
+      parent,
+      options,
+    );
   }
 
-  private getRectButtonStyle(
-    tone: RectButtonTone,
-    disabled: boolean,
-    active: boolean,
-  ): { fill: number; fillAlpha: number; textFill: number } {
-    if (disabled) {
-      return {
-        fill: 0x34362e,
-        fillAlpha: tone === "secondary" ? 0.52 : 0.62,
-        textFill: 0xaeb4b8,
-      };
-    }
+  private drawDecisionImpactChips(
+    parent: Container,
+    impacts: EffectLine[],
+    rightX: number,
+    y: number,
+  ): void {
+    let cursorX = rightX;
 
-    if (active || tone === "primary") {
-      return {
-        fill: 0xe0c46f,
-        fillAlpha: 1,
-        textFill: 0x141719,
-      };
+    for (const impact of [...impacts].reverse()) {
+      const chip = new Container();
+      const value = this.drawText(chip, impact.value, 24, 4, {
+        fill: impact.negative ? 0xff9c8f : 0x9ed99b,
+        fontSize: 11,
+        fontWeight: "900",
+      });
+      const chipWidth = Math.max(42, 32 + value.width);
+      const background = new Graphics();
+      background.rect(0, 0, chipWidth, 22)
+        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 });
+      chip.addChildAt(background, 0);
+      this.drawIcon(chip, impact.iconId, 13, 11, 13);
+      chip.x = cursorX - chipWidth;
+      chip.y = y;
+      parent.addChild(chip);
+      this.bindTooltip(chip, impact.tooltip);
+      cursorX -= chipWidth + 5;
     }
-
-    if (tone === "secondary") {
-      return {
-        fill: 0x262719,
-        fillAlpha: 0.92,
-        textFill: 0xf1df9a,
-      };
-    }
-
-    return {
-      fill: 0x2d2f23,
-      fillAlpha: 0.84,
-      textFill: 0xf4eedf,
-    };
   }
 
   private drawTabs<T extends string>(
@@ -5908,11 +1964,7 @@ export class PixiVillageRenderer {
     fillAlpha = 0.76,
     _cornerRadius = 0,
   ): Graphics {
-    const panel = new Graphics();
-    panel.rect(x, y, width, height);
-    panel.fill({ color: 0x10120e, alpha: fillAlpha });
-    parent.addChild(panel);
-    return panel;
+    return drawPanelPrimitive(parent, x, y, width, height, fillAlpha);
   }
 
   private bindAction(target: Container, detail: PixiActionDetail): void {
@@ -6234,163 +2286,13 @@ export class PixiVillageRenderer {
     const animationFrames = this.assets.getBuildingAnimationFrames(buildingId, level, built);
 
     if (animationFrames) {
-      const texture = this.resolveAnimationTexture(animationFrames, performance.now());
+      const texture = this.ambientEffects.resolveAnimationTexture(animationFrames, performance.now());
       if (texture) {
         return new Sprite(texture);
       }
     }
 
     return new Sprite(this.assets.getBuildingTexture(buildingId, level, built));
-  }
-
-  private createTerrainSprite(textureKey: string): Sprite | null {
-    const animationFrames = this.assets.getTerrainTileAnimationFrames(textureKey);
-
-    if (animationFrames) {
-      const sprite = new Sprite();
-      this.registerTextureAnimation(sprite, animationFrames);
-      return sprite;
-    }
-
-    const texture = this.assets.getTerrainTileTexture(textureKey);
-    return texture ? new Sprite(texture) : null;
-  }
-
-  private registerTextureAnimation(
-    sprite: Sprite,
-    animationFrames: FrameObject[],
-  ): void {
-    const frames = animationFrames.flatMap((frame): TextureAnimationFrame[] => {
-      const durationMs = typeof frame.time === "number" ? frame.time : 100;
-      return durationMs > 0
-        ? [{ texture: frame.texture, durationMs }]
-        : [];
-    });
-
-    if (frames.length <= 1) {
-      if (frames[0]) {
-        sprite.texture = frames[0].texture;
-      }
-      return;
-    }
-
-    const totalDurationMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
-    if (totalDurationMs <= 0) {
-      sprite.texture = frames[0].texture;
-      return;
-    }
-
-    const binding: TextureAnimationBinding = {
-      sprite,
-      frames,
-      totalDurationMs,
-      currentFrameIndex: -1,
-      phaseOffsetMs: this.getNoiseSeed(this.textureAnimationBindingCounter++) * totalDurationMs,
-    };
-
-    this.textureAnimationBindings.add(binding);
-    this.applyTextureAnimationFrame(binding, performance.now());
-    this.updateAmbientAnimationLoop();
-  }
-
-  private resolveAnimationTexture(
-    animationFrames: FrameObject[],
-    nowMs: number,
-  ): FrameObject["texture"] | null {
-    const frames = animationFrames.flatMap((frame): TextureAnimationFrame[] => {
-      const durationMs = typeof frame.time === "number" ? frame.time : 100;
-      return durationMs > 0
-        ? [{ texture: frame.texture, durationMs }]
-        : [];
-    });
-
-    if (frames.length === 0) {
-      return null;
-    }
-
-    if (frames.length === 1) {
-      return frames[0].texture;
-    }
-
-    const totalDurationMs = frames.reduce((sum, frame) => sum + frame.durationMs, 0);
-    if (totalDurationMs <= 0) {
-      return frames[0].texture;
-    }
-
-    const frameIndex = this.getTextureAnimationFrameIndex(
-      frames,
-      totalDurationMs,
-      nowMs,
-    );
-    return frames[frameIndex]?.texture ?? frames[0].texture;
-  }
-
-  private refreshTextureAnimations(nowMs: number): void {
-    if (this.textureAnimationBindings.size === 0) {
-      return;
-    }
-
-    if (
-      this.lastTextureAnimationFrameAtMs > 0 &&
-      nowMs - this.lastTextureAnimationFrameAtMs < TEXTURE_ANIMATION_FRAME_MIN_MS
-    ) {
-      return;
-    }
-    this.lastTextureAnimationFrameAtMs = nowMs;
-
-    for (const binding of Array.from(this.textureAnimationBindings)) {
-      if (binding.sprite.destroyed || !binding.sprite.parent) {
-        this.textureAnimationBindings.delete(binding);
-        continue;
-      }
-
-      this.applyTextureAnimationFrame(binding, nowMs);
-    }
-  }
-
-  private applyTextureAnimationFrame(binding: TextureAnimationBinding, nowMs: number): void {
-    const frameIndex = this.getTextureAnimationFrameIndex(
-      binding.frames,
-      binding.totalDurationMs,
-      nowMs + binding.phaseOffsetMs,
-    );
-
-    if (frameIndex === binding.currentFrameIndex) {
-      return;
-    }
-
-    binding.currentFrameIndex = frameIndex;
-    binding.sprite.texture = binding.frames[frameIndex].texture;
-  }
-
-  private getTextureAnimationFrameIndex(
-    frames: TextureAnimationFrame[],
-    totalDurationMs: number,
-    nowMs: number,
-  ): number {
-    const loopPositionMs = nowMs % totalDurationMs;
-    let elapsed = 0;
-
-    for (let index = 0; index < frames.length; index += 1) {
-      elapsed += frames[index].durationMs;
-      if (loopPositionMs < elapsed) {
-        return index;
-      }
-    }
-
-    return frames.length - 1;
-  }
-
-  private unregisterTextureAnimationsForNode(node: Container): void {
-    for (const binding of Array.from(this.textureAnimationBindings)) {
-      if (binding.sprite === node) {
-        this.textureAnimationBindings.delete(binding);
-      }
-    }
-
-    for (const child of node.children) {
-      this.unregisterTextureAnimationsForNode(child as Container);
-    }
   }
 
   private fitSprite(sprite: Sprite, maxWidth: number, maxHeight: number): void {
@@ -6416,9 +2318,15 @@ export class PixiVillageRenderer {
       lineHeight?: number;
     },
   ): Text {
-    const label = this.drawText(parent, text, x, y, options);
-    label.anchor.set(0.5);
-    return label;
+    return drawCenteredTextPrimitive(
+      parent,
+      (tokenParent, tokenText, tokenX, tokenY, tokenOptions) =>
+        this.drawText(tokenParent, tokenText, tokenX, tokenY, tokenOptions),
+      text,
+      x,
+      y,
+      options,
+    );
   }
 
   private drawText(
@@ -6437,25 +2345,7 @@ export class PixiVillageRenderer {
       lineHeight?: number;
     },
   ): Text {
-    const normalizedLineHeight = options.lineHeight ?? getHudTextLineHeight(options.fontSize);
-    const label = new Text({
-      text,
-      style: {
-        fill: options.fill,
-        fontFamily: HUD_FONT_FAMILY,
-        fontSize: options.fontSize,
-        fontWeight: normalizeHudFontWeight(options.fontWeight ?? "700"),
-        lineHeight: normalizedLineHeight,
-        align: options.align,
-        wordWrap: options.wordWrap,
-        wordWrapWidth: options.wordWrapWidth,
-      },
-    });
-    label.alpha = options.alpha ?? 1;
-    label.x = x;
-    label.y = y;
-    parent.addChild(label);
-    return label;
+    return drawTextPrimitive(parent, text, x, y, options);
   }
 
   private measureWrappedTextHeight(
@@ -6584,54 +2474,37 @@ export class PixiVillageRenderer {
     return Math.max(1, Math.round(value * scale));
   }
 
-  private getLogicalWheelDelta(event: WheelEvent): number {
-    return event.deltaY / this.hudPixelScale;
-  }
-
   private shouldAnimateCamera(): boolean {
-    return (
-      Math.abs(this.cameraTargetZoom - this.cameraZoom) > CAMERA_ZOOM_SNAP_EPSILON ||
-      Math.abs(this.cameraTargetOffsetX - this.cameraOffsetX) > CAMERA_OFFSET_SNAP_EPSILON ||
-      Math.abs(this.cameraTargetOffsetY - this.cameraOffsetY) > CAMERA_OFFSET_SNAP_EPSILON
+    return shouldAnimateCameraState(
+      this.cameraTargetZoom,
+      this.cameraZoom,
+      this.cameraTargetOffsetX,
+      this.cameraOffsetX,
+      this.cameraTargetOffsetY,
+      this.cameraOffsetY,
     );
   }
 
   private refreshCameraTransform(): void {
-    const viewportWidth = this.host.clientWidth;
-    const viewportHeight = this.host.clientHeight;
-
-    if (viewportWidth <= 0 || viewportHeight <= 0) {
-      return;
-    }
-
-    if (!this.shouldAnimateCamera()) {
-      return;
-    }
-
-    this.cameraZoom += (this.cameraTargetZoom - this.cameraZoom) * CAMERA_SMOOTH_FACTOR;
-    this.cameraOffsetX += (this.cameraTargetOffsetX - this.cameraOffsetX) * CAMERA_SMOOTH_FACTOR;
-    this.cameraOffsetY += (this.cameraTargetOffsetY - this.cameraOffsetY) * CAMERA_SMOOTH_FACTOR;
-    this.clampCurrentCamera(viewportWidth, viewportHeight);
-
-    if (
-      Math.abs(this.cameraTargetZoom - this.cameraZoom) <= CAMERA_ZOOM_SNAP_EPSILON &&
-      Math.abs(this.cameraTargetOffsetX - this.cameraOffsetX) <= CAMERA_OFFSET_SNAP_EPSILON &&
-      Math.abs(this.cameraTargetOffsetY - this.cameraOffsetY) <= CAMERA_OFFSET_SNAP_EPSILON
-    ) {
-      this.cameraZoom = this.cameraTargetZoom;
-      this.cameraOffsetX = this.cameraTargetOffsetX;
-      this.cameraOffsetY = this.cameraTargetOffsetY;
-      this.clampCurrentCamera(viewportWidth, viewportHeight);
-    }
-
-    this.applyCameraTransform();
+    const next = refreshCameraStateTransform(this.host, this.cameraLayer, this.layout, {
+      zoom: this.cameraZoom,
+      targetZoom: this.cameraTargetZoom,
+      offsetX: this.cameraOffsetX,
+      targetOffsetX: this.cameraTargetOffsetX,
+      offsetY: this.cameraOffsetY,
+      targetOffsetY: this.cameraTargetOffsetY,
+    });
+    this.cameraZoom = next.zoom;
+    this.cameraOffsetX = next.offsetX;
+    this.cameraOffsetY = next.offsetY;
   }
 
   private clampCurrentCamera(viewportWidth: number, viewportHeight: number): void {
-    const clamped = this.clampCamera(
+    const clamped = clampCameraState(
       this.cameraZoom,
       this.cameraOffsetX,
       this.cameraOffsetY,
+      this.layout,
       viewportWidth,
       viewportHeight,
     );
@@ -6641,10 +2514,11 @@ export class PixiVillageRenderer {
   }
 
   private clampTargetCamera(viewportWidth: number, viewportHeight: number): void {
-    const clamped = this.clampCamera(
+    const clamped = clampCameraState(
       this.cameraTargetZoom,
       this.cameraTargetOffsetX,
       this.cameraTargetOffsetY,
+      this.layout,
       viewportWidth,
       viewportHeight,
     );
@@ -6659,96 +2533,8 @@ export class PixiVillageRenderer {
     this.cameraLayer.scale.set(this.cameraZoom);
   }
 
-  private clampCamera(
-    zoom: number,
-    offsetX: number,
-    offsetY: number,
-    viewportWidth: number,
-    viewportHeight: number,
-  ): { zoom: number; offsetX: number; offsetY: number } {
-    const scale = this.layout.scale;
-    const terrainWidth = defaultVillageLayout.width * scale;
-    const terrainHeight = defaultVillageLayout.height * scale;
-    const originX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
-    const originY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-    const clampedZoom = Math.max(CAMERA_MIN_ZOOM, Math.min(CAMERA_MAX_ZOOM, zoom));
-    const scaledTerrainWidth = terrainWidth * clampedZoom;
-    const scaledTerrainHeight = terrainHeight * clampedZoom;
-    const insets = this.getCameraViewportInsets(viewportWidth, viewportHeight);
-    const safeLeft = insets.left;
-    const safeTop = insets.top;
-    const safeRight = viewportWidth - insets.right;
-    const safeBottom = viewportHeight - insets.bottom;
-    const safeWidth = Math.max(1, safeRight - safeLeft);
-    const safeHeight = Math.max(1, safeBottom - safeTop);
-    let clampedOffsetX = offsetX;
-    let clampedOffsetY = offsetY;
-
-    if (scaledTerrainWidth <= safeWidth) {
-      clampedOffsetX = safeLeft + (safeWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
-    } else {
-      const minX = safeRight - (originX + terrainWidth) * clampedZoom;
-      const maxX = safeLeft - originX * clampedZoom;
-      clampedOffsetX = Math.max(minX, Math.min(maxX, clampedOffsetX));
-    }
-
-    if (scaledTerrainHeight <= safeHeight) {
-      clampedOffsetY = safeTop + (safeHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
-    } else {
-      const minY = safeBottom - (originY + terrainHeight) * clampedZoom;
-      const maxY = safeTop - originY * clampedZoom;
-      clampedOffsetY = Math.max(minY, Math.min(maxY, clampedOffsetY));
-    }
-
-    return {
-      zoom: clampedZoom,
-      offsetX: clampedOffsetX,
-      offsetY: clampedOffsetY,
-    };
-  }
-
-  private getCameraViewportInsets(
-    viewportWidth: number,
-    viewportHeight: number,
-  ): { left: number; right: number; top: number; bottom: number } {
-    const hudScale = HUD_DESIGN_SCALE * this.getHudPixelScale();
-    const minSafeWidth = 240;
-    const minSafeHeight = 220;
-    let left = HUD_LEFT_PANEL_WIDTH * hudScale;
-    const right = 0;
-    let top = HUD_TOP_STRIP_HEIGHT * hudScale;
-    const bottom = 0;
-    const maxLeftInset = Math.max(0, viewportWidth - minSafeWidth);
-
-    left = Math.min(left, maxLeftInset);
-
-    const maxTopInset = Math.max(0, viewportHeight - minSafeHeight);
-    top = Math.min(top, maxTopInset);
-
-    return {
-      left,
-      right,
-      top,
-      bottom,
-    };
-  }
-
   private getLayout(width: number, height: number): SceneLayout {
-    const scale = Math.min(width / 1420, height / 880);
-    const villageWidth = 1120 * scale;
-    const villageHeight = 680 * scale;
-
-    return {
-      originX: (width - villageWidth) / 2,
-      originY: Math.max(76, (height - villageHeight) / 2),
-      width: villageWidth,
-      height: villageHeight,
-      scale,
-    };
-  }
-
-  private getHudPixelScale(): number {
-    return 1;
+    return getSceneLayout(width, height);
   }
 
   private getStaticWorldKey(state: GameState): string {
@@ -6758,29 +2544,6 @@ export class PixiVillageRenderer {
       this.layout.originX.toFixed(2),
       this.layout.originY.toFixed(2),
     ].join("|");
-  }
-
-  private seededUnit(seed: number): number {
-    const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-    return value - Math.floor(value);
-  }
-
-  private getNoiseSeed(index: number): number {
-    const normalizedIndex = Math.max(0, Math.floor(index));
-    const cached = this.noiseSeedCache[normalizedIndex];
-
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const value = this.seededUnit(normalizedIndex + 1);
-    this.noiseSeedCache[normalizedIndex] = value;
-    return value;
-  }
-
-  private triangleWave(value: number): number {
-    const fractional = value - Math.floor(value);
-    return (1 - Math.abs(fractional * 2 - 1)) * 2 - 1;
   }
 
   private getPlotBounds(plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">): Bounds {
@@ -6797,62 +2560,6 @@ export class PixiVillageRenderer {
       width,
       height,
     };
-  }
-
-  private formatRate(value: number): string {
-    if (Math.abs(value) >= 10) {
-      return value.toFixed(0);
-    }
-
-    return value.toFixed(1);
-  }
-
-  private formatPercentBonus(value: number): string {
-    return `+${Math.round(value * 100)}%`;
-  }
-
-  private formatTemplate(
-    template: string,
-    params: Record<string, string | number>,
-  ): string {
-    return Object.entries(params).reduce(
-      (message, [key, value]) => message.split(`{${key}}`).join(String(value)),
-      template,
-    );
-  }
-
-  private formatScoutingRemaining(seconds: number): string {
-    const gameHours = seconds / GAME_HOUR_REAL_SECONDS;
-
-    if (gameHours >= 1) {
-      return `${Math.ceil(gameHours)}h`;
-    }
-
-    return `${Math.max(1, Math.ceil(gameHours * 60))}m`;
-  }
-
-  private getHourlyRateLabel(ratePerSecond: number): string {
-    const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
-
-    if (Math.abs(hourlyRate) < 0.05) {
-      return "0/h";
-    }
-
-    return `${hourlyRate > 0 ? "+" : ""}${this.formatRate(hourlyRate)}/h`;
-  }
-
-  private getRateColor(ratePerSecond: number): number {
-    const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
-
-    if (hourlyRate > 0.05) {
-      return 0x8fe0b8;
-    }
-
-    if (hourlyRate < -0.05) {
-      return 0xff9aa2;
-    }
-
-    return 0xaeb4b8;
   }
 
   private getDefenseScore(state: GameState): number {
@@ -6880,116 +2587,14 @@ export class PixiVillageRenderer {
       const text = translations ? formatLogEntry(entry, translations) : entry.key;
       return {
         text,
-        fill: this.getLogEntryFillColor(entry, index === 0),
-        iconId: this.getLogEntryIconId(entry),
+        fill: getLogEntryFillColor(entry, index === 0),
+        iconId: getLogEntryIconId(entry),
       };
     });
     this.lastFormattedLogSource = state.log;
     this.lastFormattedLogTranslations = translations;
     this.lastFormattedLogEntries = entries;
     return entries;
-  }
-
-  private getLogEntryFillColor(entry: GameState["log"][number], latest: boolean): number {
-    const severity = getLogEntrySeverity(entry);
-
-    if (severity === "critical") {
-      return 0xff707a;
-    }
-
-    if (severity === "warning") {
-      return 0xf1c17f;
-    }
-
-    if (severity === "positive") {
-      return 0x9ed99b;
-    }
-
-    return latest ? 0xf1df9a : 0xc8cabb;
-  }
-
-  private getLogEntryIconId(entry: GameState["log"][number]): string {
-    const key = entry.key;
-
-    if (key === "logStarvationDeath" || key === "logDehydrationDeath") {
-      return "death";
-    }
-
-    if (
-      key === "logConstructionInjury" ||
-      key === "logScarcityInjury" ||
-      key === "logIllness" ||
-      key === "logClinicTreated" ||
-      key === "logShelterExposureInjury"
-    ) {
-      return "crisis-injured";
-    }
-
-    if (key === "logConstructionStarted" || key === "logUpgradeStarted" || key === "logReachedLevel") {
-      return "build";
-    }
-
-    if (key === "logSurvivorJoined" || key === "logSurvivorsJoined") {
-      return "people";
-    }
-
-    if (key === "logScoutingStarted" || key === "logScoutingReturned") {
-      return "scout";
-    }
-
-    if (
-      key === "logResourceSiteAssaultStarted" ||
-      key === "logResourceSiteAssaultFailed" ||
-      key === "logResourceSiteAssaultOverrun" ||
-      key === "logResourceSiteCaptured"
-    ) {
-      return "shield";
-    }
-
-    if (key === "logMarketTrade") {
-      return "material";
-    }
-
-    if (key === "logEnvironmentRainStarted" || key === "logEnvironmentRainEnded") {
-      return "crisis-rain";
-    }
-
-    if (key === "logEnvironmentSnowStarted" || key === "logEnvironmentSnowEnded") {
-      return "crisis-snow";
-    }
-
-    if (key === "logEnvironmentRadiationStarted" || key === "logEnvironmentRadiationEnded") {
-      return "crisis-radiation";
-    }
-
-    if (
-      key === "logShelterCrisisStarted" ||
-      key === "logShelterCrisisWarning" ||
-      key === "logShelterCrisisResolved"
-    ) {
-      return "crisis-shelter";
-    }
-
-    if (key === "logShelterExposure") {
-      return "crisis-countdown";
-    }
-
-    if (key === "logDecisionAppeared") {
-      return "archive";
-    }
-
-    const severity = getLogEntrySeverity(entry);
-    if (severity === "critical") {
-      return "death";
-    }
-    if (severity === "warning") {
-      return "crisis-countdown";
-    }
-    if (severity === "positive") {
-      return "people";
-    }
-
-    return "clock";
   }
 
   private wrapLogText(
