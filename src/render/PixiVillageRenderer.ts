@@ -308,12 +308,45 @@ const MAX_DAYLIGHT_TRANSITION_FPS = 4;
 const DAYLIGHT_TRANSITION_FRAME_MIN_MS = 1000 / MAX_DAYLIGHT_TRANSITION_FPS;
 const DAYLIGHT_DARKNESS_BUCKET_STEP = 0.015;
 const TOOLTIP_POSITION_EPSILON = 0.75;
+const MODAL_BACKDROP_ALPHA = 0.34;
 const RAIN_LAYER_A_MIN_COUNT = 540;
 const RAIN_LAYER_A_MAX_COUNT = 1300;
 const RAIN_LAYER_B_MIN_COUNT = 360;
 const RAIN_LAYER_B_MAX_COUNT = 880;
 const RADIATION_MOTE_MIN_COUNT = 260;
 const RADIATION_MOTE_MAX_COUNT = 760;
+const HUD_FONT_FAMILY = "\"Segoe UI\", \"Noto Sans\", Arial, sans-serif";
+const HUD_FONT_WEIGHT_NORMAL: TextStyleFontWeight = "400";
+const HUD_FONT_WEIGHT_BOLD: TextStyleFontWeight = "700";
+
+function getHudTextLineHeight(fontSize: number): number {
+  return Math.max(1, Math.round(fontSize * 1.35));
+}
+
+function normalizeHudFontWeight(fontWeight?: TextStyleFontWeight): TextStyleFontWeight {
+  if (typeof fontWeight === "number") {
+    return fontWeight >= 550 ? HUD_FONT_WEIGHT_BOLD : HUD_FONT_WEIGHT_NORMAL;
+  }
+
+  if (!fontWeight) {
+    return HUD_FONT_WEIGHT_BOLD;
+  }
+
+  if (fontWeight === "bold" || fontWeight === "bolder") {
+    return HUD_FONT_WEIGHT_BOLD;
+  }
+
+  if (fontWeight === "normal" || fontWeight === "lighter") {
+    return HUD_FONT_WEIGHT_NORMAL;
+  }
+
+  const numericWeight = Number.parseInt(fontWeight, 10);
+  if (!Number.isNaN(numericWeight)) {
+    return numericWeight >= 550 ? HUD_FONT_WEIGHT_BOLD : HUD_FONT_WEIGHT_NORMAL;
+  }
+
+  return HUD_FONT_WEIGHT_BOLD;
+}
 
 function upgradingTooltip(
   name: string,
@@ -350,9 +383,9 @@ export class PixiVillageRenderer {
     text: "",
     style: {
       fill: 0xf4eedf,
-      fontFamily: "Inter, Arial, sans-serif",
+      fontFamily: HUD_FONT_FAMILY,
       fontSize: 13,
-      fontWeight: "700",
+      fontWeight: normalizeHudFontWeight("700"),
       lineHeight: 18,
       wordWrap: true,
       wordWrapWidth: 280,
@@ -1321,9 +1354,9 @@ export class PixiVillageRenderer {
         text: alert.label,
         style: {
           fill: 0xf5efdf,
-          fontFamily: "Inter, Arial, sans-serif",
+          fontFamily: HUD_FONT_FAMILY,
           fontSize: 11,
-          fontWeight: "900",
+          fontWeight: normalizeHudFontWeight("900"),
         },
       })
       : null;
@@ -1554,11 +1587,7 @@ export class PixiVillageRenderer {
   ): void {
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    overlay.addChild(backdrop);
-    this.bindAction(backdrop, { action: "close-village-modal" });
+    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
 
     const panelWidth = 308;
     const panelHeight = 302;
@@ -1576,19 +1605,12 @@ export class PixiVillageRenderer {
     const totalPopulation = getPopulation(state);
 
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
-    this.drawIcon(panel, "people", 24, 34, 20);
-    this.drawText(panel, translations.ui.survivors, 52, 20, {
-      fill: 0xf3edda,
-      fontSize: 22,
-      fontWeight: "900",
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: "people",
+      title: translations.ui.survivors,
+      rightText: `${totalPopulation}`,
+      closeAction: { action: "close-village-modal" },
     });
-    const total = this.drawText(panel, `${totalPopulation}`, panelWidth - 72, 23, {
-      fill: 0xf1df9a,
-      fontSize: 18,
-      fontWeight: "900",
-    });
-    total.anchor.set(1, 0);
 
     const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
       { iconId: "people", value: `${state.survivors.workers}`, label: translations.ui.availableWorkers, tooltip: translations.ui.availableWorkers },
@@ -1617,7 +1639,7 @@ export class PixiVillageRenderer {
       this.drawWorkforceRow(panel, {
         ...row,
         x: 18,
-        y: 70 + index * 23,
+        y: headerBottom + 2 + index * 23,
         width: panelWidth - 28,
       });
     });
@@ -1632,11 +1654,7 @@ export class PixiVillageRenderer {
   ): void {
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    overlay.addChild(backdrop);
-    this.bindAction(backdrop, { action: "close-village-modal" });
+    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
 
     const panelWidth = Math.min(720, width - 48);
     const panelHeight = Math.max(420, Math.min(620, height - 72));
@@ -1647,26 +1665,26 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
 
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
-    this.drawIcon(panel, "archive", 28, 34, 22);
-    this.drawText(panel, translations.ui.decisionArchive ?? "Decision archive", 58, 19, {
-      fill: 0xf3edda,
-      fontSize: 22,
-      fontWeight: "900",
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: "archive",
+      title: translations.ui.decisionArchive ?? "Decision archive",
+      closeAction: { action: "close-village-modal" },
     });
 
-    this.drawText(panel, translations.ui.leadershipProfile ?? "Leadership profile", 28, 72, {
+    const profileHeadingY = headerBottom + 2;
+    this.drawText(panel, translations.ui.leadershipProfile ?? "Leadership profile", 28, profileHeadingY, {
       fill: 0xd8c890,
       fontSize: 13,
       fontWeight: "900",
     });
-    this.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, 106, 24);
-    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 62, 94, {
+    this.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, profileHeadingY + 34, 24);
+    this.drawText(panel, this.getDecisionProfileOverallLabel(state, translations), 62, profileHeadingY + 22, {
       fill: 0xf1df9a,
       fontSize: 20,
       fontWeight: "900",
     });
 
+    const axesStartY = profileHeadingY + 66;
     decisionProfileAxes.forEach((axis, index) => {
       this.drawDecisionProfileAxis(
         panel,
@@ -1674,12 +1692,12 @@ export class PixiVillageRenderer {
         translations.ui[axis.rightLabelKey] ?? axis.rightLabelKey,
         getDecisionProfileAxisValue(state, axis.id),
         28,
-        138 + index * 48,
+        axesStartY + index * 48,
         panelWidth - 56,
       );
     });
 
-    const historyY = 306;
+    const historyY = axesStartY + decisionProfileAxes.length * 48 + 12;
     this.drawText(panel, translations.ui.decisionHistory ?? "Decision history", 28, historyY, {
       fill: 0xd8c890,
       fontSize: 13,
@@ -1719,9 +1737,11 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const rowHeights = history.map((row) =>
-      row.originalIndex === this.selectedDecisionHistoryIndex ? 156 : 42,
-    );
+    const rowWidth = panelWidth - 56;
+    const rowHeights = history.map((row) => {
+      const expanded = row.originalIndex === this.selectedDecisionHistoryIndex;
+      return this.getDecisionHistoryRowHeight(row, translations, rowWidth, expanded);
+    });
     const contentHeight = rowHeights.reduce(
       (total, rowHeight) => total + rowHeight + 8,
       0,
@@ -1744,7 +1764,7 @@ export class PixiVillageRenderer {
         translations,
         28,
         rowY,
-        panelWidth - 56,
+        rowWidth,
         rowHeight,
         expanded,
       );
@@ -1828,20 +1848,53 @@ export class PixiVillageRenderer {
       return;
     }
 
-    this.drawText(rowLayer, definitionCopy?.body ?? "", 14, 52, {
+    const bodyText = definitionCopy?.body ?? "";
+    const resultText = result;
+    const bodyWidth = width - 28;
+    const bodyLabel = this.drawText(rowLayer, bodyText, 14, 52, {
       fill: 0xc9d0ca,
       fontSize: 12,
       fontWeight: "700",
       wordWrap: true,
-      wordWrapWidth: width - 28,
+      wordWrapWidth: bodyWidth,
     });
-    this.drawText(rowLayer, result, 14, 106, {
+    const resultY = bodyLabel.y + bodyLabel.height + 8;
+    this.drawText(rowLayer, resultText, 14, resultY, {
       fill: 0xf1df9a,
       fontSize: 12,
       fontWeight: "800",
       wordWrap: true,
-      wordWrapWidth: width - 28,
+      wordWrapWidth: bodyWidth,
     });
+  }
+
+  private getDecisionHistoryRowHeight(
+    row: DecisionHistoryRow,
+    translations: TranslationPack,
+    width: number,
+    expanded: boolean,
+  ): number {
+    if (!expanded) {
+      return 42;
+    }
+
+    const definitionCopy = translations.quests.decisions[row.entry.definitionId];
+    const resultText = definitionCopy?.results[row.entry.optionId] ?? "";
+    const contentWidth = width - 28;
+    const bodyHeight = this.measureWrappedTextHeight(
+      definitionCopy?.body ?? "",
+      12,
+      "700",
+      contentWidth,
+    );
+    const resultHeight = this.measureWrappedTextHeight(
+      resultText,
+      12,
+      "800",
+      contentWidth,
+    );
+
+    return Math.max(96, Math.ceil(52 + bodyHeight + 8 + resultHeight + 12));
   }
 
   private drawDecisionImpactChips(
@@ -2364,6 +2417,104 @@ export class PixiVillageRenderer {
     this.drawResourceBreakdownPanel(state, translations, width, height, infoPanel);
   }
 
+  private drawModalBackdrop(
+    overlay: Container,
+    width: number,
+    height: number,
+    closeAction?: PixiActionDetail,
+    blockClose = false,
+  ): void {
+    const backdrop = new Graphics();
+    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: MODAL_BACKDROP_ALPHA });
+
+    if (blockClose) {
+      backdrop.eventMode = "static";
+      backdrop.on("pointerdown", (event) => {
+        event.stopPropagation();
+      });
+    } else if (closeAction) {
+      this.bindAction(backdrop, closeAction);
+    }
+
+    overlay.addChild(backdrop);
+  }
+
+  private drawOverlayHeader(
+    parent: Container,
+    panelWidth: number,
+    translations: TranslationPack,
+    options: {
+      iconId: string;
+      title: string;
+      closeAction?: PixiActionDetail;
+      kicker?: string;
+      subtitle?: string;
+      rightText?: string;
+    },
+  ): number {
+    if (options.closeAction) {
+      this.createIconButton(
+        parent,
+        "close",
+        panelWidth - 54,
+        18,
+        34,
+        34,
+        options.closeAction,
+        translations.ui.close,
+      );
+    }
+
+    const badge = new Container();
+    badge.x = 22;
+    badge.y = 18;
+    parent.addChild(badge);
+    const badgeBox = new Graphics();
+    badgeBox.rect(0, 0, 42, 42)
+      .fill({ color: 0x11140f, alpha: 0.9 });
+    badge.addChild(badgeBox);
+    this.drawIcon(badge, options.iconId, 21, 21, 22);
+
+    if (options.kicker) {
+      this.drawText(parent, options.kicker, 72, 18, {
+        fill: 0xd8c890,
+        fontSize: 12,
+        fontWeight: "900",
+      });
+    }
+
+    const titleY = options.kicker ? 36 : 26;
+    const titleLabel = this.drawText(parent, options.title, 72, titleY, {
+      fill: 0xf5efdf,
+      fontSize: 22,
+      fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 152,
+    });
+    let contentY = titleLabel.y + titleLabel.height + 8;
+
+    if (options.subtitle) {
+      const subtitleLabel = this.drawText(parent, options.subtitle, 72, contentY, {
+        fill: 0xaeb6ad,
+        fontSize: 11,
+        fontWeight: "800",
+        wordWrap: true,
+        wordWrapWidth: panelWidth - 152,
+      });
+      contentY = subtitleLabel.y + subtitleLabel.height + 8;
+    }
+
+    if (options.rightText) {
+      this.drawText(parent, options.rightText, panelWidth - 72, 23, {
+        fill: 0xf1df9a,
+        fontSize: 18,
+        fontWeight: "900",
+      }).anchor.set(1, 0);
+    }
+
+    return Math.max(72, contentY);
+  }
+
   private drawWeatherOverviewPanel(
     state: GameState,
     translations: TranslationPack,
@@ -2372,11 +2523,7 @@ export class PixiVillageRenderer {
   ): void {
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    overlay.addChild(backdrop);
-    this.bindAction(backdrop, { action: "close-village-modal" });
+    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
 
     const panelWidth = Math.min(620, width - 48);
     const panelHeight = 356;
@@ -2387,16 +2534,6 @@ export class PixiVillageRenderer {
     overlay.addChild(panel);
 
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    this.createIconButton(
-      panel,
-      "close",
-      panelWidth - 54,
-      18,
-      34,
-      34,
-      { action: "close-village-modal" },
-      translations.ui.close,
-    );
 
     const condition = state.environment.condition;
     const definition = getEnvironmentDefinition(condition);
@@ -2413,29 +2550,21 @@ export class PixiVillageRenderer {
       ? translations.ui.environmentStable
       : this.formatScoutingRemaining(Math.max(0, state.environment.endsAt - state.elapsedSeconds));
 
-    this.drawIcon(panel, this.getEnvironmentPanelIconId(condition), 28, 31, 20);
-    this.drawText(panel, translations.ui.weatherOverview ?? translations.ui.environment, 56, 20, {
-      fill: 0xf5efdf,
-      fontSize: 22,
-      fontWeight: "900",
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: this.getEnvironmentPanelIconId(condition),
+      title: translations.ui.weatherOverview ?? translations.ui.environment,
+      rightText: conditionLabel,
+      closeAction: { action: "close-village-modal" },
     });
-    const conditionLabelRightX = panelWidth - 76;
-    this.drawText(panel, conditionLabel, conditionLabelRightX, 24, {
-      fill: 0xf1df9a,
-      fontSize: 16,
-      fontWeight: "900",
-      align: "right",
-    }).anchor.set(1, 0);
-
-    this.drawText(panel, this.getEnvironmentDescription(state, translations), 24, 66, {
+    const descriptionLabel = this.drawText(panel, this.getEnvironmentDescription(state, translations), 24, headerBottom + 2, {
       fill: 0xc8cabb,
       fontSize: 13,
       fontWeight: "700",
       wordWrap: true,
       wordWrapWidth: panelWidth - 48,
     });
-
-    this.drawText(panel, translations.ui.weatherStatus ?? "Status", 24, 122, {
+    const statusY = descriptionLabel.y + descriptionLabel.height + 12;
+    this.drawText(panel, translations.ui.weatherStatus ?? "Status", 24, statusY, {
       fill: 0xaeb4b8,
       fontSize: 12,
       fontWeight: "800",
@@ -2446,7 +2575,7 @@ export class PixiVillageRenderer {
       `${intensity}/${ENVIRONMENT_MAX_INTENSITY}`,
       intensity,
       panelWidth,
-      154,
+      statusY + 32,
     );
     this.drawBreakdownRow(
       panel,
@@ -2454,10 +2583,10 @@ export class PixiVillageRenderer {
       endsIn,
       condition === "stable" ? 0 : -0.01,
       panelWidth,
-      188,
+      statusY + 66,
     );
-
-    this.drawText(panel, translations.ui.weatherPenalties ?? "Potential penalties", 24, 224, {
+    const penaltiesY = statusY + 100;
+    this.drawText(panel, translations.ui.weatherPenalties ?? "Potential penalties", 24, penaltiesY, {
       fill: 0xaeb4b8,
       fontSize: 12,
       fontWeight: "800",
@@ -2468,7 +2597,7 @@ export class PixiVillageRenderer {
       `-${this.formatRate(moralePenaltyPerHour)}/h`,
       -moralePenaltyPerHour / GAME_HOUR_REAL_SECONDS,
       panelWidth,
-      256,
+      penaltiesY + 32,
     );
     this.drawBreakdownRow(
       panel,
@@ -2476,7 +2605,7 @@ export class PixiVillageRenderer {
       `+${Math.round(healthIncidentRisk)}`,
       -Math.max(0.01, healthIncidentRisk),
       panelWidth,
-      290,
+      penaltiesY + 66,
     );
 
     if (shelterDeadlineHours !== null) {
@@ -2493,7 +2622,7 @@ export class PixiVillageRenderer {
         shelterValue,
         -0.01,
         panelWidth,
-        324,
+        penaltiesY + 100,
       );
     }
   }
@@ -2545,11 +2674,7 @@ export class PixiVillageRenderer {
   ): void {
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    overlay.addChild(backdrop);
-    this.bindAction(backdrop, { action: "close-village-modal" });
+    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
 
     const panelWidth = Math.min(620, width - 48);
     const panelHeight = Math.max(320, Math.min(520, height - 72));
@@ -2559,7 +2684,6 @@ export class PixiVillageRenderer {
     panel.eventMode = "static";
     overlay.addChild(panel);
     this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-    this.createIconButton(panel, "close", panelWidth - 54, 18, 34, 34, { action: "close-village-modal" }, translations.ui.close);
 
     const breakdown = getResourceBreakdown(state, resourceId);
     this.appendResourceSiteBreakdownLines(state, resourceId, breakdown);
@@ -2567,19 +2691,14 @@ export class PixiVillageRenderer {
     const stockLabel = resourceId === "morale"
       ? `${Math.floor(state.resources.morale)}%`
       : `${Math.floor(state.resources[resourceId])}/${Math.floor(state.capacities[resourceId])}`;
-
-    this.drawIcon(panel, resourceId, 28, 31, 20);
-    this.drawText(panel, translations.resources[resourceId], 52, 19, {
-      fill: 0xf5efdf,
-      fontSize: 22,
-      fontWeight: "900",
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: resourceId,
+      title: translations.resources[resourceId],
+      rightText: stockLabel,
+      closeAction: { action: "close-village-modal" },
     });
-    this.drawText(panel, stockLabel, panelWidth - 92, 21, {
-      fill: 0xf1df9a,
-      fontSize: 18,
-      fontWeight: "900",
-    }).anchor.set(1, 0);
-    this.drawText(panel, translations.ui.resourceBreakdown, 24, 68, {
+    const sectionStartY = headerBottom + 4;
+    this.drawText(panel, translations.ui.resourceBreakdown, 24, sectionStartY, {
       fill: 0xaeb4b8,
       fontSize: 12,
       fontWeight: "800",
@@ -2591,7 +2710,7 @@ export class PixiVillageRenderer {
       this.getHourlyRateLabel(totalRate),
       totalRate,
       panelWidth,
-      100,
+      sectionStartY + 32,
       true,
     );
 
@@ -2610,7 +2729,7 @@ export class PixiVillageRenderer {
       {
         activeId: activeTab,
         x: 24,
-        y: 140,
+        y: sectionStartY + 72,
         height: 34,
         minWidth: 116,
         maxWidth: panelWidth - 48,
@@ -2623,7 +2742,7 @@ export class PixiVillageRenderer {
     );
 
     const rowHeight = 34;
-    const viewportY = 190;
+    const viewportY = sectionStartY + 122;
     const viewportHeight = Math.max(88, panelHeight - viewportY - 24);
 
     if (
@@ -3203,21 +3322,54 @@ export class PixiVillageRenderer {
 
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    if (activeDecision) {
-      backdrop.eventMode = "static";
-      backdrop.on("pointerdown", (event) => {
-        event.stopPropagation();
-      });
-    } else {
-      this.bindAction(backdrop, { action: "close-decision-result" });
-    }
-    overlay.addChild(backdrop);
+    this.drawModalBackdrop(
+      overlay,
+      width,
+      height,
+      activeDecision ? undefined : { action: "close-decision-result" },
+      Boolean(activeDecision),
+    );
 
     const panelWidth = Math.min(560, width - 48);
-    const panelHeight = 348;
+    const panelInnerWidth = panelWidth - 56;
+    let panelHeight = 348;
+
+    if (activeDecision) {
+      const definition = decisionQuestById[activeDecision.definitionId];
+      const copy = translations.quests.decisions[definition.id];
+      const bodyHeight = this.measureWrappedTextHeight(
+        copy?.body ?? "",
+        14,
+        "700",
+        panelInnerWidth,
+      );
+      const consequencesHeight = this.measureWrappedTextHeight(
+        translations.quests.ui.hiddenConsequences,
+        12,
+        "900",
+        panelInnerWidth,
+      );
+      const optionCount = definition.options.length;
+      const buttonsHeight = optionCount * 34 + Math.max(0, optionCount - 1) * 8;
+      const firstButtonY = 86 + bodyHeight + 12 + consequencesHeight + 16;
+      panelHeight = Math.ceil(firstButtonY + buttonsHeight + 24);
+    } else if (resolvedDecisionPreview) {
+      const resultDefinition = decisionQuestById[resolvedDecisionPreview.definitionId];
+      const resultCopy = translations.quests.decisions[resultDefinition.id];
+      const selectedOptionLabel =
+        resultCopy?.options[resolvedDecisionPreview.optionId] ?? resolvedDecisionPreview.optionId;
+      const decisionLine = `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`;
+      const decisionHeight = this.measureWrappedTextHeight(decisionLine, 13, "800", panelInnerWidth);
+      const resultHeight = this.measureWrappedTextHeight(
+        resultCopy?.results[resolvedDecisionPreview.optionId] ?? "",
+        13,
+        "800",
+        panelInnerWidth,
+      );
+      panelHeight = Math.ceil(94 + decisionHeight + 10 + resultHeight + 46);
+    }
+
+    panelHeight = Math.max(320, Math.min(panelHeight, Math.max(320, height - 40)));
     const panel = new Container();
     panel.x = (width - panelWidth) / 2;
     panel.y = Math.max(34, (height - panelHeight) / 2);
@@ -3228,25 +3380,20 @@ export class PixiVillageRenderer {
     if (activeDecision) {
       const definition = decisionQuestById[activeDecision.definitionId];
       const copy = translations.quests.decisions[definition.id];
-      this.drawIcon(panel, "people", 30, 38, 24);
-      this.drawText(panel, translations.quests.ui.decisionRequired, 62, 18, {
-        fill: 0xd8c890,
-        fontSize: 12,
-        fontWeight: "900",
+      const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+        iconId: "people",
+        kicker: translations.quests.ui.decisionRequired,
+        title: copy?.title ?? definition.id,
       });
-      this.drawText(panel, copy?.title ?? definition.id, 62, 38, {
-        fill: 0xf5efdf,
-        fontSize: 24,
-        fontWeight: "900",
-      });
-      this.drawText(panel, copy?.body ?? "", 28, 86, {
+      const bodyLabel = this.drawText(panel, copy?.body ?? "", 28, headerBottom + 2, {
         fill: 0xd7ddd8,
         fontSize: 14,
         fontWeight: "700",
         wordWrap: true,
         wordWrapWidth: panelWidth - 56,
       });
-      this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, 170, {
+      const consequencesY = bodyLabel.y + bodyLabel.height + 12;
+      const consequencesLabel = this.drawText(panel, translations.quests.ui.hiddenConsequences, 28, consequencesY, {
         fill: 0xffc66d,
         fontSize: 12,
         fontWeight: "900",
@@ -3255,13 +3402,18 @@ export class PixiVillageRenderer {
       });
 
       const buttonWidth = panelWidth - 56;
+      const buttonBlockHeight = definition.options.length * 34 + Math.max(0, definition.options.length - 1) * 8;
+      const buttonStartY = Math.min(
+        consequencesLabel.y + consequencesLabel.height + 16,
+        panelHeight - buttonBlockHeight - 24,
+      );
       definition.options.forEach((option, index) => {
         const affordable = canAffordDecisionOption(state, option);
         this.createModalButton(
           panel,
           copy?.options[option.id] ?? option.id,
           28,
-          212 + index * 42,
+          buttonStartY + index * 42,
           buttonWidth,
           34,
           {
@@ -3286,40 +3438,22 @@ export class PixiVillageRenderer {
     const resultOption = this.getDecisionHistoryOption(resultEntry);
     const selectedOptionLabel = resultCopy?.options[resultEntry.optionId] ?? resultEntry.optionId;
     const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(resultEntry.resolvedAt)} ${formatGameClock(resultEntry.resolvedAt)}`;
-    this.createIconButton(
-      panel,
-      "close",
-      panelWidth - 58,
-      18,
-      38,
-      38,
-      { action: "close-decision-result" },
-      translations.ui.close,
-    );
-    this.drawIcon(panel, "archive", 30, 38, 24);
-    this.drawText(panel, translations.ui.decisionArchive ?? "Decision archive", 62, 18, {
-      fill: 0xd8c890,
-      fontSize: 12,
-      fontWeight: "900",
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: "archive",
+      kicker: translations.ui.decisionArchive ?? "Decision archive",
+      title: resultCopy?.title ?? resultDefinition.id,
+      subtitle: resolvedDay,
+      closeAction: { action: "close-decision-result" },
     });
-    this.drawText(panel, resultCopy?.title ?? resultDefinition.id, 62, 38, {
-      fill: 0xf5efdf,
-      fontSize: 24,
-      fontWeight: "900",
-    });
-    this.drawText(panel, resolvedDay, 28, 76, {
-      fill: 0xaeb6ad,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-    this.drawText(panel, `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`, 28, 94, {
+    const decisionLabel = this.drawText(panel, `${translations.quests.ui.decision ?? "Decision"}: ${selectedOptionLabel}`, 28, headerBottom + 2, {
       fill: 0xd7ddd8,
       fontSize: 13,
       fontWeight: "800",
       wordWrap: true,
       wordWrapWidth: panelWidth - 56,
     });
-    this.drawText(panel, resultCopy?.results[resultEntry.optionId] ?? "", 28, 124, {
+    const resultY = decisionLabel.y + decisionLabel.height + 10;
+    const resultLabel = this.drawText(panel, resultCopy?.results[resultEntry.optionId] ?? "", 28, resultY, {
       fill: 0xf1df9a,
       fontSize: 13,
       fontWeight: "800",
@@ -3328,12 +3462,15 @@ export class PixiVillageRenderer {
     });
 
     if (resultOption) {
-      this.drawDecisionImpactChips(
-        panel,
-        this.getDecisionImpactLines(resultOption, translations).slice(0, 8),
-        panelWidth - 28,
-        286,
-      );
+      const chipsY = resultLabel.y + resultLabel.height + 16;
+      if (chipsY <= panelHeight - 28) {
+        this.drawDecisionImpactChips(
+          panel,
+          this.getDecisionImpactLines(resultOption, translations).slice(0, 8),
+          panelWidth - 28,
+          chipsY,
+        );
+      }
     }
   }
 
@@ -3349,21 +3486,9 @@ export class PixiVillageRenderer {
 
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    this.bindAction(backdrop, { action: "close-conquest-result" });
-    overlay.addChild(backdrop);
+    this.drawModalBackdrop(overlay, width, height, { action: "close-conquest-result" });
 
     const panelWidth = Math.min(520, width - 48);
-    const panelHeight = 304;
-    const panel = new Container();
-    panel.x = (width - panelWidth) / 2;
-    panel.y = Math.max(34, (height - panelHeight) / 2);
-    panel.eventMode = "static";
-    overlay.addChild(panel);
-    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
-
     const resourceName = translations.resources[conquestResultPreview.resourceId];
     const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(conquestResultPreview.resolvedAt)} ${formatGameClock(conquestResultPreview.resolvedAt)}`;
     const isVictory = conquestResultPreview.outcome === "victory";
@@ -3396,60 +3521,59 @@ export class PixiVillageRenderer {
       : (isOverrun
           ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis defenses."
           : translations.ui.conquestDefeatBodyFailed ?? "No one returned from the assault.");
-
-    this.createIconButton(
-      panel,
-      "close",
-      panelWidth - 58,
-      18,
-      38,
-      38,
-      { action: "close-conquest-result" },
-      translations.ui.close,
+    const summaryHeight = this.measureWrappedTextHeight(summary, 24, "900", panelWidth - 120);
+    const bodyHeight = this.measureWrappedTextHeight(body, 13, "800", panelWidth - 56);
+    const dayY = 38 + summaryHeight + 8;
+    const bodyBaseY = dayY + 22;
+    const sentBaseY = bodyBaseY + bodyHeight + 16;
+    const returnedBaseY = sentBaseY + 32;
+    const fallenBaseY = returnedBaseY + 32;
+    const requirementBaseY = fallenBaseY + 32;
+    let panelHeight = Math.ceil(
+      (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0 ? requirementBaseY : fallenBaseY) + 40,
     );
-    this.drawIcon(panel, "shield", 30, 38, 24);
-    this.drawText(
-      panel,
-      isVictory
+    panelHeight = Math.max(304, Math.min(panelHeight, Math.max(304, height - 40)));
+
+    const panel = new Container();
+    panel.x = (width - panelWidth) / 2;
+    panel.y = Math.max(34, (height - panelHeight) / 2);
+    panel.eventMode = "static";
+    overlay.addChild(panel);
+    this.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+
+    const headerBottom = this.drawOverlayHeader(panel, panelWidth, translations, {
+      iconId: "shield",
+      kicker: isVictory
         ? translations.ui.conquestVictoryTitle ?? "Oasis secured"
         : translations.ui.conquestDefeatTitle ?? "Oasis assault failed",
-      62,
-      18,
-      {
-      fill: 0xd8c890,
-      fontSize: 12,
-      fontWeight: "900",
-      },
-    );
-    this.drawText(panel, summary, 62, 38, {
-      fill: 0xf5efdf,
-      fontSize: 24,
-      fontWeight: "900",
+      title: summary,
+      subtitle: resolvedDay,
+      closeAction: { action: "close-conquest-result" },
     });
-    this.drawText(panel, resolvedDay, 28, 76, {
-      fill: 0xaeb6ad,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-    this.drawText(panel, body, 28, 98, {
+    const bodyY = Math.max(bodyBaseY, headerBottom + 2);
+    const bodyLabel = this.drawText(panel, body, 28, bodyY, {
       fill: 0xd7ddd8,
       fontSize: 13,
       fontWeight: "800",
       wordWrap: true,
       wordWrapWidth: panelWidth - 56,
     });
+    const sentY = bodyLabel.y + bodyLabel.height + 16;
+    const returnedY = sentY + 32;
+    const fallenY = returnedY + 32;
+    const requirementY = fallenY + 32;
 
-    this.drawText(panel, sentLine, 28, 156, {
+    this.drawText(panel, sentLine, 28, sentY, {
       fill: 0xe3d7b5,
       fontSize: 14,
       fontWeight: "900",
     });
-    this.drawText(panel, returnedLine, 28, 188, {
+    this.drawText(panel, returnedLine, 28, returnedY, {
       fill: conquestResultPreview.returnedTroops > 0 ? 0x9ed99b : 0xaeb4b8,
       fontSize: 15,
       fontWeight: "900",
     });
-    this.drawText(panel, fallenLine, 28, 220, {
+    this.drawText(panel, fallenLine, 28, fallenY, {
       fill: conquestResultPreview.deaths > 0 ? 0xd38a8a : 0xaeb4b8,
       fontSize: 15,
       fontWeight: "900",
@@ -3463,7 +3587,7 @@ export class PixiVillageRenderer {
           { required: conquestResultPreview.requiredTroops ?? 0 },
         ),
         28,
-        252,
+        requirementY,
         {
           fill: 0xf1c17f,
           fontSize: 13,
@@ -3493,11 +3617,7 @@ export class PixiVillageRenderer {
 
     const overlay = new Container();
     this.hudLayer.addChild(overlay);
-
-    const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: 0 });
-    overlay.addChild(backdrop);
-    this.bindAction(backdrop, { action: "close-village-modal" });
+    this.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
 
     const isResourceSiteModal = Boolean(selectedResourceSite);
     const isBuildChoice = selectedPlot?.buildingId === null;
@@ -3523,7 +3643,7 @@ export class PixiVillageRenderer {
       this.drawModalHeader(
         panel,
         translations.ui.resourceSiteTitle ?? "Oasis",
-        selectedResourceSite.id,
+        `${translations.resources[selectedResourceSite.resourceId]} / ${translations.ui.resourceSiteStatus ?? "Status"}`,
         modalWidth,
         translations,
       );
@@ -3572,20 +3692,12 @@ export class PixiVillageRenderer {
     modalWidth: number,
     translations: TranslationPack,
   ): void {
-    const badge = new Container();
-    badge.x = 22;
-    badge.y = 18;
-    parent.addChild(badge);
-
-    const badgeBox = new Graphics();
-    badgeBox.rect(0, 0, 42, 42)
-      .fill({ color: 0x11140f, alpha: 0.9 });
-    badge.addChild(badgeBox);
-    this.drawIcon(badge, "build", 21, 21, 22);
-
-    this.drawText(parent, title, 72, 20, { fill: 0xf5efdf, fontSize: 21, fontWeight: "900" });
-    this.drawText(parent, subtitle, 72, 48, { fill: 0xaeb4b8, fontSize: 12, fontWeight: "800" });
-    this.drawModalClose(parent, modalWidth, translations);
+    this.drawOverlayHeader(parent, modalWidth, translations, {
+      iconId: "build",
+      title,
+      subtitle,
+      closeAction: { action: "close-village-modal" },
+    });
   }
 
   private drawModalClose(parent: Container, modalWidth: number, translations: TranslationPack): void {
@@ -3600,7 +3712,6 @@ export class PixiVillageRenderer {
     modalWidth: number,
     modalHeight: number,
   ): void {
-    this.drawModalClose(parent, modalWidth, translations);
     const panelX = 26;
     const panelY = 86;
     const panelWidth = modalWidth - 52;
@@ -3616,55 +3727,68 @@ export class PixiVillageRenderer {
     const resourceName = translations.resources[siteState.resourceId];
     const yieldPerWorkerPerHour = siteState.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
     const travelHours = getTravelTilesToSite(siteState.id);
+    const contentX = panelX + 16;
+    const contentWidth = panelWidth - 32;
+    let cursorY = panelY + 14;
     const statusLabel = siteState.assault
       ? translations.ui.resourceSiteStatusAssault ?? "Assault in progress"
       : siteState.captured
         ? translations.ui.resourceSiteStatusCaptured ?? "Secured"
         : translations.ui.resourceSiteStatusLocked ?? "Unsecured";
-    this.drawText(parent, `${translations.ui.resourceSiteCommodity ?? "Commodity"}: ${resourceName}`, panelX + 16, panelY + 14, {
+    const commodityLabel = this.drawText(parent, `${translations.ui.resourceSiteCommodity ?? "Commodity"}: ${resourceName}`, contentX, cursorY, {
       fill: 0xf5efdf,
       fontSize: 16,
       fontWeight: "900",
     });
-    this.drawText(parent, `${translations.ui.resourceSiteStatus ?? "Status"}: ${statusLabel}`, panelX + 16, panelY + 42, {
+    cursorY = commodityLabel.y + commodityLabel.height + 6;
+    const statusText = this.drawText(parent, `${translations.ui.resourceSiteStatus ?? "Status"}: ${statusLabel}`, contentX, cursorY, {
       fill: siteState.captured ? 0x9ed99b : siteState.assault ? 0xf1c17f : 0xd38a8a,
       fontSize: 13,
       fontWeight: "900",
     });
-    this.drawText(
+    cursorY = statusText.y + statusText.height + 6;
+    const requirementText = this.drawText(
       parent,
       `${translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength"}: ${siteState.captureMinTroops} ${translations.ui.availableTroops?.toLowerCase() ?? "troops"}`,
-      panelX + 16,
-      panelY + 64,
+      contentX,
+      cursorY,
       {
         fill: 0xaeb4b8,
         fontSize: 12,
         fontWeight: "800",
+        wordWrap: true,
+        wordWrapWidth: contentWidth,
       },
     );
-    this.drawText(
+    cursorY = requirementText.y + requirementText.height + 6;
+    const travelText = this.drawText(
       parent,
       `${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h (${travelHours} tiles)`,
-      panelX + 16,
-      panelY + 86,
+      contentX,
+      cursorY,
       {
         fill: 0xaeb4b8,
         fontSize: 12,
         fontWeight: "800",
+        wordWrap: true,
+        wordWrapWidth: contentWidth,
       },
     );
+    cursorY = travelText.y + travelText.height + 14;
 
     if (siteState.assault) {
-      this.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", panelX + 16, panelY + 132, {
+      const runningLabel = this.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", contentX, cursorY, {
         fill: 0xf1df9a,
         fontSize: 13,
         fontWeight: "900",
+        wordWrap: true,
+        wordWrapWidth: contentWidth,
       });
       this.drawText(
         parent,
         `${translations.ui.returnsIn ?? "returns in"} ${this.formatScoutingRemaining(siteState.assault.remainingSeconds)}`,
-        panelX + 16,
-        panelY + 158,
+        contentX,
+        runningLabel.y + runningLabel.height + 12,
         {
           fill: 0xf5efdf,
           fontSize: 16,
@@ -3676,31 +3800,37 @@ export class PixiVillageRenderer {
 
     if (!siteState.captured) {
       const selectedTroops = this.getResourceSiteTroopCount(siteState.id, state.survivors.troops, siteState.captureMinTroops);
-      this.drawText(parent, translations.ui.resourceSiteSendTroops ?? "Send troops", panelX + 16, panelY + 128, {
+      this.drawText(parent, translations.ui.resourceSiteSendTroops ?? "Send troops", contentX, cursorY, {
         fill: 0xd7ddd8,
         fontSize: 14,
         fontWeight: "900",
       });
-      this.createLocalModalButton(parent, "-", panelX + 16, panelY + 152, 42, 34, () => {
+      const controlsY = cursorY + 24;
+      this.createLocalModalButton(parent, "-", contentX, controlsY, 42, 34, () => {
         this.setResourceSiteTroopCount(siteState.id, selectedTroops - 1, state.survivors.troops, siteState.captureMinTroops);
       }, selectedTroops <= 1);
-      this.drawCenteredText(parent, `${selectedTroops}`, panelX + 90, panelY + 169, {
+      this.drawCenteredText(parent, `${selectedTroops}`, contentX + 74, controlsY + 17, {
         fill: 0xf5efdf,
         fontSize: 16,
         fontWeight: "900",
       });
-      this.createLocalModalButton(parent, "+", panelX + 122, panelY + 152, 42, 34, () => {
+      this.createLocalModalButton(parent, "+", contentX + 106, controlsY, 42, 34, () => {
         this.setResourceSiteTroopCount(siteState.id, selectedTroops + 1, state.survivors.troops, siteState.captureMinTroops);
       }, selectedTroops >= Math.max(1, state.survivors.troops));
       const canSend = selectedTroops > 0 && selectedTroops <= state.survivors.troops;
       const sendDisabledTooltip = canSend
         ? undefined
         : translations.ui.notEnoughTroops ?? "Not enough available troops.";
+      const sendButtonWidth = Math.max(
+        120,
+        Math.min(194, panelX + panelWidth - (contentX + 170) - 16),
+      );
+      const sendButtonX = panelX + panelWidth - sendButtonWidth - 16;
       this.createRectButton(parent, {
         label: translations.ui.resourceSiteSendAssault ?? "Capture oasis",
-        x: panelX + 186,
-        y: panelY + 152,
-        width: 194,
+        x: sendButtonX,
+        y: controlsY,
+        width: sendButtonWidth,
         height: 34,
         detail: {
           action: "resource-site-assault",
@@ -3721,12 +3851,14 @@ export class PixiVillageRenderer {
             selected: selectedTroops,
           },
         ),
-        panelX + 16,
-        panelY + 220,
+        contentX,
+        controlsY + 68,
         {
           fill: canSend ? 0xaeb4b8 : 0xd38a8a,
           fontSize: 12,
           fontWeight: "800",
+          wordWrap: true,
+          wordWrapWidth: contentWidth,
         },
       );
 
@@ -3739,26 +3871,29 @@ export class PixiVillageRenderer {
               translations.ui.resourceSiteBelowThreshold ?? "Below requirement: need at least {required} troops.",
               { required: siteState.captureMinTroops },
             ),
-        panelX + 16,
-        panelY + 196,
+        contentX,
+        controlsY + 44,
         {
           fill: requirementColor,
           fontSize: 12,
           fontWeight: "900",
+          wordWrap: true,
+          wordWrapWidth: contentWidth,
         },
       );
       return;
     }
 
-    this.drawText(parent, translations.ui.resourceSiteSettlement ?? "Oasis settlement crew", panelX + 16, panelY + 128, {
+    this.drawText(parent, translations.ui.resourceSiteSettlement ?? "Oasis settlement crew", contentX, cursorY, {
       fill: 0xd7ddd8,
       fontSize: 14,
       fontWeight: "900",
     });
+    const workerControlsY = cursorY + 24;
     this.createRectButton(parent, {
       label: "-",
-      x: panelX + 16,
-      y: panelY + 152,
+      x: contentX,
+      y: workerControlsY,
       width: 42,
       height: 34,
       detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: -1 },
@@ -3767,8 +3902,8 @@ export class PixiVillageRenderer {
     this.drawCenteredText(
       parent,
       `${siteState.assignedWorkers}/${siteState.maxWorkers}`,
-      panelX + 96,
-      panelY + 169,
+      contentX + 80,
+      workerControlsY + 17,
       {
         fill: 0xf5efdf,
         fontSize: 16,
@@ -3777,8 +3912,8 @@ export class PixiVillageRenderer {
     );
     this.createRectButton(parent, {
       label: "+",
-      x: panelX + 136,
-      y: panelY + 152,
+      x: contentX + 120,
+      y: workerControlsY,
       width: 42,
       height: 34,
       detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: 1 },
@@ -3797,12 +3932,14 @@ export class PixiVillageRenderer {
           resource: resourceName,
         },
       ),
-      panelX + 16,
-      panelY + 198,
+      contentX,
+      workerControlsY + 46,
       {
         fill: 0x9ed99b,
         fontSize: 12,
         fontWeight: "900",
+        wordWrap: true,
+        wordWrapWidth: contentWidth,
       },
     );
   }
@@ -5500,9 +5637,9 @@ export class PixiVillageRenderer {
       text: label,
       style: {
         fill: labelFill,
-        fontFamily: "Inter, Arial, sans-serif",
+        fontFamily: HUD_FONT_FAMILY,
         fontSize: compact ? 12 : 13,
-        fontWeight: "800",
+        fontWeight: normalizeHudFontWeight("800"),
       },
     });
     const subtext = sublabel
@@ -5510,9 +5647,9 @@ export class PixiVillageRenderer {
         text: sublabel,
         style: {
           fill: sublabelFill,
-          fontFamily: "Inter, Arial, sans-serif",
+          fontFamily: HUD_FONT_FAMILY,
           fontSize: compact ? 9 : 10,
-          fontWeight: "800",
+          fontWeight: normalizeHudFontWeight("800"),
         },
       })
       : null;
@@ -6269,6 +6406,7 @@ export class PixiVillageRenderer {
       align?: "left" | "center" | "right";
       wordWrap?: boolean;
       wordWrapWidth?: number;
+      lineHeight?: number;
     },
   ): Text {
     const label = this.drawText(parent, text, x, y, options);
@@ -6289,15 +6427,18 @@ export class PixiVillageRenderer {
       align?: "left" | "center" | "right";
       wordWrap?: boolean;
       wordWrapWidth?: number;
+      lineHeight?: number;
     },
   ): Text {
+    const normalizedLineHeight = options.lineHeight ?? getHudTextLineHeight(options.fontSize);
     const label = new Text({
       text,
       style: {
         fill: options.fill,
-        fontFamily: "Inter, Arial, sans-serif",
+        fontFamily: HUD_FONT_FAMILY,
         fontSize: options.fontSize,
-        fontWeight: options.fontWeight ?? "700",
+        fontWeight: normalizeHudFontWeight(options.fontWeight ?? "700"),
+        lineHeight: normalizedLineHeight,
         align: options.align,
         wordWrap: options.wordWrap,
         wordWrapWidth: options.wordWrapWidth,
@@ -6308,6 +6449,27 @@ export class PixiVillageRenderer {
     label.y = y;
     parent.addChild(label);
     return label;
+  }
+
+  private measureWrappedTextHeight(
+    text: string,
+    fontSize: number,
+    fontWeight: TextStyleFontWeight,
+    maxWidth: number,
+  ): number {
+    const lineHeight = getHudTextLineHeight(fontSize);
+    const style = new TextStyle({
+      fill: 0xffffff,
+      fontFamily: HUD_FONT_FAMILY,
+      fontSize,
+      fontWeight: normalizeHudFontWeight(fontWeight),
+      lineHeight,
+      wordWrap: true,
+      wordWrapWidth: Math.max(1, maxWidth),
+    });
+    const sample = text && text.trim().length > 0 ? text : " ";
+    const metrics = CanvasTextMetrics.measureText(sample, style);
+    return Math.max(lineHeight, Math.ceil(metrics.height));
   }
 
   private applyHudPixelScale(container: Container, scale: number): void {
@@ -6328,9 +6490,8 @@ export class PixiVillageRenderer {
         if (fontSize !== undefined) {
           child.style.fontSize = fontSize;
         }
-        if (lineHeight !== undefined) {
-          child.style.lineHeight = lineHeight;
-        }
+        const effectiveFontSize = typeof child.style.fontSize === "number" ? child.style.fontSize : 12;
+        child.style.lineHeight = lineHeight ?? getHudTextLineHeight(effectiveFontSize);
         if (wordWrapWidth !== undefined) {
           child.style.wordWrapWidth = wordWrapWidth;
         }
@@ -6831,9 +6992,9 @@ export class PixiVillageRenderer {
   ): string[] {
     const style = new TextStyle({
       fill: 0xffffff,
-      fontFamily: "Inter, Arial, sans-serif",
+      fontFamily: HUD_FONT_FAMILY,
       fontSize: 11,
-      fontWeight,
+      fontWeight: normalizeHudFontWeight(fontWeight),
       wordWrap: false,
     });
     const lines: string[] = [];

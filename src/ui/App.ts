@@ -410,6 +410,7 @@ export class App {
 
     if (action === "open-selected-plot" && this.state) {
       this.villageModalPlotId = this.state.village.selectedPlotId;
+      this.villageInfoPanel = null;
       this.requestRender();
       return;
     }
