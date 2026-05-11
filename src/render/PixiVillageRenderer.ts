@@ -267,6 +267,7 @@ export class PixiVillageRenderer {
   private canvasTooltipHeight = 0;
   private canvasTooltipX = Number.NaN;
   private canvasTooltipY = Number.NaN;
+  private hadBlockingOverlayOpen = false;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
   private readonly handlePointerDown = (event: PointerEvent) => this.handleHostPointerDown(event);
@@ -324,7 +325,7 @@ export class PixiVillageRenderer {
     this.lastState = state;
     this.lastTranslations = translations;
     this.activeModalPlotId = modalPlotId ?? null;
-    this.cameraDragBlocked = Boolean(
+    const hasBlockingOverlay = Boolean(
       modalPlotId ||
       infoPanel ||
       state.quests.activeDecision ||
@@ -332,6 +333,11 @@ export class PixiVillageRenderer {
       conquestResultPreview ||
       gameOverPreview,
     );
+    this.cameraDragBlocked = hasBlockingOverlay;
+    if (hasBlockingOverlay && !this.hadBlockingOverlayOpen) {
+      this.hideCanvasTooltip();
+    }
+    this.hadBlockingOverlayOpen = hasBlockingOverlay;
 
     if (!this.app) {
       return;
@@ -507,6 +513,8 @@ export class PixiVillageRenderer {
   }
 
   private handleHostPointerDown(event: PointerEvent): void {
+    this.hideCanvasTooltip();
+
     const dragStart = handlePointerDownWithCamera(
       this.host,
       this.hudInteractionAreas,
