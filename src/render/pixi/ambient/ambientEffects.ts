@@ -393,8 +393,25 @@ export class AmbientEffectsController {
     }
 
     if (daylight.phase === "night") {
-      graphic.rect(screenX, screenY, screenWidth, Math.max(2, Math.ceil(height * 0.36) + 1))
-        .fill({ color: 0x040b14, alpha: Math.min(0.18, daylight.darkness * 0.24) });
+      const topShadeAlpha = Math.min(0.18, daylight.darkness * 0.24);
+      const topShadeHeight = Math.max(2, Math.ceil(height * 0.36) + 1);
+      const topShadeBands = 18;
+      const topShadeBandHeight = Math.max(2, Math.ceil(topShadeHeight / topShadeBands));
+
+      for (let bandIndex = 0; bandIndex < topShadeBands; bandIndex += 1) {
+        const progress = bandIndex / Math.max(1, topShadeBands - 1);
+        const falloff = 1 - progress;
+        const bandAlpha = topShadeAlpha * falloff * falloff;
+        const y = screenY + bandIndex * topShadeBandHeight;
+        const remainingHeight = topShadeHeight - bandIndex * topShadeBandHeight;
+
+        if (remainingHeight <= 0 || bandAlpha <= 0.001) {
+          break;
+        }
+
+        graphic.rect(screenX, y, screenWidth, Math.min(topShadeBandHeight + 1, remainingHeight + 1))
+          .fill({ color: 0x040b14, alpha: bandAlpha });
+      }
     }
   }
 
