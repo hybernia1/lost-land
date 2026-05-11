@@ -119,6 +119,9 @@
     <path fill="#d9d2b7" d="M4 3h16v5H4V3Zm2 2v1h12V5H6Zm-1 5h14v10H5V10Zm2 2v6h10v-6H7Z"/>
     <path fill="#e0c46f" d="M9 13h6v2H9v-2Z"/>
   </symbol>
+  <symbol id="icon-death" viewBox="0 0 24 24">
+    <path fill="#d26858" d="M11 4h2v5.6h4v2h-4V20h-2v-8.4H7v-2h4V4Z"/>
+  </symbol>
   <symbol id="icon-close" viewBox="0 0 24 24">
     <path fill="#d9d2b7" d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5Z"/>
   </symbol>

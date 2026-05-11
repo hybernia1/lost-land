@@ -116,7 +116,8 @@ button:disabled {
 .language-button,
 .text-button {
   min-height: 42px;
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   background: #2c3439;
   color: #f4eedf;
   cursor: pointer;
@@ -130,8 +131,8 @@ button:disabled {
 
 .menu-input {
   min-height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   outline: 0;
   background: #111519;
   color: #f5efdf;
@@ -140,7 +141,6 @@ button:disabled {
 }
 
 .menu-input:focus {
-  border-color: rgba(209, 178, 93, 0.72);
   box-shadow: 0 0 0 3px rgba(209, 178, 93, 0.14);
 }
 
@@ -158,8 +158,8 @@ button:disabled {
 .save-card {
   display: grid;
   gap: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   background: #20262b;
   color: #f4eedf;
   cursor: pointer;
@@ -178,7 +178,6 @@ button:disabled {
 }
 
 .save-card:not(:disabled):hover {
-  border-color: rgba(209, 178, 93, 0.56);
   background: #2c3439;
 }
 
@@ -201,8 +200,8 @@ button:disabled {
 
 .settings-panel {
   min-height: auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
 }
 
 .text-button {
@@ -251,8 +250,8 @@ button:disabled {
   top: 0;
   left: 0;
   max-width: min(320px, calc(100vw - 20px));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   background: #111519;
   color: #f4eedf;
   opacity: 0;

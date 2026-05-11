@@ -1,9 +1,11 @@
 import {
   Application,
+  CanvasTextMetrics,
   Container,
   Graphics,
   Rectangle,
   Text,
+  TextStyle,
   Sprite,
   type FrameObject,
   type TextStyleFontWeight,
@@ -50,7 +52,7 @@ import {
   getClinicFoodPerTreatment,
   getClinicTreatmentRatePerGameHour,
 } from "../systems/health";
-import { formatLogEntry } from "../systems/log";
+import { formatLogEntry, getLogEntrySeverity } from "../systems/log";
 import {
   canTradeAtMarket,
   getAvailableMarketTrades,
@@ -197,6 +199,12 @@ type BuildingMetric = {
   tooltip?: string;
 };
 
+type FormattedLogEntry = {
+  text: string;
+  fill: number;
+  iconId: string;
+};
+
 type ResourceBreakdownTab = "production" | "consumption";
 type BarracksTab = "training" | "scouting";
 
@@ -263,7 +271,7 @@ const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
 const villagePlotDefinitions = defaultVillageLayout.plots;
 const nonPerimeterVillagePlots = villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter");
 const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
-const HUD_MAX_PIXEL_SCALE = 1.2;
+const HUD_DESIGN_SCALE = 1.2;
 const HUD_TOP_STRIP_HEIGHT = 68;
 const HUD_SIDE_PANEL_MARGIN = 0;
 const HUD_LEFT_PANEL_WIDTH = 366;
@@ -394,7 +402,7 @@ export class PixiVillageRenderer {
   private lastTextureAnimationFrameAtMs = 0;
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
-  private lastFormattedLogEntries: string[] = [];
+  private lastFormattedLogEntries: FormattedLogEntry[] = [];
   private textureAnimationBindingCounter = 0;
   private readonly noiseSeedCache: number[] = [];
   private readonly textureAnimationBindings = new Set<TextureAnimationBinding>();
@@ -466,11 +474,12 @@ export class PixiVillageRenderer {
     }
 
     this.layout = this.getLayout(width, height);
-    const hudPixelScale = this.getHudPixelScale(width, height);
-    const hudWidth = width / hudPixelScale;
-    const hudHeight = height / hudPixelScale;
+    const hudPixelScale = this.getHudPixelScale();
+    const hudRenderScale = HUD_DESIGN_SCALE * hudPixelScale;
+    const hudWidth = width / hudRenderScale;
+    const hudHeight = height / hudRenderScale;
     const visualTime = performance.now() / 1000;
-    this.hudPixelScale = hudPixelScale;
+    this.hudPixelScale = hudRenderScale;
     this.clearContainerChildren(this.cameraDynamicLayer);
     this.clearContainerChildren(this.hudLayer);
     this.buildChoicesScrollArea = null;
@@ -518,8 +527,8 @@ export class PixiVillageRenderer {
     this.syncAmbientOverlayState(state);
     this.refreshAmbientOverlays(performance.now(), true);
     this.updateAmbientAnimationLoop();
-    this.applyHudPixelScale(this.hudLayer, hudPixelScale);
-    this.scaleHudInteractionBounds(hudPixelScale);
+    this.applyHudPixelScale(this.hudLayer, hudRenderScale);
+    this.scaleHudInteractionBounds(hudRenderScale);
     this.app.render();
   }
 
@@ -1113,8 +1122,7 @@ export class PixiVillageRenderer {
     const area = new Graphics();
     area
       .rect(0, HUD_TOP_STRIP_HEIGHT, HUD_LEFT_PANEL_WIDTH, areaHeight)
-      .fill({ color: 0x151812, alpha: 1 })
-      .stroke({ color: 0xb6c38f, alpha: 0.2, width: 1 });
+      .fill({ color: 0x151812, alpha: 1 });
     this.hudLayer.addChild(area);
   }
 
@@ -1122,8 +1130,7 @@ export class PixiVillageRenderer {
     const strip = new Graphics();
     strip
       .rect(0, 0, width, HUD_TOP_STRIP_HEIGHT)
-      .fill({ color: 0x151812, alpha: 1 })
-      .stroke({ color: 0xb6c38f, alpha: 0.24, width: 1 });
+      .fill({ color: 0x151812, alpha: 1 });
     this.hudLayer.addChild(strip);
     return HUD_TOP_STRIP_HEIGHT;
   }
@@ -1143,9 +1150,8 @@ export class PixiVillageRenderer {
 
     const mark = new Graphics();
     mark
-      .roundRect(0, 0, 44, 44, 7)
-      .fill({ color: 0x141611, alpha: 0.62 })
-      .stroke({ color: 0xd9c88b, alpha: 0.36, width: 1.2 });
+      .rect(0, 0, 44, 44)
+      .fill({ color: 0x141611, alpha: 0.62 });
     layer.addChild(mark);
     this.drawIcon(layer, iconId, 22, 22, 24);
     if (tooltip) {
@@ -1191,9 +1197,8 @@ export class PixiVillageRenderer {
     const height = 22;
     const colors = this.getBrandAlertColors(alert.tone);
     const background = new Graphics();
-    background.roundRect(0, 0, width, height, 8)
-      .fill({ color: colors.fill, alpha: 0.82 })
-      .stroke({ color: colors.stroke, alpha: 0.64, width: 1 });
+    background.rect(0, 0, width, height)
+      .fill({ color: colors.fill, alpha: 0.82 });
     group.addChild(background);
     this.drawIcon(group, alert.iconId, 12, height / 2, 13);
 
@@ -1215,20 +1220,20 @@ export class PixiVillageRenderer {
     return group;
   }
 
-  private getBrandAlertColors(tone: BrandAlert["tone"]): { fill: number; stroke: number } {
+  private getBrandAlertColors(tone: BrandAlert["tone"]): { fill: number } {
     if (tone === "cold") {
-      return { fill: 0x12232d, stroke: 0x86c4df };
+      return { fill: 0x12232d };
     }
 
     if (tone === "danger") {
-      return { fill: 0x2c1715, stroke: 0xd26858 };
+      return { fill: 0x2c1715 };
     }
 
     if (tone === "warning") {
-      return { fill: 0x2a2412, stroke: 0xe0c46f };
+      return { fill: 0x2a2412 };
     }
 
-    return { fill: 0x141611, stroke: 0x9fc0ba };
+    return { fill: 0x141611 };
   }
 
   private getBrandAlerts(state: GameState, translations?: TranslationPack): BrandAlert[] {
@@ -1617,9 +1622,9 @@ export class PixiVillageRenderer {
         (trackHeight - thumbHeight) *
           (this.decisionHistoryScrollY / this.decisionHistoryScrollMax);
       const track = new Graphics();
-      track.roundRect(panelWidth - 18, viewportY, 5, trackHeight, 3)
+      track.rect(panelWidth - 18, viewportY, 5, trackHeight)
         .fill({ color: 0x0b0d0a, alpha: 0.72 });
-      track.roundRect(panelWidth - 18, thumbY, 5, thumbHeight, 3)
+      track.rect(panelWidth - 18, thumbY, 5, thumbHeight)
         .fill({ color: 0xe0c46f, alpha: 0.6 });
       panel.addChild(track);
     }
@@ -1648,9 +1653,8 @@ export class PixiVillageRenderer {
     parent.addChild(rowLayer);
 
     const background = new Graphics();
-    background.roundRect(0, 0, width, height, 6)
-      .fill({ color: expanded ? 0x1b1f18 : 0x171a14, alpha: 0.76 })
-      .stroke({ color: 0xe0c46f, alpha: expanded ? 0.34 : 0.12, width: 1 });
+    background.rect(0, 0, width, height)
+      .fill({ color: expanded ? 0x1b1f18 : 0x171a14, alpha: 0.76 });
     rowLayer.addChild(background);
 
     this.bindLocalAction(rowLayer, () => {
@@ -1721,9 +1725,8 @@ export class PixiVillageRenderer {
       });
       const chipWidth = Math.max(42, 32 + value.width);
       const background = new Graphics();
-      background.roundRect(0, 0, chipWidth, 22, 6)
-        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 })
-        .stroke({ color: impact.negative ? 0xd26858 : 0x9ed99b, alpha: 0.24, width: 1 });
+      background.rect(0, 0, chipWidth, 22)
+        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 });
       chip.addChildAt(background, 0);
       this.drawIcon(chip, impact.iconId, 13, 11, 13);
       chip.x = cursorX - chipWidth;
@@ -1820,9 +1823,8 @@ export class PixiVillageRenderer {
 
     const trackY = y + 22;
     const track = new Graphics();
-    track.roundRect(x, trackY, width, 8, 4)
-      .fill({ color: 0x0b0d0a, alpha: 0.78 })
-      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+    track.rect(x, trackY, width, 8)
+      .fill({ color: 0x0b0d0a, alpha: 0.78 });
     const centerX = x + width / 2;
     track.rect(centerX - 1, trackY - 4, 2, 16)
       .fill({ color: 0xd8c890, alpha: 0.42 });
@@ -1831,8 +1833,7 @@ export class PixiVillageRenderer {
     const knobX = x + ((value + 100) / 200) * width;
     const knob = new Graphics();
     knob.circle(knobX, trackY + 4, 7)
-      .fill({ color: 0xe0c46f, alpha: 0.95 })
-      .stroke({ color: 0x3b331d, alpha: 0.8, width: 2 });
+      .fill({ color: 0xe0c46f, alpha: 0.95 });
     parent.addChild(knob);
   }
 
@@ -2055,6 +2056,7 @@ export class PixiVillageRenderer {
     });
 
     const entries = this.getFormattedLogEntries(state, translations);
+    const textWrapWidth = width - 58;
 
     if (entries.length === 0) {
       this.drawText(layer, "-", 14, viewportY, {
@@ -2066,7 +2068,17 @@ export class PixiVillageRenderer {
       return;
     }
 
-    const contentHeight = entries.length * 38;
+    const lineHeight = 15;
+    let rowCursorY = 0;
+    const rows = entries.map((entry, index) => {
+      const lines = this.wrapLogText(entry.text, index === 0 ? "800" : "700", textWrapWidth);
+      const rowHeight = Math.max(38, lines.length * lineHeight + 8);
+      const row = { entry, index, y: rowCursorY, height: rowHeight, lines };
+      rowCursorY += rowHeight;
+      return row;
+    });
+
+    const contentHeight = rowCursorY;
     this.logScrollMax = Math.max(0, contentHeight - viewportHeight);
     this.logScrollY = Math.max(0, Math.min(this.logScrollY, this.logScrollMax));
     this.logScrollArea = {
@@ -2076,19 +2088,32 @@ export class PixiVillageRenderer {
       height: viewportHeight + 8,
     };
 
-    entries.forEach((entry, index) => {
-      const rowY = viewportY + index * 38 - this.logScrollY;
+    const logContent = new Container();
+    logContent.y = viewportY - this.logScrollY;
+    layer.addChild(logContent);
 
-      if (rowY < viewportY - 38 || rowY > viewportY + viewportHeight) {
+    const logMask = new Graphics();
+    logMask.eventMode = "none";
+    logMask.rect(10, viewportY, width - 30, viewportHeight)
+      .fill({ color: 0xffffff, alpha: 1 });
+    layer.addChild(logMask);
+    logContent.mask = logMask;
+
+    rows.forEach((row) => {
+      const rowY = row.y;
+      const visibleY = rowY - this.logScrollY;
+
+      if (visibleY < -row.height || visibleY > viewportHeight) {
         return;
       }
 
-      this.drawText(layer, entry, 14, rowY, {
-        fill: index === 0 ? 0xf1df9a : 0xc8cabb,
-        fontSize: 11,
-        fontWeight: index === 0 ? "800" : "700",
-        wordWrap: true,
-        wordWrapWidth: width - 42,
+      this.drawIcon(logContent, row.entry.iconId, 20, rowY + 9, 14);
+      row.lines.forEach((line, lineIndex) => {
+        this.drawText(logContent, line, 30, rowY + lineIndex * lineHeight, {
+          fill: row.entry.fill,
+          fontSize: 11,
+          fontWeight: row.index === 0 ? "800" : "700",
+        });
       });
     });
 
@@ -2097,9 +2122,9 @@ export class PixiVillageRenderer {
       const thumbHeight = Math.max(28, trackHeight * viewportHeight / contentHeight);
       const thumbY = viewportY + (trackHeight - thumbHeight) * (this.logScrollY / this.logScrollMax);
       const track = new Graphics();
-      track.roundRect(width - 18, viewportY, 5, trackHeight, 3)
+      track.rect(width - 18, viewportY, 5, trackHeight)
         .fill({ color: 0x0b0d0a, alpha: 0.72 });
-      track.roundRect(width - 18, thumbY, 5, thumbHeight, 3)
+      track.rect(width - 18, thumbY, 5, thumbHeight)
         .fill({ color: 0xe0c46f, alpha: 0.6 });
       layer.addChild(track);
     }
@@ -2525,9 +2550,9 @@ export class PixiVillageRenderer {
         (trackHeight - thumbHeight) *
           (this.resourceBreakdownScrollY / this.resourceBreakdownScrollMax);
       const scrollbar = new Graphics();
-      scrollbar.roundRect(panelWidth - 20, viewportY, 5, trackHeight, 3)
+      scrollbar.rect(panelWidth - 20, viewportY, 5, trackHeight)
         .fill({ color: 0x0b0d0a, alpha: 0.76 });
-      scrollbar.roundRect(panelWidth - 20, thumbY, 5, thumbHeight, 3)
+      scrollbar.rect(panelWidth - 20, thumbY, 5, thumbHeight)
         .fill({ color: 0xe0c46f, alpha: 0.66 });
       panel.addChild(scrollbar);
     }
@@ -2543,9 +2568,8 @@ export class PixiVillageRenderer {
     highlighted = false,
   ): void {
     const row = new Graphics();
-    row.roundRect(18, y - 7, width - 36, 28, 6)
-      .fill({ color: highlighted ? 0x262719 : 0x0f120e, alpha: highlighted ? 0.72 : 0.38 })
-      .stroke({ color: 0xe0c46f, alpha: highlighted ? 0.22 : 0.1, width: 1 });
+    row.rect(18, y - 7, width - 36, 28)
+      .fill({ color: highlighted ? 0x262719 : 0x0f120e, alpha: highlighted ? 0.72 : 0.38 });
     parent.addChild(row);
 
     this.drawText(parent, label, 32, y, {
@@ -3197,8 +3221,7 @@ export class PixiVillageRenderer {
 
     const badgeBox = new Graphics();
     badgeBox.rect(0, 0, 42, 42)
-      .fill({ color: 0x11140f, alpha: 0.9 })
-      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+      .fill({ color: 0x11140f, alpha: 0.9 });
     badge.addChild(badgeBox);
     this.drawIcon(badge, "build", 21, 21, 22);
 
@@ -3405,16 +3428,15 @@ export class PixiVillageRenderer {
     contentHeight: number,
   ): void {
     const track = new Graphics();
-    track.roundRect(x, y, width, height, width / 2)
-      .fill({ color: 0x070807, alpha: 0.52 })
-      .stroke({ color: 0xe0c46f, alpha: 0.2, width: 1 });
+    track.rect(x, y, width, height)
+      .fill({ color: 0x070807, alpha: 0.52 });
     parent.addChild(track);
 
     const thumbHeight = Math.max(46, (height / contentHeight) * height);
     const thumbTravel = Math.max(0, height - thumbHeight - 4);
     const thumbY = y + 2 + (maxScroll > 0 ? (scrollY / maxScroll) * thumbTravel : 0);
     const thumb = new Graphics();
-    thumb.roundRect(x + 2, thumbY, width - 4, thumbHeight, (width - 4) / 2)
+    thumb.rect(x + 2, thumbY, width - 4, thumbHeight)
       .fill({ color: 0xe0c46f, alpha: 0.86 });
     parent.addChild(thumb);
   }
@@ -3861,9 +3883,8 @@ export class PixiVillageRenderer {
     parent.addChild(card);
 
     const box = new Graphics();
-    box.roundRect(0, 0, width, height, 7)
-      .fill({ color: 0x10120e, alpha: 0.78 })
-      .stroke({ color: 0xe0c46f, alpha: 0.18, width: 1 });
+    box.rect(0, 0, width, height)
+      .fill({ color: 0x10120e, alpha: 0.78 });
     card.addChild(box);
 
     this.drawIcon(card, metric.iconId, 22, height / 2, 22);
@@ -4131,9 +4152,8 @@ export class PixiVillageRenderer {
     parent.addChild(stepper);
 
     const box = new Graphics();
-    box.roundRect(0, 0, width, 44, 7)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 })
-      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    box.rect(0, 0, width, 44)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 });
     stepper.addChild(box);
 
     this.drawText(stepper, translations.ui.marketAmount ?? "Amount", 12, 7, {
@@ -4330,9 +4350,8 @@ export class PixiVillageRenderer {
     parent.addChild(card);
 
     const box = new Graphics();
-    box.roundRect(0, 0, width, height, 7)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 })
-      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    box.rect(0, 0, width, height)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 });
     card.addChild(box);
     this.drawIcon(card, iconId, 22, height / 2, 20);
     this.drawText(card, label, 48, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
@@ -4354,9 +4373,8 @@ export class PixiVillageRenderer {
     parent.addChild(stepper);
 
     const box = new Graphics();
-    box.roundRect(0, 0, width, 50, 7)
-      .fill({ color: 0x0c0f0d, alpha: 0.58 })
-      .stroke({ color: 0xe0c46f, alpha: 0.14, width: 1 });
+    box.rect(0, 0, width, 50)
+      .fill({ color: 0x0c0f0d, alpha: 0.58 });
     stepper.addChild(box);
 
     this.drawText(stepper, label, 12, 8, { fill: 0xaeb4b8, fontSize: 11, fontWeight: "800" });
@@ -4392,9 +4410,8 @@ export class PixiVillageRenderer {
     parent.addChild(rowContainer);
 
     const row = new Graphics();
-    row.roundRect(x + 18, y - 2, width - 36, 28, 7)
-      .fill({ color: 0x080a09, alpha: 0.44 })
-      .stroke({ color: 0xe0c46f, alpha: 0.12, width: 1 });
+    row.rect(x + 18, y - 2, width - 36, 28)
+      .fill({ color: 0x080a09, alpha: 0.44 });
     rowContainer.addChild(row);
     this.drawIcon(rowContainer, mode === "safe" ? "scout" : "shield", x + 34, y + 12, 17);
     this.drawText(rowContainer, modeLabel, x + 50, y + 3, { fill: 0xf5efdf, fontSize: 12, fontWeight: "900" });
@@ -4997,9 +5014,8 @@ export class PixiVillageRenderer {
     const height = subtext ? (compact ? 38 : 46) : (compact ? 30 : 34);
     const panel = new Graphics();
     panel
-      .roundRect(0, 0, width, height, compact ? 7 : 8)
-      .fill({ color: 0x10120e, alpha: compact ? 0.64 : 0.76 })
-      .stroke({ color: compact ? 0xb8c693 : 0xe0c46f, alpha: compact ? 0.16 : 0.22, width: 1 });
+      .rect(0, 0, width, height)
+      .fill({ color: 0x10120e, alpha: compact ? 0.64 : 0.76 });
     group.addChild(panel);
     this.drawIcon(group, iconId, compact ? 15 : 17, height / 2, compact ? 14 : 16);
     text.x = compact ? 28 : 32;
@@ -5095,9 +5111,8 @@ export class PixiVillageRenderer {
 
     const style = this.getRectButtonStyle(options.tone ?? "toolbar", options.disabled ?? false, options.active ?? false);
     const box = new Graphics();
-    box.roundRect(0, 0, options.width, options.height, 7)
-      .fill({ color: style.fill, alpha: style.fillAlpha })
-      .stroke({ color: 0xe0c46f, alpha: style.strokeAlpha, width: 1 });
+    box.rect(0, 0, options.width, options.height)
+      .fill({ color: style.fill, alpha: style.fillAlpha });
     button.addChild(box);
 
     if (options.iconId) {
@@ -5134,11 +5149,10 @@ export class PixiVillageRenderer {
     button.x = options.x;
     button.y = options.y;
 
-    const circle = new Graphics();
-    circle.circle(0, 0, options.radius)
-      .fill({ color: options.active ? 0xe0c46f : 0x2d2f23, alpha: options.active ? 1 : 0.9 })
-      .stroke({ color: 0xe0c46f, alpha: options.active ? 0.72 : 0.28, width: 1.5 });
-    button.addChild(circle);
+    const box = new Graphics();
+    box.rect(-options.radius, -options.radius, options.radius * 2, options.radius * 2)
+      .fill({ color: options.active ? 0xe0c46f : 0x2d2f23, alpha: options.active ? 1 : 0.9 });
+    button.addChild(box);
 
     const icon = this.drawIcon(button, options.iconId, 0, 0, options.radius * 1.08);
     icon.alpha = options.active ? 0.92 : 1;
@@ -5152,12 +5166,11 @@ export class PixiVillageRenderer {
     tone: RectButtonTone,
     disabled: boolean,
     active: boolean,
-  ): { fill: number; fillAlpha: number; strokeAlpha: number; textFill: number } {
+  ): { fill: number; fillAlpha: number; textFill: number } {
     if (disabled) {
       return {
         fill: 0x34362e,
         fillAlpha: tone === "secondary" ? 0.52 : 0.62,
-        strokeAlpha: tone === "secondary" ? 0.16 : 0.22,
         textFill: 0xaeb4b8,
       };
     }
@@ -5166,7 +5179,6 @@ export class PixiVillageRenderer {
       return {
         fill: 0xe0c46f,
         fillAlpha: 1,
-        strokeAlpha: tone === "primary" ? 0.54 : 0.6,
         textFill: 0x141719,
       };
     }
@@ -5175,7 +5187,6 @@ export class PixiVillageRenderer {
       return {
         fill: 0x262719,
         fillAlpha: 0.92,
-        strokeAlpha: 0.36,
         textFill: 0xf1df9a,
       };
     }
@@ -5183,7 +5194,6 @@ export class PixiVillageRenderer {
     return {
       fill: 0x2d2f23,
       fillAlpha: 0.84,
-      strokeAlpha: 0.18,
       textFill: 0xf4eedf,
     };
   }
@@ -5208,9 +5218,8 @@ export class PixiVillageRenderer {
       parent.addChild(tabLayer);
 
       const box = new Graphics();
-      box.roundRect(0, 0, tabWidth, options.height, 7)
-        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 })
-        .stroke({ color: 0xe0c46f, alpha: active ? 0.62 : 0.22, width: 1 });
+      box.rect(0, 0, tabWidth, options.height)
+        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 });
       tabLayer.addChild(box);
       this.drawCenteredText(tabLayer, tab.label, tabWidth / 2, options.height / 2, {
         fill: active ? 0x11140f : 0xd8d2bd,
@@ -5240,17 +5249,11 @@ export class PixiVillageRenderer {
     width: number,
     height: number,
     fillAlpha = 0.76,
-    cornerRadius = 8,
+    _cornerRadius = 0,
   ): Graphics {
     const panel = new Graphics();
-    if (cornerRadius > 0) {
-      panel.roundRect(x, y, width, height, cornerRadius);
-    } else {
-      panel.rect(x, y, width, height);
-    }
-    panel
-      .fill({ color: 0x10120e, alpha: fillAlpha })
-      .stroke({ color: 0xe0c46f, alpha: 0.22, width: 1 });
+    panel.rect(x, y, width, height);
+    panel.fill({ color: 0x10120e, alpha: fillAlpha });
     parent.addChild(panel);
     return panel;
   }
@@ -5305,9 +5308,8 @@ export class PixiVillageRenderer {
       this.canvasTooltipWidth = Math.min(320, Math.max(92, this.canvasTooltipLabel.width + 24));
       this.canvasTooltipHeight = Math.max(36, this.canvasTooltipLabel.height + 18);
       this.canvasTooltipPanel.clear();
-      this.canvasTooltipPanel.roundRect(0, 0, this.canvasTooltipWidth, this.canvasTooltipHeight, 7)
-        .fill({ color: 0x111519, alpha: 0.96 })
-        .stroke({ color: 0xe0c46f, alpha: 0.28, width: 1 });
+      this.canvasTooltipPanel.rect(0, 0, this.canvasTooltipWidth, this.canvasTooltipHeight)
+        .fill({ color: 0x111519, alpha: 0.96 });
     }
 
     this.tooltipLayer.visible = true;
@@ -5370,14 +5372,8 @@ export class PixiVillageRenderer {
     }
 
     const marker = new Graphics();
-    marker
-      .roundRect(bounds.x, bounds.y, bounds.width, bounds.height, 7 * this.layout.scale)
-      .stroke({
-        color: 0xf6e58d,
-        alpha: 0.8,
-        width: 2,
-      },
-    );
+    marker.rect(bounds.x, bounds.y, bounds.width, bounds.height)
+      .fill({ color: 0xf6e58d, alpha: 0.18 });
     this.cameraDynamicLayer.addChild(marker);
   }
 
@@ -5393,8 +5389,7 @@ export class PixiVillageRenderer {
 
     const ring = new Graphics();
     ring.circle(0, 0, 16)
-      .fill({ color: 0x2a090b, alpha: 0.94 })
-      .stroke({ color: 0xff5566, alpha: 0.86, width: 2 });
+      .fill({ color: 0x2a090b, alpha: 0.94 });
     badge.addChild(ring);
 
     const bolt = new Graphics();
@@ -5435,8 +5430,7 @@ export class PixiVillageRenderer {
 
     const box = new Graphics();
     box.circle(radius, radius, radius)
-      .fill({ color: 0x24494d, alpha: 0.95 })
-      .stroke({ color: 0x8ed7cf, alpha: 0.74, width: 1.4 });
+      .fill({ color: 0x24494d, alpha: 0.95 });
     box.circle(radius - radius * 0.25, radius - radius * 0.28, radius * 0.42)
       .fill({ color: 0xffffff, alpha: 0.08 });
     badge.addChild(box);
@@ -5479,18 +5473,13 @@ export class PixiVillageRenderer {
     parent.addChild(badge);
 
     const shadow = new Graphics();
-    shadow.roundRect(2, 3, width, height, 7)
+    shadow.rect(2, 3, width, height)
       .fill({ color: 0x000000, alpha: 0.32 });
     badge.addChild(shadow);
 
     const box = new Graphics();
-    box.roundRect(0, 0, width, height, 7)
-      .fill({ color: asleep ? 0x1a1d18 : 0x10120e, alpha: 0.94 })
-      .stroke({
-        color: asleep ? 0x889089 : 0xe0c46f,
-        alpha: asleep ? 0.32 : 0.44,
-        width: 1,
-      });
+    box.rect(0, 0, width, height)
+      .fill({ color: asleep ? 0x1a1d18 : 0x10120e, alpha: 0.94 });
     badge.addChild(box);
 
     this.drawIcon(badge, asleep ? "clock" : "people", 14, height / 2, 13);
@@ -5525,14 +5514,13 @@ export class PixiVillageRenderer {
 
     const height = 26;
     const shadow = new Graphics();
-    shadow.roundRect(-width / 2 + 2, 3, width, height, 7)
+    shadow.rect(-width / 2 + 2, 3, width, height)
       .fill({ color: 0x000000, alpha: 0.34 });
     badge.addChild(shadow);
 
     const box = new Graphics();
-    box.roundRect(-width / 2, 0, width, height, 7)
-      .fill({ color: 0x10120e, alpha: 0.94 })
-      .stroke({ color: 0xe0c46f, alpha: 0.46, width: 1 });
+    box.rect(-width / 2, 0, width, height)
+      .fill({ color: 0x10120e, alpha: 0.94 });
     badge.addChild(box);
 
     this.drawIcon(badge, "clock", -width / 2 + 15, height / 2, 13);
@@ -5777,8 +5765,8 @@ export class PixiVillageRenderer {
     }
 
     for (const child of container.children) {
-      child.x *= scale;
-      child.y *= scale;
+      child.x = Math.round(child.x * scale);
+      child.y = Math.round(child.y * scale);
       this.scaleHitArea(child, scale);
 
       if (child instanceof Text) {
@@ -5796,12 +5784,13 @@ export class PixiVillageRenderer {
           child.style.wordWrapWidth = wordWrapWidth;
         }
         child.resolution = window.devicePixelRatio || 1;
+        child.roundPixels = true;
         continue;
       }
 
       if (child instanceof Graphics || child instanceof Sprite) {
-        child.scale.x *= scale;
-        child.scale.y *= scale;
+        child.scale.x = Math.round(child.scale.x * scale * 1000) / 1000;
+        child.scale.y = Math.round(child.scale.y * scale * 1000) / 1000;
         continue;
       }
 
@@ -5828,10 +5817,10 @@ export class PixiVillageRenderer {
       return;
     }
 
-    bounds.x *= scale;
-    bounds.y *= scale;
-    bounds.width *= scale;
-    bounds.height *= scale;
+    bounds.x = Math.round(bounds.x * scale);
+    bounds.y = Math.round(bounds.y * scale);
+    bounds.width = Math.round(bounds.width * scale);
+    bounds.height = Math.round(bounds.height * scale);
   }
 
   private registerHudInteractionArea(
@@ -5861,10 +5850,10 @@ export class PixiVillageRenderer {
 
   private scaleHitArea(target: Container, scale: number): void {
     if (target.hitArea instanceof Rectangle) {
-      target.hitArea.x *= scale;
-      target.hitArea.y *= scale;
-      target.hitArea.width *= scale;
-      target.hitArea.height *= scale;
+      target.hitArea.x = Math.round(target.hitArea.x * scale);
+      target.hitArea.y = Math.round(target.hitArea.y * scale);
+      target.hitArea.width = Math.round(target.hitArea.width * scale);
+      target.hitArea.height = Math.round(target.hitArea.height * scale);
     }
   }
 
@@ -5873,7 +5862,7 @@ export class PixiVillageRenderer {
       return undefined;
     }
 
-    return Math.round(value * scale * 100) / 100;
+    return Math.max(1, Math.round(value * scale));
   }
 
   private getLogicalWheelDelta(event: WheelEvent): number {
@@ -6003,7 +5992,7 @@ export class PixiVillageRenderer {
     viewportWidth: number,
     viewportHeight: number,
   ): { left: number; right: number; top: number; bottom: number } {
-    const hudScale = this.getHudPixelScale(viewportWidth, viewportHeight);
+    const hudScale = HUD_DESIGN_SCALE * this.getHudPixelScale();
     const minSafeWidth = 240;
     const minSafeHeight = 220;
     let left = HUD_LEFT_PANEL_WIDTH * hudScale;
@@ -6039,8 +6028,8 @@ export class PixiVillageRenderer {
     };
   }
 
-  private getHudPixelScale(width: number, height: number): number {
-    return Math.min(HUD_MAX_PIXEL_SCALE, Math.max(1, Math.min(width / 1120, height / 640)));
+  private getHudPixelScale(): number {
+    return 1;
   }
 
   private getStaticWorldKey(state: GameState): string {
@@ -6160,7 +6149,7 @@ export class PixiVillageRenderer {
   private getFormattedLogEntries(
     state: GameState,
     translations: TranslationPack | undefined,
-  ): string[] {
+  ): FormattedLogEntry[] {
     if (
       this.lastFormattedLogSource === state.log &&
       this.lastFormattedLogTranslations === translations
@@ -6168,12 +6157,172 @@ export class PixiVillageRenderer {
       return this.lastFormattedLogEntries;
     }
 
-    const entries = translations
-      ? state.log.map((entry) => formatLogEntry(entry, translations))
-      : state.log.map((entry) => entry.key);
+    const entries = state.log.map((entry, index) => {
+      const text = translations ? formatLogEntry(entry, translations) : entry.key;
+      return {
+        text,
+        fill: this.getLogEntryFillColor(entry, index === 0),
+        iconId: this.getLogEntryIconId(entry),
+      };
+    });
     this.lastFormattedLogSource = state.log;
     this.lastFormattedLogTranslations = translations;
     this.lastFormattedLogEntries = entries;
     return entries;
+  }
+
+  private getLogEntryFillColor(entry: GameState["log"][number], latest: boolean): number {
+    const severity = getLogEntrySeverity(entry);
+
+    if (severity === "critical") {
+      return 0xff707a;
+    }
+
+    if (severity === "warning") {
+      return 0xf1c17f;
+    }
+
+    if (severity === "positive") {
+      return 0x9ed99b;
+    }
+
+    return latest ? 0xf1df9a : 0xc8cabb;
+  }
+
+  private getLogEntryIconId(entry: GameState["log"][number]): string {
+    const key = entry.key;
+
+    if (key === "logStarvationDeath" || key === "logDehydrationDeath") {
+      return "death";
+    }
+
+    if (
+      key === "logConstructionInjury" ||
+      key === "logScarcityInjury" ||
+      key === "logIllness" ||
+      key === "logClinicTreated" ||
+      key === "logShelterExposureInjury"
+    ) {
+      return "crisis-injured";
+    }
+
+    if (key === "logConstructionStarted" || key === "logUpgradeStarted" || key === "logReachedLevel") {
+      return "build";
+    }
+
+    if (key === "logSurvivorJoined" || key === "logSurvivorsJoined") {
+      return "people";
+    }
+
+    if (key === "logScoutingStarted" || key === "logScoutingReturned") {
+      return "scout";
+    }
+
+    if (key === "logMarketTrade") {
+      return "material";
+    }
+
+    if (key === "logEnvironmentRainStarted" || key === "logEnvironmentRainEnded") {
+      return "crisis-rain";
+    }
+
+    if (key === "logEnvironmentSnowStarted" || key === "logEnvironmentSnowEnded") {
+      return "crisis-snow";
+    }
+
+    if (key === "logEnvironmentRadiationStarted" || key === "logEnvironmentRadiationEnded") {
+      return "crisis-radiation";
+    }
+
+    if (
+      key === "logShelterCrisisStarted" ||
+      key === "logShelterCrisisWarning" ||
+      key === "logShelterCrisisResolved"
+    ) {
+      return "crisis-shelter";
+    }
+
+    if (key === "logShelterExposure") {
+      return "crisis-countdown";
+    }
+
+    if (key === "logDecisionAppeared") {
+      return "archive";
+    }
+
+    const severity = getLogEntrySeverity(entry);
+    if (severity === "critical") {
+      return "death";
+    }
+    if (severity === "warning") {
+      return "crisis-countdown";
+    }
+    if (severity === "positive") {
+      return "people";
+    }
+
+    return "clock";
+  }
+
+  private wrapLogText(
+    text: string,
+    fontWeight: TextStyleFontWeight,
+    maxWidth: number,
+  ): string[] {
+    const style = new TextStyle({
+      fill: 0xffffff,
+      fontFamily: "Inter, Arial, sans-serif",
+      fontSize: 11,
+      fontWeight,
+      wordWrap: false,
+    });
+    const lines: string[] = [];
+    const baseWords = text.split(/\s+/).filter((word) => word.length > 0);
+
+    if (baseWords.length === 0) {
+      return [text];
+    }
+
+    let currentLine = "";
+
+    for (const word of baseWords) {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      const candidateWidth = CanvasTextMetrics.measureText(candidate, style).width;
+
+      if (candidateWidth <= maxWidth) {
+        currentLine = candidate;
+        continue;
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = "";
+      }
+
+      if (CanvasTextMetrics.measureText(word, style).width <= maxWidth) {
+        currentLine = word;
+        continue;
+      }
+
+      let chunk = "";
+      for (const char of word) {
+        const charCandidate = chunk + char;
+        if (CanvasTextMetrics.measureText(charCandidate, style).width <= maxWidth || chunk.length === 0) {
+          chunk = charCandidate;
+          continue;
+        }
+
+        lines.push(chunk);
+        chunk = char;
+      }
+
+      currentLine = chunk;
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
   }
 }

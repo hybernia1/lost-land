@@ -194,11 +194,13 @@ export type QuestState = {
 };
 
 export type LogEntrySource = "ui" | "questUi" | "questDecisionResult" | "questSuddenResult";
+export type LogEntrySeverity = "neutral" | "positive" | "warning" | "critical";
 
 export type LogEntry = {
   source: LogEntrySource;
   key: string;
   params?: Record<string, string | number>;
+  severity?: LogEntrySeverity;
 };
 
 export type GameState = {

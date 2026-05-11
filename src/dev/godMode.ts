@@ -145,8 +145,8 @@ function installStyle(): void {
       bottom: 16px;
       min-width: 46px;
       min-height: 34px;
-      border: 1px solid rgba(224, 196, 111, 0.42);
-      border-radius: 7px;
+      border: 0;
+      border-radius: 0;
       background: rgba(17, 21, 25, 0.88);
       color: #f1df9a;
       cursor: pointer;
@@ -168,8 +168,8 @@ function installStyle(): void {
       bottom: 60px;
       display: none;
       width: min(320px, calc(100vw - 32px));
-      border: 1px solid rgba(224, 196, 111, 0.38);
-      border-radius: 8px;
+      border: 0;
+      border-radius: 0;
       background: rgba(13, 17, 20, 0.96);
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
       padding: 14px;
@@ -197,7 +197,7 @@ function installStyle(): void {
       align-items: center;
       justify-content: space-between;
       margin-bottom: 12px;
-      border-radius: 7px;
+      border-radius: 0;
       background: rgba(255, 255, 255, 0.06);
       padding: 8px 10px;
       color: #f4eedf;
@@ -223,7 +223,8 @@ function installStyle(): void {
 
     .god-mode-grid button {
       min-height: 34px;
-      border-radius: 7px;
+      border: 0;
+      border-radius: 0;
       background: #2c3439;
       color: #f4eedf;
       cursor: pointer;

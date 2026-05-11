@@ -1,4 +1,11 @@
-import type { BuildingId, GameState, LogEntry, ObjectiveQuestId, ResourceId } from "../game/types";
+import type {
+  BuildingId,
+  GameState,
+  LogEntry,
+  LogEntrySeverity,
+  ObjectiveQuestId,
+  ResourceId,
+} from "../game/types";
 import { loadLocale, packs } from "../i18n";
 import type { TranslationPack } from "../i18n/types";
 
@@ -90,7 +97,25 @@ export function pushLogEntry(state: GameState, entry: LogEntry): void {
   state.log = state.log.slice(0, 32);
 }
 
+export function getLogEntrySeverity(entry: LogEntry): LogEntrySeverity {
+  if (entry.key === "logScoutingReturned") {
+    const deaths = Number(entry.params?.deaths ?? 0);
+    if (deaths > 0) {
+      return "warning";
+    }
+  }
+
+  return entry.severity ?? inferLogSeverity(entry.key);
+}
+
 function normalizeLogEntry(entry: LogEntry): LogEntry {
+  const severity = entry.severity;
+  const normalizedSeverity: LogEntrySeverity = severity === "positive" ||
+    severity === "warning" ||
+    severity === "critical"
+    ? severity
+    : inferLogSeverity(String(entry.key));
+
   return {
     source: entry.source === "questUi" ||
       entry.source === "questDecisionResult" ||
@@ -99,6 +124,7 @@ function normalizeLogEntry(entry: LogEntry): LogEntry {
       : "ui",
     key: String(entry.key),
     params: entry.params,
+    severity: normalizedSeverity,
   };
 }
 
@@ -149,3 +175,47 @@ function getLocalizedParams(params: LogParams, translations: TranslationPack): L
 
   return localizedParams;
 }
+
+function inferLogSeverity(key: string): LogEntrySeverity {
+  if (criticalLogKeys.has(key)) {
+    return "critical";
+  }
+
+  if (warningLogKeys.has(key) || key === "scarcityTheft") {
+    return "warning";
+  }
+
+  if (positiveLogKeys.has(key)) {
+    return "positive";
+  }
+
+  return "neutral";
+}
+
+const criticalLogKeys = new Set<string>([
+  "logStarvationDeath",
+  "logDehydrationDeath",
+  "logShelterExposure",
+]);
+
+const warningLogKeys = new Set<string>([
+  "logConstructionInjury",
+  "logScarcityInjury",
+  "logIllness",
+  "logShelterCrisisStarted",
+  "logShelterCrisisWarning",
+  "logShelterExposureInjury",
+  "logEnvironmentSnowStarted",
+  "logEnvironmentRadiationStarted",
+]);
+
+const positiveLogKeys = new Set<string>([
+  "logClinicTreated",
+  "logSurvivorJoined",
+  "logSurvivorsJoined",
+  "logReachedLevel",
+  "logShelterCrisisResolved",
+  "logEnvironmentRainEnded",
+  "logEnvironmentSnowEnded",
+  "logEnvironmentRadiationEnded",
+]);
