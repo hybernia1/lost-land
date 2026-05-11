@@ -1,14 +1,18 @@
 # Audio assets
 
-## Kenney Interface Sounds (CC0)
+## UI action sounds
 
-- Source: https://kenney.nl/assets/interface-sounds
 - Files used:
-  - `modal-open.wav` (`open_004.wav`)
-  - `modal-close.wav` (`close_004.wav`)
-  - `ui-tab-rustle.wav` (`scroll_004.wav`)
-  - `quest-decision-alert.wav` (`question_001.wav`)
-- License file: `LICENSE-kenney-interface-sounds.txt`
+  - `modal-open.ogg`
+  - `modal-close.ogg`
+  - `tab-switch.ogg`
+  - `ui-click.ogg`
+  - `quest-reward-claim.ogg`
+  - `quest-decision-alert.wav`
+- License/source notes:
+  - `quest-decision-alert.wav`: Kenney Interface Sounds (CC0), source https://kenney.nl/assets/interface-sounds, original `question_001.wav`
+  - Remaining `.ogg` UI files are provided from local project assets.
+  - License file for Kenney pack: `LICENSE-kenney-interface-sounds.txt`
 
 ## OpenGameArt ambient loops (CC0)
 

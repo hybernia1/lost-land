@@ -8,9 +8,11 @@ import type { ConquestResultPreview, GameOverPreview, PixiActionDetail, VillageI
 import { hasSavedGame, listSavedGames } from "../systems/save";
 import { getPopulation } from "../systems/population";
 import type { GodModeController } from "../dev/godMode";
-import modalOpenSoundUrl from "../assets/audio/modal-open.wav";
-import modalCloseSoundUrl from "../assets/audio/modal-close.wav";
-import tabSwitchSoundUrl from "../assets/audio/ui-tab-rustle.wav";
+import modalOpenSoundUrl from "../assets/audio/modal-open.ogg";
+import modalCloseSoundUrl from "../assets/audio/modal-close.ogg";
+import tabSwitchSoundUrl from "../assets/audio/tab-switch.ogg";
+import uiClickSoundUrl from "../assets/audio/ui-click.ogg";
+import questRewardClaimSoundUrl from "../assets/audio/quest-reward-claim.ogg";
 import decisionQuestAlertSoundUrl from "../assets/audio/quest-decision-alert.wav";
 import dayAmbientLoopSoundUrl from "../assets/audio/ambient-day-birds.ogg";
 import nightAmbientLoopSoundUrl from "../assets/audio/ambient-night-crickets.mp3";
@@ -38,6 +40,8 @@ export class App {
   private readonly modalOpenAudio = this.createUiAudio(modalOpenSoundUrl);
   private readonly modalCloseAudio = this.createUiAudio(modalCloseSoundUrl);
   private readonly tabSwitchAudio = this.createUiAudio(tabSwitchSoundUrl);
+  private readonly uiClickAudio = this.createUiAudio(uiClickSoundUrl);
+  private readonly questRewardClaimAudio = this.createUiAudio(questRewardClaimSoundUrl);
   private readonly decisionQuestAlertAudio = this.createUiAudio(decisionQuestAlertSoundUrl);
   private readonly dayAmbientLoopAudio = this.createLoopingAudio(dayAmbientLoopSoundUrl, 0.24);
   private readonly nightAmbientLoopAudio = this.createLoopingAudio(nightAmbientLoopSoundUrl, 0.28);
@@ -328,6 +332,7 @@ export class App {
         if (isVillagePlot) {
           this.game.selectVillagePlot(plotId);
         }
+        this.playUiSound(this.uiClickAudio);
         this.villageModalPlotId = plotId;
         this.villageInfoPanel = null;
         this.requestRender();
@@ -340,6 +345,9 @@ export class App {
 
   private handlePixiAction(event: CustomEvent<PixiActionDetail>): void {
     this.suppressVillageClickUntil = Date.now() + 400;
+    if (event.detail.action && event.detail.action !== "consume-pointer") {
+      this.playUiSound(this.uiClickAudio);
+    }
     this.handleGameAction(event.detail);
   }
 
@@ -424,6 +432,7 @@ export class App {
 
     if (action === "claim-objective-reward" && objectiveQuestId) {
       this.game.claimObjectiveReward(objectiveQuestId);
+      this.playUiSound(this.questRewardClaimAudio);
       return;
     }
 
@@ -594,6 +603,8 @@ export class App {
     if (!button) {
       return;
     }
+
+    this.playUiSound(this.uiClickAudio);
 
     if (button.dataset.locale) {
       this.locale = button.dataset.locale as Locale;
