@@ -291,6 +291,7 @@ const WEATHER_OVERLAY_FRAME_MIN_MS = 1000 / MAX_WEATHER_OVERLAY_FPS;
 const MAX_DAYLIGHT_TRANSITION_FPS = 4;
 const DAYLIGHT_TRANSITION_FRAME_MIN_MS = 1000 / MAX_DAYLIGHT_TRANSITION_FPS;
 const DAYLIGHT_DARKNESS_BUCKET_STEP = 0.015;
+const TOOLTIP_POSITION_EPSILON = 0.75;
 const RAIN_LAYER_A_MIN_COUNT = 540;
 const RAIN_LAYER_A_MAX_COUNT = 1300;
 const RAIN_LAYER_B_MIN_COUNT = 360;
@@ -409,6 +410,8 @@ export class PixiVillageRenderer {
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
   private canvasTooltipHeight = 0;
+  private canvasTooltipX = Number.NaN;
+  private canvasTooltipY = Number.NaN;
   private readonly handleWheel = (event: WheelEvent) => this.handleHostWheel(event);
   private readonly handleMouseLeave = () => this.hideCanvasTooltip();
   private readonly handlePointerDown = (event: PointerEvent) => this.handleHostPointerDown(event);
@@ -5285,13 +5288,16 @@ export class PixiVillageRenderer {
 
   private bindTooltip(target: Container, text: string): void {
     target.eventMode = "static";
-    target.on("pointerover", (event) => {
+    target.on("pointerenter", (event) => {
       this.showCanvasTooltip(text, event.global.x, event.global.y);
     });
     target.on("pointermove", (event) => {
       this.showCanvasTooltip(text, event.global.x, event.global.y);
     });
-    target.on("pointerout", () => {
+    target.on("pointerleave", () => {
+      this.hideCanvasTooltip();
+    });
+    target.on("pointercancel", () => {
       this.hideCanvasTooltip();
     });
   }
@@ -5302,6 +5308,8 @@ export class PixiVillageRenderer {
       return;
     }
 
+    let shouldRender = !this.tooltipLayer.visible;
+
     if (this.canvasTooltipText !== text) {
       this.canvasTooltipText = text;
       this.canvasTooltipLabel.text = text;
@@ -5310,13 +5318,20 @@ export class PixiVillageRenderer {
       this.canvasTooltipPanel.clear();
       this.canvasTooltipPanel.rect(0, 0, this.canvasTooltipWidth, this.canvasTooltipHeight)
         .fill({ color: 0x111519, alpha: 0.96 });
+      shouldRender = true;
     }
 
     this.tooltipLayer.visible = true;
-    this.positionCanvasTooltip(x, y, this.canvasTooltipWidth, this.canvasTooltipHeight);
+    if (this.positionCanvasTooltip(x, y, this.canvasTooltipWidth, this.canvasTooltipHeight)) {
+      shouldRender = true;
+    }
+
+    if (shouldRender) {
+      this.renderTooltipFrame();
+    }
   }
 
-  private positionCanvasTooltip(x: number, y: number, width: number, height: number): void {
+  private positionCanvasTooltip(x: number, y: number, width: number, height: number): boolean {
     const margin = 10;
     const offset = 14;
     const stageWidth = this.host.clientWidth;
@@ -5332,13 +5347,44 @@ export class PixiVillageRenderer {
       nextY = y - height - offset;
     }
 
-    this.tooltipLayer.x = Math.max(margin, Math.min(stageWidth - width - margin, nextX));
-    this.tooltipLayer.y = Math.max(margin, Math.min(stageHeight - height - margin, nextY));
+    const clampedX = Math.max(margin, Math.min(stageWidth - width - margin, nextX));
+    const clampedY = Math.max(margin, Math.min(stageHeight - height - margin, nextY));
+    const moved = (
+      Number.isNaN(this.canvasTooltipX) ||
+      Number.isNaN(this.canvasTooltipY) ||
+      Math.abs(this.canvasTooltipX - clampedX) > TOOLTIP_POSITION_EPSILON ||
+      Math.abs(this.canvasTooltipY - clampedY) > TOOLTIP_POSITION_EPSILON
+    );
+
+    if (moved) {
+      this.tooltipLayer.x = clampedX;
+      this.tooltipLayer.y = clampedY;
+      this.canvasTooltipX = clampedX;
+      this.canvasTooltipY = clampedY;
+    }
+
+    return moved;
   }
 
   private hideCanvasTooltip(): void {
+    if (!this.tooltipLayer.visible && !this.canvasTooltipText) {
+      return;
+    }
+
     this.tooltipLayer.visible = false;
     this.canvasTooltipText = "";
+    this.canvasTooltipX = Number.NaN;
+    this.canvasTooltipY = Number.NaN;
+    this.renderTooltipFrame();
+  }
+
+  private renderTooltipFrame(): void {
+    if (this.app) {
+      this.app.render();
+      return;
+    }
+
+    this.requestRender();
   }
 
   private addPalisadeTooltip(
