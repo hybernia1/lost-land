@@ -531,6 +531,10 @@
         {
          "firstgid":19,
          "source":"tilesets\/brick.tsj"
+        }, 
+        {
+         "firstgid":37,
+         "source":"tilesets\/objects.tsj"
         }],
  "tilewidth":128,
  "type":"map",

@@ -1,0 +1,23 @@
+{
+  "columns": 4,
+  "image": "../../assets/tiles/objects.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "objects",
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.12.1",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "crateStack" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "car" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "truck" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "barricade" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "trash" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "schoolBus" }] }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}
