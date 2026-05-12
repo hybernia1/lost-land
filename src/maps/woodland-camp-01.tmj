@@ -44,12 +44,90 @@
          "width":32,
          "x":0,
          "y":0
-        },
+        }, 
         {
          "draworder":"topdown",
          "id":3,
          "name":"decor",
-         "objects":[],
+         "objects":[
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":119,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":650.666666666667,
+                 "y":801.333333333333
+                }, 
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":120,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":650.333333333333,
+                 "y":800.333333333333
+                }, 
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":121,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":646.333333333333,
+                 "y":737.666666666667
+                }, 
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":122,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":581.666666666667,
+                 "y":777
+                }, 
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":123,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":625.666666666667,
+                 "y":865
+                }, 
+                {
+                 "gid":1,
+                 "height":64,
+                 "id":124,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":128,
+                 "x":683.666666666667,
+                 "y":829.666666666667
+                }],
          "opacity":1,
          "properties":[
                 {
@@ -434,7 +512,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":119,
+ "nextobjectid":127,
  "orientation":"isometric",
  "properties":[
         {

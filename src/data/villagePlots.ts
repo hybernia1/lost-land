@@ -7,10 +7,9 @@ export type VillagePlotDefinition = {
   width: number;
   height: number;
   allowedBuildingIds?: BuildingId[];
-  kind?: "building" | "perimeter";
 };
 
-export type VillagePlotRule = Pick<VillagePlotDefinition, "allowedBuildingIds" | "kind">;
+export type VillagePlotRule = Pick<VillagePlotDefinition, "allowedBuildingIds">;
 
 export type VillageResourceSiteDefinition = {
   id: string;

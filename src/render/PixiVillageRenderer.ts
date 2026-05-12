@@ -98,7 +98,6 @@ import {
   environmentAlertIconByCondition,
   environmentAlertToneByCondition,
   getHudTextLineHeight,
-  nonPerimeterVillagePlots,
   normalizeHudFontWeight,
   resourceColors,
   resourceSiteDefinitions,
@@ -401,7 +400,7 @@ export class PixiVillageRenderer {
     }
     drawWorldResourceSites(this.worldRendererHost(), state, translations);
 
-    for (const plot of nonPerimeterVillagePlots) {
+    for (const plot of villagePlotDefinitions) {
       drawWorldPlot(this.worldRendererHost(), plot, state, translations);
     }
 
@@ -467,7 +466,7 @@ export class PixiVillageRenderer {
       return siteHit.id;
     }
 
-    const plotHit = nonPerimeterVillagePlots.find((plot) => {
+    const plotHit = villagePlotDefinitions.find((plot) => {
       const bounds = this.getPlotBounds(plot);
       return (
         x >= bounds.x &&
