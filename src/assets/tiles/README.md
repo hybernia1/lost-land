@@ -14,8 +14,7 @@ without baking in a background.
 - atlas size `384x384` (both dimensions are multiples of 64)
 - imported from `Floor_Grass_02-128x64.png` with magenta colorkey converted to alpha
 
-`grass-basic.png` remains the deterministic base source tile used to derive
-all `grass.png` variants while preserving exact diamond geometry and angle.
+`grass.png` is now maintained as the canonical in-repo ground atlas.
 
 `brick.png` is an interior isometric floor atlas:
 - 18 frames
