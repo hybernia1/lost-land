@@ -198,9 +198,11 @@ function drawResourceSite(
 
   const resourceIcon = siteState.resourceId === "food"
     ? "food"
-    : siteState.resourceId === "coal"
-      ? "coal"
-      : "material";
+    : siteState.resourceId === "water"
+      ? "water"
+      : siteState.resourceId === "coal"
+        ? "coal"
+        : "material";
   host.drawIcon(layer, resourceIcon, 0, 0, Math.max(18, radius * 1.1));
 
   if (siteState.assault) {
@@ -297,16 +299,8 @@ export function drawPlot(
       alpha,
       width: selected ? 3 : 2,
     });
-  empty
-    .moveTo(-markerSize * 0.22, 0)
-    .lineTo(markerSize * 0.22, 0)
-    .moveTo(0, -markerSize * 0.22)
-    .lineTo(0, markerSize * 0.22)
-    .stroke({
-      color: selected ? 0xf3c85f : 0xeadca0,
-      alpha: selected ? 0.95 : 0.58,
-      width: Math.max(3, 5 * host.layout.scale),
-    });
   plotLayer.addChild(empty);
+  const addMarker = host.drawIcon(plotLayer, "plus", 0, 0, Math.max(14, markerSize * 0.78));
+  addMarker.alpha = selected ? 0.95 : 0.58;
 }
 

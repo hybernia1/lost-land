@@ -1,4 +1,5 @@
 import type { BuildingId } from "../game/types";
+import academyTextureUrl from "../assets/buildings/academy.png";
 import barracksTextureUrl from "../assets/buildings/barracks.png";
 import clinicTextureUrl from "../assets/buildings/clinic.png";
 import dormitoryTextureUrl from "../assets/buildings/dormitory.png";
@@ -25,11 +26,9 @@ function singleTexture(textureUrl: string): BuildingTextureVisualDefinition {
   };
 }
 
-const storageVisual = singleTexture(storageTextureUrl);
-
 export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisualDefinition>> = {
   mainBuilding: singleTexture(mainBuildingTextureUrl),
-  storage: storageVisual,
+  storage: singleTexture(storageTextureUrl),
   dormitory: singleTexture(dormitoryTextureUrl),
   hydroponics: singleTexture(hydroponicsTextureUrl),
   waterStill: singleTexture(waterStillTextureUrl),
@@ -38,6 +37,6 @@ export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisua
   market: singleTexture(marketTextureUrl),
   watchtower: singleTexture(watchtowerTextureUrl),
   barracks: singleTexture(barracksTextureUrl),
-  academy: storageVisual,
+  academy: singleTexture(academyTextureUrl),
   clinic: singleTexture(clinicTextureUrl),
 };
