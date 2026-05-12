@@ -27,8 +27,8 @@ all `grass.png` variants while preserving exact diamond geometry and angle.
 
 `walls.png` is a fixed perimeter-wall atlas:
 - 4 frames
-- frame size `256x512`
+- frame size `192x384`
 - atlas layout `2 columns x 2 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `512x1024`
+- atlas size `384x768`
 - source frames: `wall_E.png`, `wallCurve_S.png`, `doorway_E.png`, `window_S.png`

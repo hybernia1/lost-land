@@ -1,21 +1,21 @@
 {
   "columns": 2,
   "image": "../../assets/tiles/walls.png",
-  "imageheight": 1024,
-  "imagewidth": 512,
+  "imageheight": 768,
+  "imagewidth": 384,
   "margin": 0,
   "name": "walls",
   "spacing": 0,
   "tilecount": 4,
   "tiledversion": "1.12.1",
-  "tileheight": 512,
+  "tileheight": 384,
   "tiles": [
     { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "wallStraight" }] },
     { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "wallCorner" }] },
     { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "doorway_E" }] },
     { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "window_S" }] }
   ],
-  "tilewidth": 256,
+  "tilewidth": 192,
   "type": "tileset",
   "version": "1.10"
 }
