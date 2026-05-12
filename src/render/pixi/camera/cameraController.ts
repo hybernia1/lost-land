@@ -291,9 +291,6 @@ export function clampCamera(
   const terrainHeight = defaultVillageLayout.height * scale;
   const originX = layout.originX + layout.width / 2 - terrainWidth / 2;
   const originY = layout.originY + layout.height / 2 - terrainHeight / 2;
-  const clampedZoom = Math.max(CAMERA_MIN_ZOOM, Math.min(CAMERA_MAX_ZOOM, zoom));
-  const scaledTerrainWidth = terrainWidth * clampedZoom;
-  const scaledTerrainHeight = terrainHeight * clampedZoom;
   const insets = getCameraViewportInsets(viewportWidth, viewportHeight);
   const safeLeft = insets.left;
   const safeTop = insets.top;
@@ -301,23 +298,84 @@ export function clampCamera(
   const safeBottom = viewportHeight - insets.bottom;
   const safeWidth = Math.max(1, safeRight - safeLeft);
   const safeHeight = Math.max(1, safeBottom - safeTop);
+  const minZoomForCoverage = defaultVillageLayout.orientation === "isometric"
+    ? safeWidth / Math.max(1, terrainWidth) + safeHeight / Math.max(1, terrainHeight)
+    : Math.max(
+      safeWidth / Math.max(1, terrainWidth),
+      safeHeight / Math.max(1, terrainHeight),
+    );
+  const minAllowedZoom = Math.max(CAMERA_MIN_ZOOM, minZoomForCoverage);
+  const clampedZoom = Math.max(minAllowedZoom, Math.min(CAMERA_MAX_ZOOM, zoom));
   let clampedOffsetX = offsetX;
   let clampedOffsetY = offsetY;
 
-  if (scaledTerrainWidth <= safeWidth) {
-    clampedOffsetX = safeLeft + (safeWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
-  } else {
-    const minX = safeRight - (originX + terrainWidth) * clampedZoom;
-    const maxX = safeLeft - originX * clampedZoom;
-    clampedOffsetX = Math.max(minX, Math.min(maxX, clampedOffsetX));
-  }
+  if (defaultVillageLayout.orientation === "isometric") {
+    const halfTerrainWidth = Math.max(1, terrainWidth / 2);
+    const halfTerrainHeight = Math.max(1, terrainHeight / 2);
+    const centerX = originX + halfTerrainWidth;
+    const centerY = originY + halfTerrainHeight;
+    const invX = 1 / (clampedZoom * halfTerrainWidth);
+    const invY = 1 / (clampedZoom * halfTerrainHeight);
+    const isoPlusCenter = centerX / halfTerrainWidth + centerY / halfTerrainHeight;
+    const isoMinusCenter = centerX / halfTerrainWidth - centerY / halfTerrainHeight;
+    const corners = [
+      { x: safeLeft, y: safeTop },
+      { x: safeRight, y: safeTop },
+      { x: safeLeft, y: safeBottom },
+      { x: safeRight, y: safeBottom },
+    ];
 
-  if (scaledTerrainHeight <= safeHeight) {
-    clampedOffsetY = safeTop + (safeHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
+    let minIsoPlus = Number.NEGATIVE_INFINITY;
+    let maxIsoPlus = Number.POSITIVE_INFINITY;
+    let minIsoMinus = Number.NEGATIVE_INFINITY;
+    let maxIsoMinus = Number.POSITIVE_INFINITY;
+
+    for (const corner of corners) {
+      const plusTerm = invX * corner.x + invY * corner.y - isoPlusCenter;
+      minIsoPlus = Math.max(minIsoPlus, plusTerm - 1);
+      maxIsoPlus = Math.min(maxIsoPlus, plusTerm + 1);
+
+      const minusTerm = invX * corner.x - invY * corner.y - isoMinusCenter;
+      minIsoMinus = Math.max(minIsoMinus, minusTerm - 1);
+      maxIsoMinus = Math.min(maxIsoMinus, minusTerm + 1);
+    }
+
+    if (minIsoPlus > maxIsoPlus) {
+      const middle = (minIsoPlus + maxIsoPlus) / 2;
+      minIsoPlus = middle;
+      maxIsoPlus = middle;
+    }
+    if (minIsoMinus > maxIsoMinus) {
+      const middle = (minIsoMinus + maxIsoMinus) / 2;
+      minIsoMinus = middle;
+      maxIsoMinus = middle;
+    }
+
+    const desiredIsoPlus = invX * offsetX + invY * offsetY;
+    const desiredIsoMinus = invX * offsetX - invY * offsetY;
+    const clampedIsoPlus = Math.max(minIsoPlus, Math.min(maxIsoPlus, desiredIsoPlus));
+    const clampedIsoMinus = Math.max(minIsoMinus, Math.min(maxIsoMinus, desiredIsoMinus));
+    clampedOffsetX = (clampedIsoPlus + clampedIsoMinus) / (2 * invX);
+    clampedOffsetY = (clampedIsoPlus - clampedIsoMinus) / (2 * invY);
   } else {
-    const minY = safeBottom - (originY + terrainHeight) * clampedZoom;
-    const maxY = safeTop - originY * clampedZoom;
-    clampedOffsetY = Math.max(minY, Math.min(maxY, clampedOffsetY));
+    const scaledTerrainWidth = terrainWidth * clampedZoom;
+    const scaledTerrainHeight = terrainHeight * clampedZoom;
+
+    if (scaledTerrainWidth <= safeWidth) {
+      clampedOffsetX = safeLeft + (safeWidth - scaledTerrainWidth) / 2 - originX * clampedZoom;
+    } else {
+      const minX = safeRight - (originX + terrainWidth) * clampedZoom;
+      const maxX = safeLeft - originX * clampedZoom;
+      clampedOffsetX = Math.max(minX, Math.min(maxX, clampedOffsetX));
+    }
+
+    if (scaledTerrainHeight <= safeHeight) {
+      clampedOffsetY = safeTop + (safeHeight - scaledTerrainHeight) / 2 - originY * clampedZoom;
+    } else {
+      const minY = safeBottom - (originY + terrainHeight) * clampedZoom;
+      const maxY = safeTop - originY * clampedZoom;
+      clampedOffsetY = Math.max(minY, Math.min(maxY, clampedOffsetY));
+    }
   }
 
   return {

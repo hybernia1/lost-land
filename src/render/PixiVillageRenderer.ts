@@ -84,6 +84,7 @@ import {
 import { getTravelTilesToSite } from "../systems/resourceSites";
 import {
   BUILDING_PREVIEW_RENDER_SCALE,
+  CAMERA_MIN_ZOOM,
   HUD_DESIGN_SCALE,
   HUD_FONT_FAMILY,
   HUD_LEFT_PANEL_WIDTH,
@@ -259,10 +260,10 @@ export class PixiVillageRenderer {
   private hudPixelScale = 1;
   private cameraOffsetX = 0;
   private cameraOffsetY = 0;
-  private cameraZoom = 1;
+  private cameraZoom = CAMERA_MIN_ZOOM;
   private cameraTargetOffsetX = 0;
   private cameraTargetOffsetY = 0;
-  private cameraTargetZoom = 1;
+  private cameraTargetZoom = CAMERA_MIN_ZOOM;
   private cameraDragStart: CameraDragState | null = null;
   private cameraDragMoved = false;
   private cameraDragBlocked = false;
