@@ -26,9 +26,9 @@ all `grass.png` variants while preserving exact diamond geometry and angle.
 - imported from `Floor_Brick_02-128x64.png` with magenta colorkey converted to alpha
 
 `walls.png` is a fixed perimeter-wall atlas:
-- 2 frames
+- 4 frames
 - frame size `256x512`
-- atlas layout `2 columns x 1 row`
+- atlas layout `2 columns x 2 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `512x512`
-- source frames: `wall_E.png`, `wallCurve_S.png`
+- atlas size `512x1024`
+- source frames: `wall_E.png`, `wallCurve_S.png`, `doorway_E.png`, `window_S.png`
