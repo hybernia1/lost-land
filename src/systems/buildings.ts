@@ -112,7 +112,6 @@ export function getSurvivorAttractionOnCompletedLevel(
   }
 
   if (
-    buildingId === "palisade" ||
     buildingId === "dormitory" ||
     buildingId === "clinic" ||
     buildingId === "watchtower"

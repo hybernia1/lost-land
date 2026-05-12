@@ -1,0 +1,19 @@
+{
+  "columns": 2,
+  "image": "../../assets/tiles/walls.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "walls",
+  "spacing": 0,
+  "tilecount": 2,
+  "tiledversion": "1.12.1",
+  "tileheight": 512,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "wallStraight" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "wallCorner" }] }
+  ],
+  "tilewidth": 256,
+  "type": "tileset",
+  "version": "1.10"
+}

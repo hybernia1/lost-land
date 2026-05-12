@@ -26,10 +26,6 @@ export type VillageResourceSiteDefinition = {
 };
 
 export const villagePlotRulesById: Record<string, VillagePlotRule> = {
-  palisade: {
-    allowedBuildingIds: ["palisade"],
-    kind: "perimeter",
-  },
   "plot-main": {
     allowedBuildingIds: ["mainBuilding"],
   },

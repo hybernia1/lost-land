@@ -56,13 +56,6 @@ export const objectiveQuestDefinitions: ObjectiveQuestDefinition[] = [
     prerequisiteIds: ["buildHydroponics"],
     reward: { material: 65, food: 10 },
   },
-  {
-    id: "buildPalisade",
-    buildingId: "palisade",
-    requiredLevel: 1,
-    prerequisiteIds: ["buildDormitory"],
-    reward: { material: 60, morale: 2 },
-  },
 ];
 
 export const suddenQuestDefinitions: SuddenQuestDefinition[] = [

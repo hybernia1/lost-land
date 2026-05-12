@@ -55,9 +55,6 @@ export const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
 export const villagePlotDefinitions = defaultVillageLayout.plots;
 export const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
 export const nonPerimeterVillagePlots = villagePlotDefinitions.filter((candidate) => candidate.kind !== "perimeter");
-export const palisadePlotDefinition = villagePlotDefinitions.find((plot) =>
-  plot.allowedBuildingIds?.includes("palisade"),
-) ?? null;
 export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 
 export const HUD_DESIGN_SCALE = 1.2;

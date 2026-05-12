@@ -12,9 +12,9 @@ import { getAcademyExpeditionDeathRiskMultiplier } from "./academy";
 
 const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
 const resourceSiteById = new Map(resourceSiteDefinitions.map((site) => [site.id, site]));
-const palisadePlot = defaultVillageLayout.plots.find((plot) =>
-  plot.allowedBuildingIds?.includes("palisade"),
-) ?? null;
+const homeTravelAnchorPlot = defaultVillageLayout.plots.find((plot) => plot.id === "plot-main") ??
+  defaultVillageLayout.plots[0] ??
+  null;
 
 export function createInitialResourceSites(): ResourceSiteState[] {
   return resourceSiteDefinitions.map((site) => ({
@@ -225,7 +225,7 @@ export function getResourceSiteProductionDelta(
 }
 
 export function getTravelTilesToSite(siteId: string): number {
-  if (!palisadePlot) {
+  if (!homeTravelAnchorPlot) {
     return 1;
   }
 
@@ -235,12 +235,12 @@ export function getTravelTilesToSite(siteId: string): number {
     return 1;
   }
 
-  const palisadeCenterX = palisadePlot.x + palisadePlot.width / 2;
-  const palisadeCenterY = palisadePlot.y + palisadePlot.height / 2;
+  const homeCenterX = homeTravelAnchorPlot.x + homeTravelAnchorPlot.width / 2;
+  const homeCenterY = homeTravelAnchorPlot.y + homeTravelAnchorPlot.height / 2;
   const siteCenterX = site.x + site.width / 2;
   const siteCenterY = site.y + site.height / 2;
   const tileSize = Math.max(1, defaultVillageLayout.tileSize);
-  const distanceTiles = (Math.abs(siteCenterX - palisadeCenterX) + Math.abs(siteCenterY - palisadeCenterY)) /
+  const distanceTiles = (Math.abs(siteCenterX - homeCenterX) + Math.abs(siteCenterY - homeCenterY)) /
     tileSize;
 
   return Math.max(1, Math.ceil(distanceTiles));

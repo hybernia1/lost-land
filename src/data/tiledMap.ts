@@ -430,12 +430,10 @@ function getVillagePlots(
     throw new Error("Tiled map is missing object layer \"plots\".");
   }
 
-  const plotObjects = [
-    ...(plotsLayer.objects ?? []).map((object) => ({ object, id: getPlotObjectId(object) })),
-    ...(getNamedObjectLayer(map, "palisade")?.objects ?? [])
-      .filter((object) => object.type === "ring")
-      .map((object) => ({ object, id: "palisade" })),
-  ];
+  const plotObjects = (plotsLayer.objects ?? []).map((object) => ({
+    object,
+    id: getPlotObjectId(object),
+  }));
 
   const plots = plotObjects
     .filter(({ object }) => object.visible !== false)

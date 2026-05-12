@@ -146,8 +146,6 @@ function isStaticVisualObjectLayer(layerName: string): boolean {
   return layerName === "decor";
 }
 
-export { drawPalisade } from "./palisade";
-
 
 export function drawResourceSites(host: WorldRenderHost, state: GameState, translations?: TranslationPack): void {
   for (const siteDefinition of resourceSiteDefinitions) {
