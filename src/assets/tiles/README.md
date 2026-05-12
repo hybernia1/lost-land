@@ -32,3 +32,11 @@ all `grass.png` variants while preserving exact diamond geometry and angle.
 - no spacing between frames (`spacing=0`)
 - atlas size `512x512`
 - source images resized from `C:\Users\nikol\Desktop\objects\*.png` (including `brana.png`)
+
+`tress.png` is a freeform decor/tree atlas:
+- 16 frames (`4x4` grid; first 9 slots currently used, remaining slots left transparent for future assets)
+- frame size `256x256`
+- atlas layout `4 columns x 4 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `1024x1024`
+- source images copied from `C:\Users\nikol\Desktop\stromečky\*a_0.png`, bottom-aligned in each frame
