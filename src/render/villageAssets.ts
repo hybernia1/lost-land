@@ -4,22 +4,19 @@ import {
   Texture,
   type FrameObject,
 } from "pixi.js";
-import constructionSiteAtlasUrl from "../assets/buildings/construction-site-atlas.png";
+import constructionSiteTextureUrl from "../assets/buildings/construction-site.png";
 import {
   buildingVisualDefinitions,
-  getBuildingVisualFrameKey,
-  getBuildingVisualLevel,
-  type BuildingAtlasVisualDefinition,
+  type BuildingVisualDefinition,
 } from "../data/buildingVisuals";
 import { villageLayoutDefinitions } from "../data/villageLayouts";
 import type { BuildingId } from "../game/types";
 
-const buildingTextureCache = new Map<string, Texture>();
 const terrainTextureCache = new Map<string, Texture>();
 const terrainAnimationCache = new Map<string, FrameObject[] | null>();
 
 export class VillageAssets {
-  private readonly buildingAtlases = new Map<string, Texture>();
+  private readonly buildingTextures = new Map<string, Texture>();
   private constructionSiteTexture: Texture | null = null;
   private readonly terrainAtlases = new Map<string, Texture>();
   private loadPromise: Promise<void> | null = null;
@@ -32,42 +29,15 @@ export class VillageAssets {
     return this.loadPromise;
   }
 
-  getBuildingTexture(buildingId: BuildingId, level: number, built: boolean): Texture {
-    const atlasTexture = this.getAtlasBuildingTexture(buildingId, level, built);
-
-    if (atlasTexture) {
-      return atlasTexture;
-    }
-
-    return built ? Texture.WHITE : this.constructionSiteTexture ?? Texture.WHITE;
-  }
-
-  getBuildingAnimationFrames(buildingId: BuildingId, level: number, built: boolean): FrameObject[] | null {
+  getBuildingTexture(buildingId: BuildingId, _level: number, built: boolean): Texture {
     if (!built) {
-      return null;
+      return this.constructionSiteTexture ?? Texture.WHITE;
     }
 
-    const visual = buildingVisualDefinitions[buildingId];
+    const visual = this.getBuildingVisual(buildingId);
+    const texture = visual ? this.buildingTextures.get(visual.textureUrl) : null;
 
-    if (!visual || visual.kind !== "atlas") {
-      return null;
-    }
-
-    const frameKey = getBuildingVisualFrameKey(buildingId, level);
-    const animation = visual.animations?.[frameKey];
-
-    if (!animation || animation.length <= 1) {
-      return null;
-    }
-
-    const frames = animation.flatMap((frame): FrameObject[] => {
-      const texture = this.getAtlasFrameTexture(buildingId, visual, getBuildingVisualLevel(level), frame.frameKey);
-      return texture
-        ? [{ texture, time: frame.durationMs }]
-        : [];
-    });
-
-    return frames.length > 1 ? frames : null;
+    return texture ?? Texture.WHITE;
   }
 
   getTerrainTileTexture(textureKey: string): Texture | null {
@@ -128,26 +98,26 @@ export class VillageAssets {
 
   private async loadTextures(): Promise<void> {
     await Promise.all([
-      this.loadBuildingAtlases(),
+      this.loadBuildingTextures(),
       this.loadTerrainAtlases(),
     ]);
   }
 
-  private async loadBuildingAtlases(): Promise<void> {
-    const atlasDefinitions = Object.values(buildingVisualDefinitions)
-      .filter((visual): visual is BuildingAtlasVisualDefinition => visual?.kind === "atlas");
-    const uniqueAtlasUrls = new Map<string, string>();
+  private async loadBuildingTextures(): Promise<void> {
+    const uniqueTextureUrls = new Set<string>();
 
-    for (const visual of atlasDefinitions) {
-      uniqueAtlasUrls.set(visual.atlasId, visual.atlasUrl);
+    for (const visual of Object.values(buildingVisualDefinitions)) {
+      if (visual?.kind === "texture") {
+        uniqueTextureUrls.add(visual.textureUrl);
+      }
     }
 
     await Promise.all([
-      ...Array.from(uniqueAtlasUrls).map(async ([atlasId, atlasUrl]) => {
-        const texture = await Assets.load<Texture>(atlasUrl);
-        this.buildingAtlases.set(atlasId, texture);
+      ...Array.from(uniqueTextureUrls).map(async (textureUrl) => {
+        const texture = await Assets.load<Texture>(textureUrl);
+        this.buildingTextures.set(textureUrl, texture);
       }),
-      Assets.load<Texture>(constructionSiteAtlasUrl).then((texture) => {
+      Assets.load<Texture>(constructionSiteTextureUrl).then((texture) => {
         this.constructionSiteTexture = texture;
       }),
     ]);
@@ -182,84 +152,8 @@ export class VillageAssets {
     return null;
   }
 
-  private getAtlasBuildingTexture(
-    buildingId: BuildingId,
-    level: number,
-    built: boolean,
-  ): Texture | null {
-    if (!built) {
-      return null;
-    }
-
+  private getBuildingVisual(buildingId: BuildingId): BuildingVisualDefinition | null {
     const visual = buildingVisualDefinitions[buildingId];
-
-    if (!visual || visual.kind !== "atlas") {
-      return null;
-    }
-
-    const atlas = this.buildingAtlases.get(visual.atlasId);
-
-    if (!atlas) {
-      return null;
-    }
-
-    const visualLevel = getBuildingVisualLevel(level);
-    const frameKey = getBuildingVisualFrameKey(buildingId, level);
-    return this.getAtlasFrameTexture(buildingId, visual, visualLevel, frameKey);
-  }
-
-  private getAtlasFrameTexture(
-    buildingId: BuildingId,
-    visual: BuildingAtlasVisualDefinition,
-    visualLevel: number,
-    frameKey: string,
-  ): Texture | null {
-    const atlas = this.buildingAtlases.get(visual.atlasId);
-
-    if (!atlas) {
-      return null;
-    }
-
-    const frame = visual.frames?.[frameKey] ?? this.getGridFrame(visual, visualLevel);
-
-    if (!frame) {
-      return null;
-    }
-
-    const key = `${buildingId}:atlas:${frameKey}`;
-    const cached = buildingTextureCache.get(key);
-
-    if (cached) {
-      return cached;
-    }
-
-    const texture = new Texture({
-      source: atlas.source,
-      frame: new Rectangle(
-        frame.x,
-        frame.y,
-        frame.width,
-        frame.height,
-      ),
-    });
-
-    buildingTextureCache.set(key, texture);
-    return texture;
-  }
-
-  private getGridFrame(visual: BuildingAtlasVisualDefinition, visualLevel: number) {
-    const frameIndex = visualLevel - 1;
-    const frameCount = visual.columns * visual.rows;
-
-    if (frameIndex < 0 || frameIndex >= frameCount) {
-      return null;
-    }
-
-    return {
-      x: (frameIndex % visual.columns) * visual.frameWidth,
-      y: Math.floor(frameIndex / visual.columns) * visual.frameHeight,
-      width: visual.frameWidth,
-      height: visual.frameHeight,
-    };
+    return visual?.kind === "texture" ? visual : null;
   }
 }
