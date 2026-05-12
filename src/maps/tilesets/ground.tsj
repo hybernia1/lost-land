@@ -1,12 +1,12 @@
 {
  "columns": 3,
  "image": "../../assets/tiles/grass.png",
- "imageheight": 128,
+ "imageheight": 384,
  "imagewidth": 384,
  "margin": 0,
  "name": "ground",
  "spacing": 0,
- "tilecount": 6,
+ "tilecount": 18,
  "tiledversion": "1.12.1",
  "tileheight": 64,
  "tiles": [
