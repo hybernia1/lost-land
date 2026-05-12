@@ -340,7 +340,7 @@ function drawBuildRow(
   host.fitSprite(
     asset,
     Math.min(104 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 1.42),
-    Math.min(78 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 0.96),
+    Math.min(200 * BUILDING_PREVIEW_RENDER_SCALE, options.height * 2.6),
   );
   row.addChild(asset);
 
@@ -447,7 +447,7 @@ export function drawBuildingDetail(
   asset.anchor.set(0.5);
   asset.x = sideMargin + 54;
   asset.y = contentTop + 50;
-  host.fitSprite(asset, 96 * BUILDING_PREVIEW_RENDER_SCALE, 72 * BUILDING_PREVIEW_RENDER_SCALE);
+  host.fitSprite(asset, 96 * BUILDING_PREVIEW_RENDER_SCALE, 196 * BUILDING_PREVIEW_RENDER_SCALE);
   content.addChild(asset);
 
   host.drawText(content, translated.name, titleX, contentTop + 6, { fill: 0xf5efdf, fontSize: 30, fontWeight: "900" });
