@@ -16,7 +16,7 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grass"
+     "value": "grass01"
     }
    ]
   },
@@ -26,7 +26,7 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grassCool"
+     "value": "grass02"
     }
    ]
   },
@@ -36,7 +36,7 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grassDry"
+     "value": "grass03"
     }
    ]
   },
@@ -46,7 +46,7 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grassDark"
+     "value": "grass04"
     }
    ]
   },
@@ -56,7 +56,7 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grassLush"
+     "value": "grass05"
     }
    ]
   },
@@ -66,7 +66,127 @@
     {
      "name": "tileId",
      "type": "string",
-     "value": "grassAsh"
+     "value": "grass06"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass07"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass08"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass09"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass10"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass11"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass12"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass13"
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass14"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass15"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass16"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass17"
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grass18"
     }
    ]
   }

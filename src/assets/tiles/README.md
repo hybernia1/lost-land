@@ -16,6 +16,15 @@ without baking in a background.
 
 `grass-basic.png` remains the deterministic base source tile used to derive
 all `grass.png` variants while preserving exact diamond geometry and angle.
+
+`brick.png` is an interior isometric floor atlas:
+- 18 frames
+- frame size `128x64`
+- atlas layout `3 columns x 6 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `384x384` (both dimensions are multiples of 64)
+- imported from `Floor_Brick_02-128x64.png` with magenta colorkey converted to alpha
+
 `palisade-simple.png` is a deterministic isometric 10-frame atlas:
 - `palisadeDiagDown`
 - `palisadeDiagUp`
