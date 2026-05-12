@@ -15,7 +15,8 @@
     { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "truck" }] },
     { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "barricade" }] },
     { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "trash" }] },
-    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "schoolBus" }] }
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "schoolBus" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "gate" }] }
   ],
   "tilewidth": 128,
   "type": "tileset",
