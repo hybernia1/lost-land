@@ -101,6 +101,12 @@
   <symbol id="icon-build" viewBox="0 0 24 24">
     <path fill="#d2a94d" d="M4 20h16v-2H4v2Zm2-4h5V8H6v8Zm7 0h5V4h-5v12ZM8 6h2V4H8v2Zm7-4h1v2h-1V2Z"/>
   </symbol>
+  <symbol id="icon-plus" viewBox="0 0 24 24">
+    <path fill="#eadca0" d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z"/>
+  </symbol>
+  <symbol id="icon-power-warning" viewBox="0 0 24 24">
+    <path fill="#ff4f62" d="M10.2 2h8.4l-4.2 7.3h5L8.8 22l3.3-8.8H5.8L10.2 2Z"/>
+  </symbol>
   <symbol id="icon-people" viewBox="0 0 24 24">
     <path fill="#d7bb72" d="M8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm8.5 1a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7ZM2 21v-2.5C2 15.5 4.7 13 8 13s6 2.5 6 5.5V21H2Zm13.4 0v-2.5c0-1.7-.6-3.2-1.7-4.4.8-.4 1.7-.6 2.8-.6 3 0 5.5 2.2 5.5 5V21h-6.6Z"/>
   </symbol>

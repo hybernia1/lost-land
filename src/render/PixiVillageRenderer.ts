@@ -2144,19 +2144,7 @@ export class PixiVillageRenderer {
       .fill({ color: 0x2a090b, alpha: 0.94 });
     badge.addChild(ring);
 
-    const bolt = new Graphics();
-    bolt
-      .poly([
-        -2, -11,
-        8, -11,
-        3, -2,
-        10, -2,
-        -4, 13,
-        0, 3,
-        -7, 3,
-      ])
-      .fill({ color: 0xff4f62, alpha: 1 });
-    badge.addChild(bolt);
+    this.drawIcon(badge, "power-warning", 0, 1, 19);
   }
 
   private drawBuildingWorkerBadge(
