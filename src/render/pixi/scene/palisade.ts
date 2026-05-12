@@ -133,8 +133,10 @@ function drawPalisadeFromMap(host: WorldRenderHost, state: GameState): void {
     });
   }
 
-  for (const corner of getPalisadeCornerPoints(shape)) {
-    const sprite = createPalisadeSprite(host, "palisade:palisadeCorner", corner.x, corner.y, alpha * ring.opacity, tint);
+  const cornerPoints = getPalisadeCornerPoints(shape);
+  for (const [cornerIndex, corner] of cornerPoints.entries()) {
+    const cornerTextureKey = getPalisadeCornerTextureKey(cornerIndex);
+    const sprite = createPalisadeSprite(host, cornerTextureKey, corner.x, corner.y, alpha * ring.opacity, tint);
 
     if (sprite) {
       drawItems.push({ y: sprite.y, sprite });
@@ -157,35 +159,42 @@ function getPalisadeEdges(shape: PalisadeShape): PalisadeEdge[] {
       id: "northEast",
       start: shape.top,
       end: shape.right,
-      textureKey: "palisade:palisadeDiagDown",
-      gateTextureKey: "palisade:palisadeGateDown",
+      textureKey: "palisade:palisadeDiagUp",
+      gateTextureKey: "palisade:palisadeGateUp",
       blockCount: shape.xBlocks,
     },
     {
       id: "southEast",
       start: shape.right,
       end: shape.bottom,
-      textureKey: "palisade:palisadeDiagUp",
-      gateTextureKey: "palisade:palisadeGateUp",
+      textureKey: "palisade:palisadeDiagDown",
+      gateTextureKey: "palisade:palisadeGateDown",
       blockCount: shape.yBlocks,
     },
     {
       id: "southWest",
       start: shape.bottom,
       end: shape.left,
-      textureKey: "palisade:palisadeDiagDown",
-      gateTextureKey: "palisade:palisadeGateDown",
+      textureKey: "palisade:palisadeDiagUpSideB",
+      gateTextureKey: "palisade:palisadeGateUpSideB",
       blockCount: shape.xBlocks,
     },
     {
       id: "northWest",
       start: shape.left,
       end: shape.top,
-      textureKey: "palisade:palisadeDiagUp",
-      gateTextureKey: "palisade:palisadeGateUp",
+      textureKey: "palisade:palisadeDiagDownSideB",
+      gateTextureKey: "palisade:palisadeGateDownSideB",
       blockCount: shape.yBlocks,
     },
   ];
+}
+
+function getPalisadeCornerTextureKey(cornerIndex: number): string {
+  // Corner order is [top, right, bottom, left].
+  // Top/left corners use sideB shading to match the west-facing edge set.
+  const isSideB = cornerIndex === 0 || cornerIndex === 3;
+  return isSideB ? "palisade:palisadeCornerSideB" : "palisade:palisadeCorner";
 }
 
 function getPalisadeShapeForHost(host: WorldRenderHost, ring: VillageMapObjectDefinition): PalisadeShape {
