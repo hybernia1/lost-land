@@ -2266,10 +2266,10 @@
         {
          "firstgid":53,
          "source":"tilesets\/objects.tsj"
-        },
+        }, 
         {
          "firstgid":69,
-         "source":"tilesets\/tress.tsj"
+         "source":"tilesets\/trees.tsj"
         }],
  "tilewidth":128,
  "type":"map",
