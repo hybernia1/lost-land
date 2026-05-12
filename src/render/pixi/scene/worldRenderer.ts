@@ -1,8 +1,8 @@
 import { Container, Graphics, Sprite } from "pixi.js";
 import { buildingById } from "../../../data/buildings";
-import { defaultVillageLayout } from "../../../data/villageLayouts";
+import { defaultVillageLayout, type VillageMapObjectDefinition } from "../../../data/villageLayouts";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../../../data/villagePlots";
-import type { BuildingId, GameState } from "../../../game/types";
+import type { BuildingId, EnvironmentConditionId, GameState } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import { getBuildingWorkerLimit, isBuildingInactiveDueToCoal } from "../../../systems/buildings";
 import { VILLAGE_BUILDING_RENDER_SCALE, palisadePlotDefinition, resourceSiteDefinitions } from "../core/constants";
@@ -19,6 +19,10 @@ type WorldRenderHost = {
   drawText: DrawTextFn;
   bindTooltip: (target: Container, text: string) => void;
   createTerrainSprite: (textureKey: string) => Sprite | null;
+  trackTerrainSprite: (
+    sprite: Sprite,
+    tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
+  ) => void;
   createBuildingSprite: (buildingId: BuildingId, level: number, built: boolean) => Sprite;
   fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => void;
   getPlotBounds: (plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">) => Bounds;
@@ -28,14 +32,6 @@ type WorldRenderHost = {
     level: number,
     upgradingRemaining: number,
     name: string,
-  ) => void;
-  drawBuildingLevelBadge: (
-    parent: Container,
-    level: number,
-    x: number,
-    y: number,
-    translations?: TranslationPack,
-    buildingName?: string,
   ) => void;
   drawBuildingWorkerBadge: (
     parent: Container,
@@ -66,10 +62,9 @@ export function drawBackground(host: WorldRenderHost, width: number, height: num
   host.backgroundLayer.addChild(overlay);
 }
 
-export function drawTerrain(host: WorldRenderHost, state: GameState): void {
+export function drawTerrain(host: WorldRenderHost): void {
   const layout = defaultVillageLayout;
   const scale = host.layout.scale;
-  const tileSize = layout.tileSize * scale;
   const terrainWidth = layout.width * scale;
   const terrainHeight = layout.height * scale;
   const originX = host.layout.originX + host.layout.width / 2 - terrainWidth / 2;
@@ -77,34 +72,33 @@ export function drawTerrain(host: WorldRenderHost, state: GameState): void {
 
   for (const layer of layout.tileLayers) {
     for (const tile of layer.tiles) {
-      const tileX = originX + tile.x * tileSize;
-      const tileY = originY + tile.y * tileSize;
+      const tileX = originX + tile.x * scale;
+      const tileY = originY + tile.y * scale;
       const sprite = host.createTerrainSprite(tile.textureKey);
 
       if (!sprite) {
         continue;
       }
       const tileDefinition = layout.tileTextures[tile.textureKey];
-      const tint = tileDefinition.tintByEnvironment?.[state.environment.condition];
-      if (tint) {
-        sprite.tint = tint;
-      }
+      const tileWidth = tileDefinition.frame.width * scale;
+      const tileHeight = tileDefinition.frame.height * scale;
+      host.trackTerrainSprite(sprite, tileDefinition.tintByEnvironment);
       sprite.alpha = layer.opacity;
 
       if (tile.rotation || tile.flipX || tile.flipY) {
         sprite.anchor.set(0.5);
         sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
-        sprite.x = tileX + tileSize / 2;
-        sprite.y = tileY + tileSize / 2;
+        sprite.x = tileX + tileWidth / 2;
+        sprite.y = tileY + tileHeight / 2;
         sprite.scale.set(
-          (tile.flipX ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.width),
-          (tile.flipY ? -1 : 1) * ((tileSize + 0.5) / sprite.texture.height),
+          (tile.flipX ? -1 : 1) * ((tileWidth + 0.5) / sprite.texture.width),
+          (tile.flipY ? -1 : 1) * ((tileHeight + 0.5) / sprite.texture.height),
         );
       } else {
         sprite.x = tileX;
         sprite.y = tileY;
-        sprite.width = tileSize + 0.5;
-        sprite.height = tileSize + 0.5;
+        sprite.width = tileWidth + 0.5;
+        sprite.height = tileHeight + 0.5;
       }
 
       host.cameraStaticLayer.addChild(sprite);
@@ -120,7 +114,11 @@ export function drawDecorObjects(host: WorldRenderHost): void {
   const originX = host.layout.originX + host.layout.width / 2 - terrainWidth / 2;
   const originY = host.layout.originY + host.layout.height / 2 - terrainHeight / 2;
 
-  for (const layer of layout.objectLayers.filter((candidate) => candidate.name === "decor")) {
+  for (const layer of layout.objectLayers) {
+    if (!isStaticVisualObjectLayer(layer.name)) {
+      continue;
+    }
+
     const objects = [...layer.objects].sort((left, right) => left.y - right.y);
 
     for (const object of objects) {
@@ -138,7 +136,8 @@ export function drawDecorObjects(host: WorldRenderHost): void {
         continue;
       }
 
-      sprite.anchor.set(0, 1);
+      const usesTileObjectAnchor = layout.orientation === "isometric" && object.tileId !== null;
+      sprite.anchor.set(usesTileObjectAnchor ? 0.5 : 0, 1);
       sprite.x = objectX;
       sprite.y = objectY;
       sprite.width = objectWidth;
@@ -148,6 +147,10 @@ export function drawDecorObjects(host: WorldRenderHost): void {
       host.cameraStaticLayer.addChild(sprite);
     }
   }
+}
+
+function isStaticVisualObjectLayer(layerName: string): boolean {
+  return layerName === "decor";
 }
 
 export function drawPalisade(host: WorldRenderHost, state: GameState, translations?: TranslationPack): void {
@@ -162,8 +165,7 @@ export function drawPalisade(host: WorldRenderHost, state: GameState, translatio
   const selected = state.village.selectedPlotId === plotId;
 
   const bounds = host.getPlotBounds(plotDefinition);
-  const badgeX = bounds.x + bounds.width / 2;
-  const badgeY = bounds.y - 18 * host.layout.scale;
+  drawPalisadeFromMap(host, state);
 
   host.addPalisadeTooltip(
     plotDefinition,
@@ -172,17 +174,6 @@ export function drawPalisade(host: WorldRenderHost, state: GameState, translatio
     building?.upgradingRemaining ?? 0,
     translations?.buildings.palisade.name ?? "Palisade",
   );
-
-  if (building) {
-    host.drawBuildingLevelBadge(
-      host.cameraDynamicLayer,
-      Math.max(1, building.level),
-      badgeX,
-      badgeY,
-      translations,
-      translations?.buildings.palisade.name ?? "Palisade",
-    );
-  }
 
   if (building && building.upgradingRemaining > 0) {
     host.drawConstructionCountdown(
@@ -194,6 +185,271 @@ export function drawPalisade(host: WorldRenderHost, state: GameState, translatio
       undefined,
     );
   }
+}
+
+type PalisadeEdgeId = "northEast" | "southEast" | "southWest" | "northWest";
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+type PalisadeEdge = {
+  id: PalisadeEdgeId;
+  start: Point;
+  end: Point;
+  textureKey: string;
+  gateTextureKey: string;
+  blockCount: number;
+};
+
+type PalisadeShape = {
+  top: Point;
+  right: Point;
+  bottom: Point;
+  left: Point;
+  xBlocks: number;
+  yBlocks: number;
+};
+
+function drawPalisadeFromMap(host: WorldRenderHost, state: GameState): void {
+  const ring = getPalisadeRingObject();
+
+  if (!ring) {
+    return;
+  }
+
+  const hasBuiltPalisade = state.buildings.palisade.level > 0;
+  const alpha = hasBuiltPalisade ? 0.95 : 0.5;
+  const tint = hasBuiltPalisade ? 0xffffff : 0xd7c29d;
+  const gateEdge = getPalisadeGateEdge(ring);
+  const gateIndex = getIntegerObjectProperty(ring, "gateIndex", 0);
+  const shape = getPalisadeShape(host, ring);
+  const edges = getPalisadeEdges(shape);
+  const drawItems: Array<{ y: number; sprite: Sprite }> = [];
+
+  for (const edge of edges) {
+    drawPalisadeEdge(host, edge, {
+      alpha: alpha * ring.opacity,
+      tint,
+      gateIndex,
+      hasGate: edge.id === gateEdge,
+      drawItems,
+    });
+  }
+
+  for (const corner of getPalisadeCornerPoints(shape)) {
+    const sprite = createPalisadeSprite(host, "palisade:palisadeCorner", corner.x, corner.y, alpha * ring.opacity, tint);
+
+    if (sprite) {
+      drawItems.push({ y: sprite.y, sprite });
+    }
+  }
+
+  drawItems
+    .sort((left, right) => left.y - right.y)
+    .forEach((item) => host.cameraDynamicLayer.addChild(item.sprite));
+}
+
+function getPalisadeRingObject(): VillageMapObjectDefinition | null {
+  const layer = defaultVillageLayout.objectLayers.find((candidate) => candidate.name === "palisade");
+  return layer?.objects.find((object) => object.type === "ring") ?? null;
+}
+
+function getPalisadeEdges(shape: PalisadeShape): PalisadeEdge[] {
+  return [
+    {
+      id: "northEast",
+      start: shape.top,
+      end: shape.right,
+      textureKey: "palisade:palisadeDiagDown",
+      gateTextureKey: "palisade:palisadeGateDown",
+      blockCount: shape.xBlocks,
+    },
+    {
+      id: "southEast",
+      start: shape.right,
+      end: shape.bottom,
+      textureKey: "palisade:palisadeDiagUp",
+      gateTextureKey: "palisade:palisadeGateUp",
+      blockCount: shape.yBlocks,
+    },
+    {
+      id: "southWest",
+      start: shape.bottom,
+      end: shape.left,
+      textureKey: "palisade:palisadeDiagDown",
+      gateTextureKey: "palisade:palisadeGateDown",
+      blockCount: shape.xBlocks,
+    },
+    {
+      id: "northWest",
+      start: shape.left,
+      end: shape.top,
+      textureKey: "palisade:palisadeDiagUp",
+      gateTextureKey: "palisade:palisadeGateUp",
+      blockCount: shape.yBlocks,
+    },
+  ];
+}
+
+function getPalisadeShape(host: WorldRenderHost, ring: VillageMapObjectDefinition): PalisadeShape {
+  const xBlocks = getPalisadeBlockCount(ring.width);
+  const yBlocks = getPalisadeBlockCount(ring.height);
+
+  if (defaultVillageLayout.orientation !== "isometric") {
+    const bounds = host.getPlotBounds({
+      x: ring.x,
+      y: ring.y,
+      width: xBlocks * defaultVillageLayout.tileWidth,
+      height: yBlocks * defaultVillageLayout.tileHeight,
+    });
+
+    return {
+      top: { x: bounds.x + bounds.width / 2, y: bounds.y },
+      right: { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+      bottom: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+      left: { x: bounds.x, y: bounds.y + bounds.height / 2 },
+      xBlocks,
+      yBlocks,
+    };
+  }
+
+  const scale = host.layout.scale;
+  const origin = getTerrainOrigin(host);
+  const top = {
+    x: origin.x + ring.x * scale,
+    y: origin.y + ring.y * scale,
+  };
+  const mapXAxis = {
+    x: xBlocks * defaultVillageLayout.tileHeight * scale,
+    y: (xBlocks * defaultVillageLayout.tileHeight / 2) * scale,
+  };
+  const mapYAxis = {
+    x: -yBlocks * defaultVillageLayout.tileHeight * scale,
+    y: (yBlocks * defaultVillageLayout.tileHeight / 2) * scale,
+  };
+
+  return {
+    top,
+    right: { x: top.x + mapXAxis.x, y: top.y + mapXAxis.y },
+    bottom: { x: top.x + mapXAxis.x + mapYAxis.x, y: top.y + mapXAxis.y + mapYAxis.y },
+    left: { x: top.x + mapYAxis.x, y: top.y + mapYAxis.y },
+    xBlocks,
+    yBlocks,
+  };
+}
+
+function getPalisadeCornerPoints(shape: PalisadeShape): Point[] {
+  return [shape.top, shape.right, shape.bottom, shape.left];
+}
+
+function getPalisadeBlockCount(rawExtent: number): number {
+  return Math.max(1, Math.round(rawExtent / defaultVillageLayout.tileHeight));
+}
+
+function getTerrainOrigin(host: WorldRenderHost): Point {
+  const layout = defaultVillageLayout;
+  const terrainWidth = layout.width * host.layout.scale;
+  const terrainHeight = layout.height * host.layout.scale;
+
+  return {
+    x: host.layout.originX + host.layout.width / 2 - terrainWidth / 2,
+    y: host.layout.originY + host.layout.height / 2 - terrainHeight / 2,
+  };
+}
+
+function drawPalisadeEdge(
+  host: WorldRenderHost,
+  edge: PalisadeEdge,
+  options: {
+    alpha: number;
+    tint: number;
+    gateIndex: number;
+    hasGate: boolean;
+    drawItems: Array<{ y: number; sprite: Sprite }>;
+  },
+): void {
+  const segmentCount = edge.blockCount;
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const segmentCenter = (index + 0.5) / segmentCount;
+    const isGateSegment = options.hasGate && index === options.gateIndex;
+
+    const point = interpolatePoint(edge.start, edge.end, segmentCenter);
+    const sprite = createPalisadeSprite(
+      host,
+      isGateSegment ? edge.gateTextureKey : edge.textureKey,
+      point.x,
+      point.y,
+      options.alpha,
+      options.tint,
+    );
+
+    if (sprite) {
+      options.drawItems.push({ y: sprite.y, sprite });
+    }
+  }
+}
+
+function createPalisadeSprite(
+  host: WorldRenderHost,
+  textureKey: string,
+  x: number,
+  y: number,
+  alpha: number,
+  tint: number,
+): Sprite | null {
+  const sprite = host.createTerrainSprite(textureKey);
+
+  if (!sprite) {
+    return null;
+  }
+
+  sprite.anchor.set(0.5);
+  sprite.x = x;
+  sprite.y = y;
+  sprite.width = 128 * host.layout.scale;
+  sprite.height = 64 * host.layout.scale;
+  sprite.alpha = alpha;
+  sprite.tint = tint;
+  return sprite;
+}
+
+function interpolatePoint(start: Point, end: Point, t: number): Point {
+  return {
+    x: start.x + (end.x - start.x) * t,
+    y: start.y + (end.y - start.y) * t,
+  };
+}
+
+function getPalisadeGateEdge(object: VillageMapObjectDefinition): PalisadeEdgeId {
+  const value = object.properties.gateEdge;
+
+  if (
+    value === "northEast" ||
+    value === "southEast" ||
+    value === "southWest" ||
+    value === "northWest"
+  ) {
+    return value;
+  }
+
+  return "southWest";
+}
+
+function getIntegerObjectProperty(
+  object: VillageMapObjectDefinition,
+  propertyName: string,
+  fallback: number,
+): number {
+  const value = object.properties[propertyName];
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.trunc(value));
 }
 
 export function drawResourceSites(host: WorldRenderHost, state: GameState, translations?: TranslationPack): void {
@@ -310,7 +566,6 @@ export function drawPlot(
     if (isBuildingInactiveDueToCoal(state, buildingId)) {
       host.drawPowerWarning(plotLayer, bounds);
     }
-    host.drawBuildingLevelBadge(plotLayer, Math.max(1, building.level), -bounds.width * 0.43, -bounds.height * 0.5, translations, name);
     host.drawBuildingWorkerBadge(plotLayer, buildingId, building.workers, getBuildingWorkerLimit(state, buildingId), bounds, translations);
     if (building.upgradingRemaining > 0) {
       host.drawConstructionCountdown(

@@ -30,6 +30,8 @@ export type VillageObjectLayerDefinition = {
   objects: VillageMapObjectDefinition[];
 };
 
+export type VillageMapObjectPropertyValue = string | number | boolean;
+
 export type VillageMapObjectDefinition = {
   id: string;
   name: string;
@@ -42,11 +44,15 @@ export type VillageMapObjectDefinition = {
   opacity: number;
   tileId: TerrainTileId | null;
   textureKey: TerrainTextureKey | null;
+  properties: Record<string, VillageMapObjectPropertyValue>;
 };
 
 export type VillageLayoutDefinition = {
   id: string;
+  orientation: "orthogonal" | "isometric";
   tilesetId: string;
+  tileWidth: number;
+  tileHeight: number;
   tileSize: number;
   width: number;
   height: number;
