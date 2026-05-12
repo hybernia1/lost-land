@@ -44,7 +44,7 @@
          "width":32,
          "x":0,
          "y":0
-        },
+        }, 
         {
          "draworder":"topdown",
          "id":3,
@@ -60,12 +60,12 @@
                          "name":"gateEdge",
                          "type":"string",
                          "value":"southWest"
-                        },
+                        }, 
                         {
                          "name":"gateIndex",
                          "type":"int",
                          "value":4
-                        },
+                        }, 
                         {
                          "name":"segmentId",
                          "type":"string",
@@ -84,17 +84,17 @@
                  "name":"editorGridUnit",
                  "type":"int",
                  "value":64
-                },
+                }, 
                 {
                  "name":"editorShape",
                  "type":"string",
                  "value":"rectangle"
-                },
+                }, 
                 {
                  "name":"editorSnapGrid",
                  "type":"string",
                  "value":"isometric-object-grid"
-                },
+                }, 
                 {
                  "name":"gateMode",
                  "type":"string",
@@ -104,14 +104,14 @@
          "visible":true,
          "x":0,
          "y":0
-        },
+        }, 
         {
          "draworder":"topdown",
          "id":2,
          "name":"plots",
          "objects":[
                 {
-                 "height":64,
+                 "height":173,
                  "id":101,
                  "name":"plot-main",
                  "opacity":1,
@@ -126,8 +126,8 @@
                  "visible":true,
                  "width":128,
                  "x":1024,
-                 "y":1024
-                },
+                 "y":915
+                }, 
                 {
                  "height":64,
                  "id":102,
@@ -145,7 +145,7 @@
                  "width":128,
                  "x":1024,
                  "y":768
-                },
+                }, 
                 {
                  "height":64,
                  "id":103,
@@ -163,7 +163,7 @@
                  "width":74,
                  "x":760.5,
                  "y":699.5
-                },
+                }, 
                 {
                  "height":64,
                  "id":104,
@@ -181,7 +181,7 @@
                  "width":128,
                  "x":1152,
                  "y":832
-                },
+                }, 
                 {
                  "height":64,
                  "id":105,
@@ -199,7 +199,7 @@
                  "width":128,
                  "x":768,
                  "y":1024
-                },
+                }, 
                 {
                  "height":64,
                  "id":106,
@@ -217,7 +217,7 @@
                  "width":128,
                  "x":1280,
                  "y":1024
-                },
+                }, 
                 {
                  "height":64,
                  "id":107,
@@ -235,7 +235,7 @@
                  "width":128,
                  "x":896,
                  "y":1152
-                },
+                }, 
                 {
                  "height":64,
                  "id":108,
@@ -253,9 +253,9 @@
                  "width":128,
                  "x":1152,
                  "y":1152
-                },
+                }, 
                 {
-                 "height":64,
+                 "height":127,
                  "id":109,
                  "name":"plot-08",
                  "opacity":1,
@@ -269,9 +269,9 @@
                  "type":"building",
                  "visible":true,
                  "width":128,
-                 "x":1088,
-                 "y":960
-                },
+                 "x":346,
+                 "y":847
+                }, 
                 {
                  "height":64,
                  "id":110,
@@ -289,7 +289,7 @@
                  "width":128,
                  "x":832,
                  "y":1088
-                },
+                }, 
                 {
                  "height":64,
                  "id":111,
@@ -307,7 +307,7 @@
                  "width":128,
                  "x":1088,
                  "y":1088
-                },
+                }, 
                 {
                  "height":64,
                  "id":112,
@@ -325,7 +325,7 @@
                  "width":128,
                  "x":832,
                  "y":832
-                },
+                }, 
                 {
                  "height":64,
                  "id":113,
@@ -343,7 +343,7 @@
                  "width":128,
                  "x":1216,
                  "y":832
-                },
+                }, 
                 {
                  "height":64,
                  "id":114,
@@ -367,7 +367,7 @@
          "visible":true,
          "x":0,
          "y":0
-        },
+        }, 
         {
          "draworder":"topdown",
          "id":4,
@@ -383,27 +383,27 @@
                          "name":"plotId",
                          "type":"string",
                          "value":"resource-forest-gate"
-                        },
+                        }, 
                         {
                          "name":"siteCaptureBaseDeathRisk",
                          "type":"float",
                          "value":0.38
-                        },
+                        }, 
                         {
                          "name":"siteCaptureMinTroops",
                          "type":"int",
                          "value":5
-                        },
+                        }, 
                         {
                          "name":"siteMaxWorkers",
                          "type":"int",
                          "value":3
-                        },
+                        }, 
                         {
                          "name":"siteResourceId",
                          "type":"string",
                          "value":"food"
-                        },
+                        }, 
                         {
                          "name":"siteYieldPerWorker",
                          "type":"float",
@@ -415,7 +415,7 @@
                  "width":128,
                  "x":1024,
                  "y":1728
-                },
+                }, 
                 {
                  "height":64,
                  "id":118,
@@ -426,27 +426,27 @@
                          "name":"plotId",
                          "type":"string",
                          "value":"resource-coal-gate"
-                        },
+                        }, 
                         {
                          "name":"siteCaptureBaseDeathRisk",
                          "type":"float",
                          "value":0.44
-                        },
+                        }, 
                         {
                          "name":"siteCaptureMinTroops",
                          "type":"int",
                          "value":6
-                        },
+                        }, 
                         {
                          "name":"siteMaxWorkers",
                          "type":"int",
                          "value":3
-                        },
+                        }, 
                         {
                          "name":"siteResourceId",
                          "type":"string",
                          "value":"coal"
-                        },
+                        }, 
                         {
                          "name":"siteYieldPerWorker",
                          "type":"float",
@@ -464,7 +464,7 @@
          "visible":true,
          "x":0,
          "y":0
-        },
+        }, 
         {
          "draworder":"topdown",
          "id":5,
@@ -491,8 +491,8 @@
  "tilesets":[
         {
          "firstgid":1,
-         "source":"tilesets\/iso-ground.tsj"
-        },
+         "source":"tilesets\/ground.tsj"
+        }, 
         {
          "firstgid":2,
          "source":"tilesets\/palisade.tsj"

@@ -58,7 +58,7 @@ The important rule is that footprint alignment uses the map grid (`128x64`), not
 
 1. Plot IDs are stable (`plot-main`, `plot-01`, ..., `plot-13`, `palisade`).
 2. Resource IDs use `resource-*` naming and always include `siteResourceId` property.
-3. New tilesets should use `iso-*` naming when they belong to isometric pipeline.
+3. Use neutral tileset names (for example `ground`, `palisade`) because the map pipeline is already fully isometric.
 
 ## Edit Workflow
 
@@ -69,7 +69,7 @@ The important rule is that footprint alignment uses the map grid (`128x64`), not
 ## Phase 1 Asset Choice
 
 Current base tile source is a local simple iso grass tile:
-- `src/assets/tiles/iso-grass-basic.png`
+- `src/assets/tiles/grass-basic.png`
 - footprint: map grid `128x64`
 - image box: currently normalized to `128x64`
 

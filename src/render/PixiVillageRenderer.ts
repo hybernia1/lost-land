@@ -2282,15 +2282,6 @@ export class PixiVillageRenderer {
   }
 
   private createBuildingSprite(buildingId: BuildingId, level: number, built: boolean): Sprite {
-    const animationFrames = this.assets.getBuildingAnimationFrames(buildingId, level, built);
-
-    if (animationFrames) {
-      const texture = this.ambientEffects.resolveAnimationTexture(animationFrames, performance.now());
-      if (texture) {
-        return new Sprite(texture);
-      }
-    }
-
     return new Sprite(this.assets.getBuildingTexture(buildingId, level, built));
   }
 

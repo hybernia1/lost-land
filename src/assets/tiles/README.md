@@ -6,7 +6,7 @@ Map tiles are grouped by Tiled layer purpose. Legacy top-down atlases use a
 Transparent overlay atlases use PNG alpha so they can be layered in Tiled
 without baking in a background.
 
-`iso-grass-basic.png` is the current default 128x64 isometric ground tile.
+`grass-basic.png` is the current default 128x64 isometric ground tile.
 `palisade-simple.png` is a deterministic isometric 5-frame atlas:
 - `palisadeDiagDown`
 - `palisadeDiagUp`

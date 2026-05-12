@@ -46,7 +46,7 @@ export function getBuildingAssetUrl(imagePath: string): string {
   const match = Object.entries(buildingAssetUrls).find(([path]) => getFilename(path) === filename);
 
   if (!match) {
-    throw new Error(`Missing building atlas asset "${imagePath}".`);
+    throw new Error(`Missing building texture asset "${imagePath}".`);
   }
 
   return match[1];
