@@ -58,6 +58,7 @@ export function drawBackground(host: WorldRenderHost, width: number, height: num
 export function drawTerrain(host: WorldRenderHost): void {
   const layout = defaultVillageLayout;
   const scale = host.layout.scale;
+  const gridTileHeight = layout.tileHeight * scale;
   const terrainWidth = layout.width * scale;
   const terrainHeight = layout.height * scale;
   const originX = host.layout.originX + host.layout.width / 2 - terrainWidth / 2;
@@ -75,21 +76,25 @@ export function drawTerrain(host: WorldRenderHost): void {
       const tileDefinition = layout.tileTextures[tile.textureKey];
       const tileWidth = tileDefinition.frame.width * scale;
       const tileHeight = tileDefinition.frame.height * scale;
+      const offsetX = 0;
+      const offsetY = gridTileHeight - tileHeight;
+      const drawX = tileX + offsetX;
+      const drawY = tileY + offsetY;
       host.trackTerrainSprite(sprite, tileDefinition.tintByEnvironment);
       sprite.alpha = layer.opacity;
 
       if (tile.rotation || tile.flipX || tile.flipY) {
         sprite.anchor.set(0.5);
         sprite.rotation = ((tile.rotation ?? 0) * Math.PI) / 180;
-        sprite.x = tileX + tileWidth / 2;
-        sprite.y = tileY + tileHeight / 2;
+        sprite.x = drawX + tileWidth / 2;
+        sprite.y = drawY + tileHeight / 2;
         sprite.scale.set(
           (tile.flipX ? -1 : 1) * ((tileWidth + 0.5) / sprite.texture.width),
           (tile.flipY ? -1 : 1) * ((tileHeight + 0.5) / sprite.texture.height),
         );
       } else {
-        sprite.x = tileX;
-        sprite.y = tileY;
+        sprite.x = drawX;
+        sprite.y = drawY;
         sprite.width = tileWidth + 0.5;
         sprite.height = tileHeight + 0.5;
       }
