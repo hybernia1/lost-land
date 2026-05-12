@@ -51,7 +51,7 @@
          "name":"palisade",
          "objects":[
                 {
-                 "height":392,
+                 "height":1001,
                  "id":116,
                  "name":"palisade-ring",
                  "opacity":1,
@@ -74,9 +74,9 @@
                  "rotation":0,
                  "type":"ring",
                  "visible":true,
-                 "width":404,
-                 "x":198,
-                 "y":798
+                 "width":887,
+                 "x":663,
+                 "y":542
                 }],
          "opacity":1,
          "properties":[
@@ -111,7 +111,7 @@
          "name":"plots",
          "objects":[
                 {
-                 "height":173,
+                 "height":65,
                  "id":101,
                  "name":"plot-main",
                  "opacity":1,
@@ -124,9 +124,9 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":128,
-                 "x":1024,
-                 "y":915
+                 "width":64,
+                 "x":993,
+                 "y":958
                 }, 
                 {
                  "height":64,
@@ -251,11 +251,11 @@
                  "type":"building",
                  "visible":true,
                  "width":128,
-                 "x":1152,
-                 "y":1152
+                 "x":1138.5,
+                 "y":1230.5
                 }, 
                 {
-                 "height":127,
+                 "height":66,
                  "id":109,
                  "name":"plot-08",
                  "opacity":1,
@@ -268,9 +268,9 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":128,
-                 "x":346,
-                 "y":847
+                 "width":63.5,
+                 "x":1279.5,
+                 "y":1342
                 }, 
                 {
                  "height":64,
@@ -309,7 +309,7 @@
                  "y":1088
                 }, 
                 {
-                 "height":64,
+                 "height":106,
                  "id":112,
                  "name":"plot-11",
                  "opacity":1,
@@ -322,9 +322,9 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":128,
+                 "width":142,
                  "x":832,
-                 "y":832
+                 "y":790
                 }, 
                 {
                  "height":64,
