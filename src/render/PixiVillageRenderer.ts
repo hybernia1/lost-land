@@ -98,9 +98,7 @@ import {
   environmentAlertIconByCondition,
   environmentAlertToneByCondition,
   getHudTextLineHeight,
-  nonPerimeterVillagePlots,
   normalizeHudFontWeight,
-  palisadePlotDefinition,
   resourceColors,
   resourceSiteDefinitions,
   villagePlotDefinitions,
@@ -144,12 +142,10 @@ import {
 import {
   drawBackground as drawWorldBackground,
   drawDecorObjects as drawWorldDecorObjects,
-  drawPalisade as drawWorldPalisade,
   drawPlot as drawWorldPlot,
   drawResourceSites as drawWorldResourceSites,
   drawTerrain as drawWorldTerrain,
 } from "./pixi/scene/worldRenderer";
-import { isInsidePalisadeGateHitArea } from "./pixi/scene/palisade";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
@@ -402,10 +398,9 @@ export class PixiVillageRenderer {
       drawWorldBackground(this.worldRendererHost(), width, height);
       this.lastBackgroundKey = backgroundKey;
     }
-    drawWorldPalisade(this.worldRendererHost(), state, translations);
     drawWorldResourceSites(this.worldRendererHost(), state, translations);
 
-    for (const plot of nonPerimeterVillagePlots) {
+    for (const plot of villagePlotDefinitions) {
       drawWorldPlot(this.worldRendererHost(), plot, state, translations);
     }
 
@@ -471,7 +466,7 @@ export class PixiVillageRenderer {
       return siteHit.id;
     }
 
-    const plotHit = nonPerimeterVillagePlots.find((plot) => {
+    const plotHit = villagePlotDefinitions.find((plot) => {
       const bounds = this.getPlotBounds(plot);
       return (
         x >= bounds.x &&
@@ -483,10 +478,6 @@ export class PixiVillageRenderer {
 
     if (plotHit) {
       return plotHit.id;
-    }
-
-    if (isInsidePalisadeGateHitArea(this.layout, x, y)) {
-      return palisadePlotDefinition?.id ?? null;
     }
 
     return null;
@@ -2549,8 +2540,7 @@ export class PixiVillageRenderer {
 
   private getDefenseScore(state: GameState): number {
     return state.survivors.troops * 4 +
-      state.buildings.watchtower.level * 12 +
-      state.buildings.palisade.level * 9;
+      state.buildings.watchtower.level * 12;
   }
 
   private getTroopHousingCapacity(state: GameState): number {

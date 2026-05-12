@@ -39,11 +39,6 @@ export const quests: QuestTranslationPack = {
         description: "Až běží voda a jídlo, dej lidem bezpečná lůžka.",
         reward: "+65 materiál, +10 jídlo",
       },
-      buildPalisade: {
-        title: "Postav palisádu",
-        description: "Brána potřebuje skutečný perimetr, ne jen hlídku.",
-        reward: "+60 materiál, +2 morálka",
-      },
     },
     decisions: {
       survivorsAtGate: {
@@ -124,7 +119,7 @@ export const quests: QuestTranslationPack = {
       nightScreams: {
         title: "Křik v noci",
         body:
-          "Z ruin za palisádou se ozval dlouhý křik. Někdo venku možná ještě žije, nebo vás něco chce vytáhnout z bezpečí.",
+          "Z ruin za perimetrovou zdi se ozval dlouhy krik. Nekdo venku mozna jeste zije, nebo vas neco chce vytahnout z bezpeci.",
         options: {
           sendPatrol: "Poslat opatrnou hlídku",
           signal: "Zablikat světly",

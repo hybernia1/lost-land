@@ -136,18 +136,6 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     consumes: { coal: 0.02, food: 0.006, water: 0.006 },
   },
   {
-    id: "palisade",
-    category: "defense",
-    name: "Palisade",
-    description: "A reinforced wooden perimeter that makes the camp safer.",
-    buildSeconds: 40,
-    baseConstructionWorkers: 3,
-    baseCost: { material: 95 },
-    produces: { morale: 0.01 },
-    defense: 9,
-    consumes: { coal: 0.005 },
-  },
-  {
     id: "clinic",
     category: "support",
     name: "Clinic",

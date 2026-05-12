@@ -39,11 +39,6 @@ export const quests: QuestTranslationPack = {
         description: "Once water and food are running, give people safe beds.",
         reward: "+65 material, +10 food",
       },
-      buildPalisade: {
-        title: "Build the palisade",
-        description: "The gate needs a real perimeter, not just a watch.",
-        reward: "+60 material, +2 morale",
-      },
     },
     decisions: {
       survivorsAtGate: {
@@ -124,7 +119,7 @@ export const quests: QuestTranslationPack = {
       nightScreams: {
         title: "Screams in the night",
         body:
-          "A long scream rises from the ruins beyond the palisade. Someone may still be alive, or something may be trying to pull you out.",
+          "A long scream rises from the ruins beyond the perimeter wall. Someone may still be alive, or something may be trying to pull you out.",
         options: {
           sendPatrol: "Send a careful patrol",
           signal: "Flash the lights",

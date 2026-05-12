@@ -17,8 +17,7 @@ export type BuildingId =
   | "watchtower"
   | "barracks"
   | "academy"
-  | "clinic"
-  | "palisade";
+  | "clinic";
 
 export type BuildingCategory =
   | "resource"
@@ -147,8 +146,7 @@ export type ObjectiveQuestId =
   | "buildGenerator"
   | "buildDormitory"
   | "buildWaterStill"
-  | "buildHydroponics"
-  | "buildPalisade";
+  | "buildHydroponics";
 
 export type DecisionQuestId =
   | "survivorsAtGate"

@@ -1,0 +1,237 @@
+{
+  "columns": 6,
+  "image": "../../assets/tiles/trees.png",
+  "imageheight": 1024,
+  "imagewidth": 1536,
+  "margin": 0,
+  "name": "trees",
+  "spacing": 0,
+  "tilecount": 24,
+  "tiledversion": "1.12.1",
+  "tileheight": 256,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "eucalyptus_a"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "eucalyptus_b"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "firtree_a"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "kapokTree_a"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "kapokTree_b"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "linden_a"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "linden_b"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_a"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_b"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_c"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_d"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_e"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "maple_f"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "oliveTree_a"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "oliveTree_b"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "oliveTree_c"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "palm_a"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "palm_b"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "pine_a"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "pine_b"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rainForestTree_a"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rainForestTree_b"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 256,
+  "type": "tileset",
+  "version": "1.10"
+}

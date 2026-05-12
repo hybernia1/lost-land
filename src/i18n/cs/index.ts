@@ -9,8 +9,7 @@ export const cs: CsTranslationPack = {
     yourSettlement: "Vaše osada",
     menuKicker: "Single-player survival strategie",
     menuTitle: "Lost Land",
-    menuText:
-      "Veď komunitu přeživších, stav za palisádou, prozkoumávej zničený svět a drž hordu mimo bránu.",
+    menuText: "Ved komunitu prezivsich, zajisti blizke oazy a drz hordu mimo branu.",
     newGame: "Nová hra",
     continue: "Pokračovat",
     settings: "Nastavení",
@@ -30,7 +29,6 @@ export const cs: CsTranslationPack = {
     speedFast: "24x",
     home: "Domů",
     homeVillage: "Domovská vesnice",
-    palisadePerimeter: "Palisádový perimetr",
     totalLevels: "úrovní celkem",
     defense: "Obrana",
     morale: "Morálka",
@@ -101,7 +99,6 @@ export const cs: CsTranslationPack = {
     buildHere: "Postavit",
     noPlotSelected: "Nejdřív vyber prázdný slot ve vesnici.",
     alreadyBuilt: "Už postaveno",
-    palisadePlot: "Linie palisády",
     buildMenu: "Stavby",
     close: "Zavřít",
     constructed: "Postavené",
@@ -174,8 +171,7 @@ export const cs: CsTranslationPack = {
     daylightDawn: "Svítání",
     populationTooltip:
       "Celkový počet přeživších napříč dostupnými lidmi, pracovníky v budovách, stavebními četami, vojáky a zraněnými.",
-    defenseTooltip:
-      "Ochrana tábora ze stráží, věží, úrovní palisády a pozdějších obranných systémů.",
+    defenseTooltip: "Ochrana tabora z vojaku, vezi a pozdejsich obrannych systemu.",
     buildingQueue: "Stavební fronta",
     queueEmpty: "Žádná aktivní stavba.",
     queueFull: "Stavební fronta je plná.",
@@ -331,10 +327,6 @@ export const cs: CsTranslationPack = {
     academy: {
       name: "Akademie",
       description: "Odemyká strategický výzkum: +5 % produkce, bezpečnější výpravy a rychlejší stavbu.",
-    },
-    palisade: {
-      name: "Palisáda",
-      description: "Zpevněný dřevěný perimetr, který zvyšuje bezpečí tábora.",
     },
     clinic: {
       name: "Ošetřovna",
