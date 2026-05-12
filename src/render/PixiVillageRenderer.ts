@@ -103,7 +103,6 @@ import {
   palisadePlotDefinition,
   resourceColors,
   resourceSiteDefinitions,
-  upgradingTooltip,
   villagePlotDefinitions,
 } from "./pixi/core/constants";
 import { drawHudLeftArea, drawHudPanels } from "./pixi/hud/hudPanels";
@@ -150,6 +149,7 @@ import {
   drawResourceSites as drawWorldResourceSites,
   drawTerrain as drawWorldTerrain,
 } from "./pixi/scene/worldRenderer";
+import { isInsidePalisadeGateHitArea } from "./pixi/scene/palisade";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
@@ -485,7 +485,7 @@ export class PixiVillageRenderer {
       return plotHit.id;
     }
 
-    if (this.isInsidePalisadePlot(x, y)) {
+    if (isInsidePalisadeGateHitArea(this.layout, x, y)) {
       return palisadePlotDefinition?.id ?? null;
     }
 
@@ -1256,13 +1256,6 @@ export class PixiVillageRenderer {
       fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => this.fitSprite(sprite, maxWidth, maxHeight),
       getPlotBounds: (plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">) =>
         this.getPlotBounds(plot),
-      addPalisadeTooltip: (
-        plot: VillagePlotDefinition,
-        selected: boolean,
-        level: number,
-        upgradingRemaining: number,
-        name: string,
-      ) => this.addPalisadeTooltip(plot, selected, level, upgradingRemaining, name),
       drawBuildingWorkerBadge: (
         parent: Container,
         buildingId: BuildingId,
@@ -2144,27 +2137,6 @@ export class PixiVillageRenderer {
     this.requestRender();
   }
 
-  private addPalisadeTooltip(
-    plot: VillagePlotDefinition,
-    _selected: boolean,
-    level: number,
-    upgradingRemaining: number,
-    name: string,
-  ): void {
-    const hitLayer = new Container();
-    const bounds = this.getPlotBounds(plot);
-    hitLayer.x = bounds.x;
-    hitLayer.y = bounds.y;
-    hitLayer.hitArea = {
-      contains: (x: number, y: number) => x >= 0 && x <= bounds.width && y >= 0 && y <= bounds.height,
-    };
-    this.bindTooltip(
-      hitLayer,
-      upgradingTooltip(name, level, upgradingRemaining, "Lvl"),
-    );
-    this.cameraDynamicLayer.addChild(hitLayer);
-  }
-
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
     const badge = new Container();
     badge.x = bounds.width * 0.28;
@@ -2573,18 +2545,6 @@ export class PixiVillageRenderer {
       width,
       height,
     };
-  }
-
-  private isInsidePalisadePlot(x: number, y: number): boolean {
-    if (!palisadePlotDefinition) {
-      return false;
-    }
-
-    const bounds = this.getPlotBounds(palisadePlotDefinition);
-    return x >= bounds.x &&
-      x <= bounds.x + bounds.width &&
-      y >= bounds.y &&
-      y <= bounds.y + bounds.height;
   }
 
   private getDefenseScore(state: GameState): number {
