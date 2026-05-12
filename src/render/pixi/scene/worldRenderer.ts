@@ -259,7 +259,12 @@ export function drawPlot(
 
     const asset = host.createBuildingSprite(buildingId, Math.max(1, building.level), building.level > 0);
     asset.anchor.set(0.5);
-    host.fitSprite(asset, bounds.width * VILLAGE_BUILDING_RENDER_SCALE, bounds.height * VILLAGE_BUILDING_RENDER_SCALE);
+    // Allow taller assets (e.g. 256x512) to keep their footprint width while extending upward.
+    host.fitSprite(
+      asset,
+      bounds.width * VILLAGE_BUILDING_RENDER_SCALE,
+      bounds.height * VILLAGE_BUILDING_RENDER_SCALE * 4,
+    );
     asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
     plotLayer.addChild(asset);
 
