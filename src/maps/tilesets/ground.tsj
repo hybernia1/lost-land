@@ -1,12 +1,12 @@
 {
- "columns": 1,
- "image": "../../assets/tiles/grass-basic.png",
- "imageheight": 64,
- "imagewidth": 128,
+ "columns": 3,
+ "image": "../../assets/tiles/grass.png",
+ "imageheight": 128,
+ "imagewidth": 384,
  "margin": 0,
  "name": "ground",
  "spacing": 0,
- "tilecount": 1,
+ "tilecount": 6,
  "tiledversion": "1.12.1",
  "tileheight": 64,
  "tiles": [
@@ -17,6 +17,56 @@
      "name": "tileId",
      "type": "string",
      "value": "grass"
+    }
+   ]
+  },
+  {
+   "id": 1,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grassCool"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grassDry"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grassDark"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grassLush"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "properties": [
+    {
+     "name": "tileId",
+     "type": "string",
+     "value": "grassAsh"
     }
    ]
   }

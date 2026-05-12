@@ -6,7 +6,15 @@ Map tiles are grouped by Tiled layer purpose. Legacy top-down atlases use a
 Transparent overlay atlases use PNG alpha so they can be layered in Tiled
 without baking in a background.
 
-`grass-basic.png` is the current default 128x64 isometric ground tile.
+`grass.png` is the current default isometric ground atlas:
+- 6 frames
+- frame size `128x64`
+- atlas layout `3 columns x 2 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `384x128` (both dimensions are multiples of 64)
+
+`grass-basic.png` remains the deterministic base source tile used to derive
+all `grass.png` variants while preserving exact diamond geometry and angle.
 `palisade-simple.png` is a deterministic isometric 10-frame atlas:
 - `palisadeDiagDown`
 - `palisadeDiagUp`
@@ -19,8 +27,8 @@ without baking in a background.
 - `palisadeGateDownSideB`
 - `palisadeGateUpSideB`
 
-Each frame is `128x64`, with `8px` transparent atlas spacing to avoid texture
-bleeding between columns and rows. The atlas is arranged as `5 columns x 2 rows`, where
+Each frame is `128x64`. The atlas is arranged as `5 columns x 2 rows`, with
+`spacing=0` and final size `640x128` (both dimensions are multiples of 64), where
 the second row is the opposite-side lighting variant (`SideB`) for the same
 geometry. The palisade frames follow the canonical 2:1 isometric slope and
 include thicker wood depth/detail treatment. Gate frames replace one generated
