@@ -7,15 +7,22 @@ Transparent overlay atlases use PNG alpha so they can be layered in Tiled
 without baking in a background.
 
 `grass-basic.png` is the current default 128x64 isometric ground tile.
-`palisade-simple.png` is a deterministic isometric 5-frame atlas:
+`palisade-simple.png` is a deterministic isometric 10-frame atlas:
 - `palisadeDiagDown`
 - `palisadeDiagUp`
 - `palisadeCorner`
 - `palisadeGateDown`
 - `palisadeGateUp`
+- `palisadeDiagDownSideB`
+- `palisadeDiagUpSideB`
+- `palisadeCornerSideB`
+- `palisadeGateDownSideB`
+- `palisadeGateUpSideB`
 
 Each frame is `128x64`, with `8px` transparent atlas spacing to avoid texture
-bleeding between frames. The palisade frames follow the canonical 2:1
-isometric slope. The gate frames replace one generated palisade block selected
-from the single `palisade-ring` object's `gateEdge` and `gateIndex`
-properties; they are not separate Tiled gameplay objects.
+bleeding between columns and rows. The atlas is arranged as `5 columns x 2 rows`, where
+the second row is the opposite-side lighting variant (`SideB`) for the same
+geometry. The palisade frames follow the canonical 2:1 isometric slope and
+include thicker wood depth/detail treatment. Gate frames replace one generated
+palisade block selected from the single `palisade-ring` object's `gateEdge`
+and `gateIndex` properties; they are not separate Tiled gameplay objects.

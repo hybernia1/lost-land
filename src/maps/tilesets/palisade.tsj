@@ -1,12 +1,12 @@
 {
   "columns": 5,
   "image": "../../assets/tiles/palisade-simple.png",
-  "imageheight": 64,
+  "imageheight": 136,
   "imagewidth": 672,
   "margin": 0,
   "name": "palisade",
   "spacing": 8,
-  "tilecount": 5,
+  "tilecount": 10,
   "tiledversion": "1.11.2",
   "tileheight": 64,
   "tiles": [
@@ -14,7 +14,12 @@
     { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeDiagUp" }] },
     { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeCorner" }] },
     { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeGateDown" }] },
-    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeGateUp" }] }
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeGateUp" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeDiagUpSideB" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeDiagDownSideB" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeCornerSideB" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeGateUpSideB" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "palisadeGateDownSideB" }] }
   ],
   "tilewidth": 128,
   "type": "tileset",
