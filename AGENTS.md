@@ -59,6 +59,10 @@ existing server is already listening on the Vite port range and reuse or stop it
 instead of creating multiple servers on 5173, 5174, 5175, etc. Prefer the
 standard Vite URL `http://127.0.0.1:5173/` when available.
 
+Python with Pillow is available in this workspace and is suitable for
+deterministic raster atlas work, especially isometric tile assets that must keep
+exact frame sizes and angles.
+
 Keep temporary implementation notes in this file only when they are useful for
 future Codex sessions. Do not put user-facing design docs, game lore, or task
 lists here unless they are also useful as agent guidance.

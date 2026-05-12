@@ -5,6 +5,7 @@ import type {
   TerrainTilePlacement,
   VillageLayoutDefinition,
   VillageMapObjectDefinition,
+  VillageMapObjectPropertyValue,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
 import type { ResourceSiteResourceId } from "../game/types";
@@ -39,6 +40,8 @@ type TiledTileset = {
   imagewidth?: number;
   imageheight?: number;
   columns?: number;
+  margin?: number;
+  spacing?: number;
   tilecount?: number;
   tilewidth: number;
   tileheight: number;
@@ -87,6 +90,7 @@ type TiledLayer = TiledTileLayer | TiledObjectLayer | {
 };
 
 type TiledMap = {
+  orientation?: "orthogonal" | "isometric" | "staggered" | "hexagonal";
   width: number;
   height: number;
   tilewidth: number;
@@ -132,19 +136,48 @@ export function createVillageLayoutFromTiled(
   rawMap: string,
 ): VillageLayoutDefinition {
   const map = JSON.parse(rawMap) as TiledMap;
+  const orientation = map.orientation === "isometric"
+    ? "isometric"
+    : map.orientation === "orthogonal" || map.orientation === undefined
+      ? "orthogonal"
+      : null;
+  if (!orientation) {
+    throw new Error(`Unsupported Tiled map orientation "${map.orientation ?? "unknown"}".`);
+  }
   const registry = createTilesetRegistry(id, map.tilesets);
+  const mapPixelBounds = getMapPixelBounds(map, orientation);
 
   return {
     id,
+    orientation,
     tilesetId: getStringProperty(map.properties, "tilesetId") ?? map.tilesets[0]?.name ?? "default",
+    tileWidth: map.tilewidth,
+    tileHeight: map.tileheight,
     tileSize: map.tilewidth,
-    width: map.width * map.tilewidth,
-    height: map.height * map.tileheight,
+    width: mapPixelBounds.width,
+    height: mapPixelBounds.height,
     tileTextures: registry.tileTextures,
-    tileLayers: getTileLayers(map, registry.gidToTile),
-    objectLayers: getObjectLayers(map, registry.gidToTile),
-    plots: getVillagePlots(map),
-    resourceSites: getResourceSites(map),
+    tileLayers: getTileLayers(map, orientation, registry.gidToTile),
+    objectLayers: getObjectLayers(map, orientation, registry.gidToTile),
+    plots: getVillagePlots(map, orientation),
+    resourceSites: getResourceSites(map, orientation),
+  };
+}
+
+function getMapPixelBounds(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
+): { width: number; height: number } {
+  if (orientation === "orthogonal") {
+    return {
+      width: map.width * map.tilewidth,
+      height: map.height * map.tileheight,
+    };
+  }
+
+  return {
+    width: (map.width + map.height) * (map.tilewidth / 2),
+    height: (map.width + map.height) * (map.tileheight / 2),
   };
 }
 
@@ -161,6 +194,8 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
     const atlasUrl = getTileAssetUrl(tileset.image ?? "");
     const tileCount = tileset.tilecount ?? ((tileset.columns ?? 1) * Math.ceil((tileset.imageheight ?? tileset.tileheight) / tileset.tileheight));
     const columns = tileset.columns ?? Math.max(1, Math.floor((tileset.imagewidth ?? tileset.tilewidth) / tileset.tilewidth));
+    const margin = tileset.margin ?? 0;
+    const spacing = tileset.spacing ?? 0;
     const tilesById = new Map((tileset.tiles ?? []).map((tile) => [tile.id, tile]));
     const textureKeyByTileIndex = new Map<number, TerrainTextureKey>();
 
@@ -169,8 +204,8 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
       const tileId = getStringProperty(tile?.properties, "tileId") ?? `${tileset.name}_${tileIndex}`;
       const textureKey = `${tileset.name}:${tileId}`;
       const frame = {
-        x: (tileIndex % columns) * tileset.tilewidth,
-        y: Math.floor(tileIndex / columns) * tileset.tileheight,
+        x: margin + (tileIndex % columns) * (tileset.tilewidth + spacing),
+        y: margin + Math.floor(tileIndex / columns) * (tileset.tileheight + spacing),
         width: tileset.tilewidth,
         height: tileset.tileheight,
       };
@@ -227,6 +262,7 @@ function resolveTileset(mapTileset: TiledTileset): TiledTileset {
 
 function getTileLayers(
   map: TiledMap,
+  orientation: "orthogonal" | "isometric",
   gidToTile: Map<number, GidTileReference>,
 ): TerrainTileLayerDefinition[] {
   const layers = map.layers.filter((layer): layer is TiledTileLayer =>
@@ -239,7 +275,7 @@ function getTileLayers(
 
   return layers.map((layer) => {
     validateTileLayer(map, layer);
-    const terrainTiles = getTerrainTiles(layer, gidToTile);
+    const terrainTiles = getTerrainTiles(map, orientation, layer, gidToTile);
 
     return {
       id: String(layer.id),
@@ -270,6 +306,7 @@ function validateTileLayer(map: TiledMap, layer: TiledTileLayer): void {
 
 function getObjectLayers(
   map: TiledMap,
+  orientation: "orthogonal" | "isometric",
   gidToTile: Map<number, GidTileReference>,
 ): VillageObjectLayerDefinition[] {
   return map.layers
@@ -280,11 +317,13 @@ function getObjectLayers(
       id: String(layer.id),
       name: layer.name,
       opacity: layer.opacity ?? 1,
-      objects: getMapObjects(layer, gidToTile),
+      objects: getMapObjects(map, orientation, layer, gidToTile),
     }));
 }
 
 function getTerrainTiles(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
   layer: TiledTileLayer,
   gidToTile: Map<number, GidTileReference>,
 ): Pick<TerrainTileLayerDefinition, "tiles" | "tileByIndex"> {
@@ -299,9 +338,10 @@ function getTerrainTiles(
       return;
     }
 
+    const tileX = index % layer.width;
+    const tileY = Math.floor(index / layer.width);
     const placement = {
-      x: index % layer.width,
-      y: Math.floor(index / layer.width),
+      ...getTilePixelPosition(map, orientation, tileX, tileY),
       tileId: tile.tileId,
       textureKey: tile.textureKey,
       ...getTileTransform(rawGid),
@@ -314,7 +354,47 @@ function getTerrainTiles(
   return { tiles, tileByIndex };
 }
 
+function getTilePixelPosition(
+  map: Pick<TiledMap, "width" | "height" | "tilewidth" | "tileheight">,
+  orientation: "orthogonal" | "isometric",
+  tileX: number,
+  tileY: number,
+): Pick<TerrainTilePlacement, "x" | "y"> {
+  if (orientation === "orthogonal") {
+    return {
+      x: tileX * map.tilewidth,
+      y: tileY * map.tileheight,
+    };
+  }
+
+  const halfTileWidth = map.tilewidth / 2;
+  const halfTileHeight = map.tileheight / 2;
+  return {
+    x: (tileX - tileY) * halfTileWidth + (map.height - 1) * halfTileWidth,
+    y: (tileX + tileY) * halfTileHeight,
+  };
+}
+
+function getObjectPixelPosition(
+  map: Pick<TiledMap, "width" | "height" | "tilewidth" | "tileheight">,
+  orientation: "orthogonal" | "isometric",
+  objectX: number,
+  objectY: number,
+): Pick<VillageMapObjectDefinition, "x" | "y"> {
+  if (orientation === "orthogonal") {
+    return { x: objectX, y: objectY };
+  }
+
+  // Tiled stores regular isometric object coordinates in projected-grid space,
+  // where both axes are scaled by tileHeight.
+  const tileX = objectX / map.tileheight;
+  const tileY = objectY / map.tileheight;
+  return getTilePixelPosition(map, orientation, tileX, tileY);
+}
+
 function getMapObjects(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
   layer: TiledObjectLayer,
   gidToTile: Map<number, GidTileReference>,
 ): VillageMapObjectDefinition[] {
@@ -322,36 +402,45 @@ function getMapObjects(
     .filter((object) => object.visible !== false)
     .map((object) => {
       const tile = object.gid ? getTileReference(object.gid, gidToTile) : null;
+      const position = getObjectPixelPosition(map, orientation, object.x, object.y);
       return {
         id: String(object.id),
         name: object.name ?? "",
         type: object.type ?? "",
-        x: object.x,
-        y: object.y,
+        x: position.x,
+        y: position.y,
         width: object.width ?? 0,
         height: object.height ?? 0,
         rotation: object.rotation ?? 0,
         opacity: layer.opacity ?? 1,
         tileId: tile?.tileId ?? null,
         textureKey: tile?.textureKey ?? null,
+        properties: getObjectProperties(object.properties),
       };
     });
 }
 
-function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
-  const layer = map.layers.find((candidate): candidate is TiledObjectLayer =>
-    candidate.type === "objectgroup" && candidate.name === "plots" && candidate.visible !== false,
-  );
+function getVillagePlots(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
+): VillagePlotDefinition[] {
+  const plotsLayer = getNamedObjectLayer(map, "plots");
 
-  if (!layer) {
+  if (!plotsLayer) {
     throw new Error("Tiled map is missing object layer \"plots\".");
   }
 
-  const plots = (layer.objects ?? [])
-    .filter((object) => object.visible !== false)
-    .filter((object) => object.type !== "resourceSite")
-    .map((object) => {
-      const id = getStringProperty(object.properties, "plotId") ?? object.name;
+  const plotObjects = [
+    ...(plotsLayer.objects ?? []).map((object) => ({ object, id: getPlotObjectId(object) })),
+    ...(getNamedObjectLayer(map, "palisade")?.objects ?? [])
+      .filter((object) => object.type === "ring")
+      .map((object) => ({ object, id: "palisade" })),
+  ];
+
+  const plots = plotObjects
+    .filter(({ object }) => object.visible !== false)
+    .map(({ object, id }) => {
+      const position = getObjectPixelPosition(map, orientation, object.x, object.y);
 
       if (!id) {
         throw new Error("Tiled plot object is missing a plotId property or name.");
@@ -359,8 +448,8 @@ function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
 
       return {
         id,
-        x: object.x,
-        y: object.y,
+        x: position.x,
+        y: position.y,
         width: object.width ?? 0,
         height: object.height ?? 0,
         ...villagePlotRulesById[id],
@@ -375,19 +464,25 @@ function getVillagePlots(map: TiledMap): VillagePlotDefinition[] {
   return plots;
 }
 
-function getResourceSites(map: TiledMap): VillageResourceSiteDefinition[] {
-  const layer = map.layers.find((candidate): candidate is TiledObjectLayer =>
-    candidate.type === "objectgroup" && candidate.name === "plots" && candidate.visible !== false,
-  );
+function getPlotObjectId(object: TiledObject): string {
+  return getStringProperty(object.properties, "plotId") ?? object.name ?? "";
+}
+
+function getResourceSites(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
+): VillageResourceSiteDefinition[] {
+  const layer = getNamedObjectLayer(map, "resourceSites");
 
   if (!layer) {
     return [];
   }
 
   return (layer.objects ?? [])
-    .filter((object) => object.visible !== false && object.type === "resourceSite")
+    .filter((object) => object.visible !== false)
     .map((object) => {
       const id = getStringProperty(object.properties, "plotId") ?? object.name;
+      const position = getObjectPixelPosition(map, orientation, object.x, object.y);
 
       if (!id) {
         throw new Error("Resource site object is missing a plotId property or name.");
@@ -431,8 +526,8 @@ function getResourceSites(map: TiledMap): VillageResourceSiteDefinition[] {
 
       return {
         id,
-        x: object.x,
-        y: object.gid ? object.y - (object.height ?? 0) : object.y,
+        x: position.x,
+        y: object.gid ? position.y - (object.height ?? 0) : position.y,
         width: object.width ?? 0,
         height: object.height ?? 0,
         resourceId,
@@ -502,6 +597,24 @@ function getNumberProperty(properties: TiledProperty[] | undefined, name: string
   return typeof property?.value === "number" ? property.value : null;
 }
 
+function getObjectProperties(
+  properties: TiledProperty[] | undefined,
+): Record<string, VillageMapObjectPropertyValue> {
+  const objectProperties: Record<string, VillageMapObjectPropertyValue> = {};
+
+  for (const property of properties ?? []) {
+    if (
+      typeof property.value === "string" ||
+      typeof property.value === "number" ||
+      typeof property.value === "boolean"
+    ) {
+      objectProperties[property.name] = property.value;
+    }
+  }
+
+  return objectProperties;
+}
+
 function getResourceSiteResourceId(
   properties: TiledProperty[] | undefined,
   siteId: string,
@@ -516,4 +629,15 @@ function getResourceSiteResourceId(
   throw new Error(
     `Resource site "${siteId}" has invalid or missing siteResourceId/resourceId property.`,
   );
+}
+
+function getNamedObjectLayer(
+  map: TiledMap,
+  name: string,
+): TiledObjectLayer | null {
+  return map.layers.find((candidate): candidate is TiledObjectLayer =>
+    candidate.type === "objectgroup" &&
+    candidate.name === name &&
+    candidate.visible !== false,
+  ) ?? null;
 }

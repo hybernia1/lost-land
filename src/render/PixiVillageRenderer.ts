@@ -19,7 +19,16 @@ import { decisionQuestById } from "../data/decisions";
 import { defaultVillageLayout } from "../data/villageLayouts";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
-import type { BuildingCategory, BuildingId, DecisionHistoryEntry, GameState, MarketResourceId, ResourceBag, ResourceId } from "../game/types";
+import type {
+  BuildingCategory,
+  BuildingId,
+  DecisionHistoryEntry,
+  EnvironmentConditionId,
+  GameState,
+  MarketResourceId,
+  ResourceBag,
+  ResourceId,
+} from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
   getAvailableBuildingsForPlot,
@@ -177,6 +186,11 @@ import {
 import { getLogEntryFillColor, getLogEntryIconId } from "./pixi/helpers/logFormatting";
 import { drawPixiIcon } from "./pixiIcons";
 import { VillageAssets } from "./villageAssets";
+
+type TerrainTintBinding = {
+  sprite: Sprite;
+  tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
+};
 export type {
   ConquestResultPreview,
   GameOverPreview,
@@ -258,6 +272,8 @@ export class PixiVillageRenderer {
   private cameraDragBlocked = false;
   private lastStaticWorldKey: string | null = null;
   private lastBackgroundKey: string | null = null;
+  private readonly terrainTintBindings: TerrainTintBinding[] = [];
+  private lastTerrainCondition: EnvironmentConditionId | null = null;
   private readonly ambientEffects: AmbientEffectsController;
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
@@ -371,13 +387,15 @@ export class PixiVillageRenderer {
     this.clampCurrentCamera(width, height);
     this.clampTargetCamera(width, height);
     this.applyCameraTransform();
-    const staticWorldKey = this.getStaticWorldKey(state);
+    const staticWorldKey = this.getStaticWorldKey();
     if (staticWorldKey !== this.lastStaticWorldKey) {
       this.clearContainerChildren(this.cameraStaticLayer);
-      drawWorldTerrain(this.worldRendererHost(), state);
+      this.resetTerrainTintBindings();
+      drawWorldTerrain(this.worldRendererHost());
       drawWorldDecorObjects(this.worldRendererHost());
       this.lastStaticWorldKey = staticWorldKey;
     }
+    this.applyTerrainTintForCondition(state.environment.condition);
     const backgroundKey = `${Math.round(width)}x${Math.round(height)}`;
     if (backgroundKey !== this.lastBackgroundKey) {
       this.clearContainerChildren(this.backgroundLayer);
@@ -453,7 +471,7 @@ export class PixiVillageRenderer {
       return siteHit.id;
     }
 
-    return villagePlotDefinitions.find((plot) => {
+    const plotHit = nonPerimeterVillagePlots.find((plot) => {
       const bounds = this.getPlotBounds(plot);
       return (
         x >= bounds.x &&
@@ -461,7 +479,17 @@ export class PixiVillageRenderer {
         y >= bounds.y &&
         y <= bounds.y + bounds.height
       );
-    })?.id ?? null;
+    });
+
+    if (plotHit) {
+      return plotHit.id;
+    }
+
+    if (this.isInsidePalisadePlot(x, y)) {
+      return palisadePlotDefinition?.id ?? null;
+    }
+
+    return null;
   }
 
   private handleHostWheel(event: WheelEvent): void {
@@ -1219,6 +1247,10 @@ export class PixiVillageRenderer {
         (key) => this.assets.getTerrainTileAnimationFrames(key),
         (key) => this.assets.getTerrainTileTexture(key),
       ),
+      trackTerrainSprite: (
+        sprite: Sprite,
+        tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
+      ) => this.trackTerrainSprite(sprite, tintByEnvironment),
       createBuildingSprite: (buildingId: BuildingId, level: number, built: boolean) =>
         this.createBuildingSprite(buildingId, level, built),
       fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => this.fitSprite(sprite, maxWidth, maxHeight),
@@ -1231,14 +1263,6 @@ export class PixiVillageRenderer {
         upgradingRemaining: number,
         name: string,
       ) => this.addPalisadeTooltip(plot, selected, level, upgradingRemaining, name),
-      drawBuildingLevelBadge: (
-        parent: Container,
-        level: number,
-        x: number,
-        y: number,
-        translations?: TranslationPack,
-        buildingName?: string,
-      ) => this.drawBuildingLevelBadge(parent, level, x, y, translations, buildingName),
       drawBuildingWorkerBadge: (
         parent: Container,
         buildingId: BuildingId,
@@ -2122,33 +2146,23 @@ export class PixiVillageRenderer {
 
   private addPalisadeTooltip(
     plot: VillagePlotDefinition,
-    selected: boolean,
+    _selected: boolean,
     level: number,
     upgradingRemaining: number,
     name: string,
   ): void {
-    const bounds = this.getPlotBounds(plot);
     const hitLayer = new Container();
+    const bounds = this.getPlotBounds(plot);
     hitLayer.x = bounds.x;
     hitLayer.y = bounds.y;
     hitLayer.hitArea = {
-      contains: (x: number, y: number) =>
-        x >= 0 && x <= bounds.width && y >= 0 && y <= bounds.height,
+      contains: (x: number, y: number) => x >= 0 && x <= bounds.width && y >= 0 && y <= bounds.height,
     };
     this.bindTooltip(
       hitLayer,
       upgradingTooltip(name, level, upgradingRemaining, "Lvl"),
     );
     this.cameraDynamicLayer.addChild(hitLayer);
-
-    if (!selected) {
-      return;
-    }
-
-    const marker = new Graphics();
-    marker.rect(bounds.x, bounds.y, bounds.width, bounds.height)
-      .fill({ color: 0xf6e58d, alpha: 0.18 });
-    this.cameraDynamicLayer.addChild(marker);
   }
 
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
@@ -2179,48 +2193,6 @@ export class PixiVillageRenderer {
       ])
       .fill({ color: 0xff4f62, alpha: 1 });
     badge.addChild(bolt);
-  }
-
-  private drawBuildingLevelBadge(
-    parent: Container,
-    level: number,
-    x: number,
-    y: number,
-    translations?: TranslationPack,
-    buildingName?: string,
-  ): void {
-    const levelLabel = translations?.ui.level ?? "Lvl";
-    const label = `${level}`;
-    const radius = level >= 10 ? 16 : 15;
-    const badge = new Container();
-    badge.x = x;
-    badge.y = y;
-    parent.addChild(badge);
-
-    const shadow = new Graphics();
-    shadow.circle(radius + 2, radius + 3, radius)
-      .fill({ color: 0x000000, alpha: 0.34 });
-    badge.addChild(shadow);
-
-    const box = new Graphics();
-    box.circle(radius, radius, radius)
-      .fill({ color: 0x24494d, alpha: 0.95 });
-    box.circle(radius - radius * 0.25, radius - radius * 0.28, radius * 0.42)
-      .fill({ color: 0xffffff, alpha: 0.08 });
-    badge.addChild(box);
-
-    this.drawCenteredText(badge, label, radius, radius, {
-      fill: 0xf3fff6,
-      fontSize: level >= 10 ? 11 : 12,
-      fontWeight: "900",
-    });
-
-    this.bindTooltip(
-      badge,
-      buildingName
-        ? `${buildingName}: ${levelLabel} ${level}`
-        : `${levelLabel} ${level}`,
-    );
   }
 
   private drawBuildingWorkerBadge(
@@ -2564,13 +2536,36 @@ export class PixiVillageRenderer {
     return getSceneLayout(width, height);
   }
 
-  private getStaticWorldKey(state: GameState): string {
+  private getStaticWorldKey(): string {
     return [
-      state.environment.condition,
       this.layout.scale.toFixed(4),
       this.layout.originX.toFixed(2),
       this.layout.originY.toFixed(2),
     ].join("|");
+  }
+
+  private resetTerrainTintBindings(): void {
+    this.terrainTintBindings.length = 0;
+    this.lastTerrainCondition = null;
+  }
+
+  private trackTerrainSprite(
+    sprite: Sprite,
+    tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
+  ): void {
+    this.terrainTintBindings.push({ sprite, tintByEnvironment });
+  }
+
+  private applyTerrainTintForCondition(condition: EnvironmentConditionId): void {
+    if (condition === this.lastTerrainCondition) {
+      return;
+    }
+
+    for (const binding of this.terrainTintBindings) {
+      binding.sprite.tint = binding.tintByEnvironment?.[condition] ?? 0xffffff;
+    }
+
+    this.lastTerrainCondition = condition;
   }
 
   private getPlotBounds(plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">): Bounds {
@@ -2587,6 +2582,18 @@ export class PixiVillageRenderer {
       width,
       height,
     };
+  }
+
+  private isInsidePalisadePlot(x: number, y: number): boolean {
+    if (!palisadePlotDefinition) {
+      return false;
+    }
+
+    const bounds = this.getPlotBounds(palisadePlotDefinition);
+    return x >= bounds.x &&
+      x <= bounds.x + bounds.width &&
+      y >= bounds.y &&
+      y <= bounds.y + bounds.height;
   }
 
   private getDefenseScore(state: GameState): number {
