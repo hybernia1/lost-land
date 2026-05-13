@@ -139,6 +139,77 @@
         }, 
         {
          "draworder":"topdown",
+         "id":3,
+         "name":"decor",
+         "objects":[
+                {
+                 "gid":54,
+                 "height":256,
+                 "id":321,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":256,
+                 "x":3844.66666666667,
+                 "y":3510
+                }, 
+                {
+                 "gid":54,
+                 "height":256,
+                 "id":322,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":256,
+                 "x":3900,
+                 "y":3404
+                }, 
+                {
+                 "gid":54,
+                 "height":256,
+                 "id":323,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":256,
+                 "x":3883.33333333333,
+                 "y":3594
+                }, 
+                {
+                 "gid":54,
+                 "height":256,
+                 "id":324,
+                 "name":"",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":256,
+                 "x":3974,
+                 "y":3540.66666666667
+                }],
+         "offsetx":10.6666666666656,
+         "offsety":-7.99999999999955,
+         "opacity":1,
+         "properties":[
+                {
+                 "name":"placementMode",
+                 "type":"string",
+                 "value":"free"
+                }],
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        }, 
+        {
+         "draworder":"topdown",
          "id":2,
          "name":"plots",
          "objects":[
@@ -512,7 +583,7 @@
          "y":0
         }],
  "nextlayerid":7,
- "nextobjectid":321,
+ "nextobjectid":325,
  "orientation":"isometric",
  "properties":[
         {
