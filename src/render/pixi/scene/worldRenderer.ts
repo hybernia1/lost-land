@@ -98,6 +98,7 @@ export function drawTerrain(host: WorldRenderHost): void {
         sprite.width = tileWidth + 0.5;
         sprite.height = tileHeight + 0.5;
       }
+      sprite.cullable = true;
 
       host.cameraStaticLayer.addChild(sprite);
     }
@@ -142,6 +143,7 @@ export function drawDecorObjects(host: WorldRenderHost): void {
       sprite.height = objectHeight;
       sprite.rotation = (object.rotation * Math.PI) / 180;
       sprite.alpha = object.opacity * layer.opacity;
+      sprite.cullable = true;
       host.cameraStaticLayer.addChild(sprite);
     }
   }

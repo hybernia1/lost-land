@@ -119,6 +119,7 @@ type TiledTilesetRegistry = {
   tileTextures: Record<TerrainTextureKey, TerrainTextureDefinition>;
   gidToTile: Map<number, GidTileReference>;
 };
+type TerrainEnvironmentTint = NonNullable<TerrainTextureDefinition["tintByEnvironment"]>;
 
 const GID_MASK = 0x0fffffff;
 const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
@@ -216,6 +217,7 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tilesetId: tileset.name,
         atlasUrl,
         frame,
+        tintByEnvironment: getDefaultTerrainTintByEnvironment(tileset.name),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
       textureKeyByTileIndex.set(tileIndex, textureKey);
@@ -247,6 +249,48 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
   }
 
   return { tileTextures, gidToTile };
+}
+
+function getDefaultTerrainTintByEnvironment(tilesetId: string): TerrainEnvironmentTint | undefined {
+  const normalized = tilesetId.trim().toLowerCase();
+
+  if (normalized === "ground") {
+    return {
+      rain: 0x8fa2b8,
+      snowFront: 0xd2dff0,
+      radiation: 0xa8c483,
+    };
+  }
+
+  if (normalized === "brick") {
+    return {
+      rain: 0x8f9098,
+      snowFront: 0xd7ddea,
+      radiation: 0xb1be89,
+    };
+  }
+
+  if (normalized === "trees") {
+    return {
+      rain: 0x7f93aa,
+      snowFront: 0xd6e4f4,
+      radiation: 0x9db97a,
+    };
+  }
+
+  if (normalized === "objects") {
+    return {
+      rain: 0x8d9aae,
+      snowFront: 0xd3deee,
+      radiation: 0xa6c27f,
+    };
+  }
+
+  return {
+    rain: 0x909fb2,
+    snowFront: 0xd5e0ef,
+    radiation: 0xa8c284,
+  };
 }
 
 function resolveTileset(mapTileset: TiledTileset): TiledTileset {

@@ -8,11 +8,10 @@
   - `tab-switch.ogg`
   - `ui-click.ogg`
   - `quest-reward-claim.ogg`
-  - `quest-decision-alert.wav`
+  - `decision-heartbeat-alert.wav`
 - License/source notes:
-  - `quest-decision-alert.wav`: Kenney Interface Sounds (CC0), source https://kenney.nl/assets/interface-sounds, original `question_001.wav`
+  - `decision-heartbeat-alert.wav`: locally generated synthetic heartbeat alert (project-created asset, PCM16 WAV).
   - Remaining `.ogg` UI files are provided from local project assets.
-  - License file for Kenney pack: `LICENSE-kenney-interface-sounds.txt`
 
 ## OpenGameArt ambient loops (CC0)
 
@@ -22,4 +21,8 @@
 - `ambient-night-crickets.mp3`
   - Source page: https://opengameart.org/content/crickets-ambient-noise-loopable
   - Direct file: https://opengameart.org/sites/default/files/crickets_1.mp3
+- `ambient-rain-loop.ogg`
+  - Source page: https://opengameart.org/content/rain-loopable
+  - Direct package: https://opengameart.org/sites/default/files/Rain%20OGG.zip
+  - Selected local file: `3.ogg` (renamed to `ambient-rain-loop.ogg`)
 - License summary file: `LICENSE-opengameart-ambient-cc0.txt`
