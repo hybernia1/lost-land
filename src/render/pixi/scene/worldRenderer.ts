@@ -76,12 +76,14 @@ export function drawTerrain(host: WorldRenderHost): void {
       const tileDefinition = layout.tileTextures[tile.textureKey];
       const tileWidth = tileDefinition.frame.width * scale;
       const tileHeight = tileDefinition.frame.height * scale;
+      const edgeOverscan = tileDefinition.tilesetId === "water" ? 0 : 0.5;
       const offsetX = 0;
       const offsetY = gridTileHeight - tileHeight;
       const drawX = tileX + offsetX;
       const drawY = tileY + offsetY;
       host.trackTerrainSprite(sprite, tileDefinition.tintByEnvironment);
       sprite.alpha = layer.opacity;
+      sprite.roundPixels = true;
 
       if (tile.rotation || tile.flipX || tile.flipY) {
         sprite.anchor.set(0.5);
@@ -89,14 +91,14 @@ export function drawTerrain(host: WorldRenderHost): void {
         sprite.x = drawX + tileWidth / 2;
         sprite.y = drawY + tileHeight / 2;
         sprite.scale.set(
-          (tile.flipX ? -1 : 1) * ((tileWidth + 0.5) / sprite.texture.width),
-          (tile.flipY ? -1 : 1) * ((tileHeight + 0.5) / sprite.texture.height),
+          (tile.flipX ? -1 : 1) * ((tileWidth + edgeOverscan) / sprite.texture.width),
+          (tile.flipY ? -1 : 1) * ((tileHeight + edgeOverscan) / sprite.texture.height),
         );
       } else {
         sprite.x = drawX;
         sprite.y = drawY;
-        sprite.width = tileWidth + 0.5;
-        sprite.height = tileHeight + 0.5;
+        sprite.width = tileWidth + edgeOverscan;
+        sprite.height = tileHeight + edgeOverscan;
       }
       sprite.cullable = true;
 
