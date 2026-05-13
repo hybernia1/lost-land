@@ -52,10 +52,10 @@ without baking in a background.
 
 `water.png` is a freeform water/decor atlas:
 - 20 frames (`5x4` grid)
-- frame size `256x256`
+- frame size `128x128`
 - atlas layout `5 columns x 4 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `1280x1024`
+- atlas size `640x512`
 - source image extracted from `C:\Users\nikol\Desktop\water.png`
 - magenta sheet background is converted to real alpha and packed into normalized cells
 

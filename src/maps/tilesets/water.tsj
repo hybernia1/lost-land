@@ -1,14 +1,14 @@
 {
   "columns": 5,
   "image": "../../assets/tiles/water.png",
-  "imageheight": 1024,
-  "imagewidth": 1280,
+  "imageheight": 512,
+  "imagewidth": 640,
   "margin": 0,
   "name": "water",
   "spacing": 0,
   "tilecount": 20,
   "tiledversion": "1.12.1",
-  "tileheight": 256,
+  "tileheight": 128,
   "tiles": [
     {
       "id": 0,
@@ -211,7 +211,7 @@
       ]
     }
   ],
-  "tilewidth": 256,
+  "tilewidth": 128,
   "type": "tileset",
   "version": "1.10"
 }
