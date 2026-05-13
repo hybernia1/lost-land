@@ -2594,7 +2594,7 @@
          "name":"plots",
          "objects":[
                 {
-                 "height":110,
+                 "height":128,
                  "id":101,
                  "name":"plot-main",
                  "opacity":1,
@@ -2607,12 +2607,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":110.5,
-                 "x":4379.66666666667,
-                 "y":3600.33333333333
+                 "width":128,
+                 "x":4352,
+                 "y":3584
                 }, 
                 {
-                 "height":89,
+                 "height":64,
                  "id":102,
                  "name":"plot-01",
                  "opacity":1,
@@ -2625,12 +2625,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":108.5,
-                 "x":4468,
-                 "y":3334
+                 "width":64,
+                 "x":4416,
+                 "y":3328
                 }, 
                 {
-                 "height":83.5,
+                 "height":64,
                  "id":103,
                  "name":"plot-02",
                  "opacity":1,
@@ -2643,12 +2643,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":89,
-                 "x":4180,
-                 "y":3344
+                 "width":64,
+                 "x":4160,
+                 "y":3328
                 }, 
                 {
-                 "height":93,
+                 "height":64,
                  "id":104,
                  "name":"plot-03",
                  "opacity":1,
@@ -2661,12 +2661,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":116,
-                 "x":4313,
-                 "y":3341
+                 "width":64,
+                 "x":4288,
+                 "y":3328
                 }, 
                 {
-                 "height":102,
+                 "height":64,
                  "id":105,
                  "name":"plot-04",
                  "opacity":1,
@@ -2679,12 +2679,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":106.5,
-                 "x":4159.5,
-                 "y":3919
+                 "width":64,
+                 "x":4159,
+                 "y":3845.5
                 }, 
                 {
-                 "height":99.5,
+                 "height":64,
                  "id":106,
                  "name":"plot-05",
                  "opacity":1,
@@ -2697,12 +2697,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":114.5,
-                 "x":4603.5,
-                 "y":3480.5
+                 "width":64,
+                 "x":4672,
+                 "y":3328
                 }, 
                 {
-                 "height":96,
+                 "height":64,
                  "id":107,
                  "name":"plot-06",
                  "opacity":1,
@@ -2715,12 +2715,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":122.5,
-                 "x":4607.5,
-                 "y":3326.5
+                 "width":64,
+                 "x":4544,
+                 "y":3328
                 }, 
                 {
-                 "height":102.5,
+                 "height":64,
                  "id":108,
                  "name":"plot-07",
                  "opacity":1,
@@ -2733,12 +2733,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":124.5,
-                 "x":4614.5,
-                 "y":3796.5
+                 "width":64,
+                 "x":4672,
+                 "y":3584
                 }, 
                 {
-                 "height":107.5,
+                 "height":64,
                  "id":109,
                  "name":"plot-08",
                  "opacity":1,
@@ -2751,12 +2751,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":120.5,
-                 "x":4632.5,
-                 "y":3949
+                 "width":64,
+                 "x":4672,
+                 "y":3712
                 }, 
                 {
-                 "height":91.5,
+                 "height":64,
                  "id":110,
                  "name":"plot-09",
                  "opacity":1,
@@ -2769,12 +2769,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":85.5,
-                 "x":4166,
-                 "y":3774.5
+                 "width":64,
+                 "x":4159,
+                 "y":3711.5
                 }, 
                 {
-                 "height":98,
+                 "height":64,
                  "id":111,
                  "name":"plot-10",
                  "opacity":1,
@@ -2787,12 +2787,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":116,
-                 "x":4617.5,
-                 "y":3636.5
+                 "width":64,
+                 "x":4672,
+                 "y":3456
                 }, 
                 {
-                 "height":90.5,
+                 "height":64,
                  "id":112,
                  "name":"plot-11",
                  "opacity":1,
@@ -2805,12 +2805,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":89,
-                 "x":4184.5,
-                 "y":3469
+                 "width":64,
+                 "x":4160,
+                 "y":3456
                 }, 
                 {
-                 "height":86.5,
+                 "height":64,
                  "id":113,
                  "name":"plot-12",
                  "opacity":1,
@@ -2823,12 +2823,12 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":100,
-                 "x":4175.5,
-                 "y":3618.5
+                 "width":64,
+                 "x":4160,
+                 "y":3584
                 }, 
                 {
-                 "height":104.5,
+                 "height":64,
                  "id":114,
                  "name":"plot-13",
                  "opacity":1,
@@ -2841,9 +2841,9 @@
                  "rotation":0,
                  "type":"building",
                  "visible":true,
-                 "width":120,
-                 "x":4351.5,
-                 "y":3934.5
+                 "width":64,
+                 "x":4672,
+                 "y":3840
                 }],
          "offsetx":57.3333333333339,
          "offsety":-10.6666666666665,
