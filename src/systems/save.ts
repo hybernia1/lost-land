@@ -10,11 +10,16 @@ type SaveFile = {
   state: GameState;
 };
 
-export type SaveSummary = {
+type SaveIndexEntry = {
   id: string;
   communityName: string;
   savedAt: string;
   elapsedSeconds: number;
+};
+
+export type SaveSummary = SaveIndexEntry & {
+  loadable: boolean;
+  version: number | null;
 };
 
 export function saveGame(state: GameState): void {
@@ -45,15 +50,19 @@ export function loadGame(saveId?: string): GameState | null {
 }
 
 export function listSavedGames(): SaveSummary[] {
-  const summaries = readIndex()
-    .filter((summary) => loadSlot(summary.id) !== null)
+  const index = readIndex();
+  const indexById = new Map(index.map((entry) => [entry.id, entry]));
+  const summaries = collectSaveIds()
+    .map((saveId) => readSaveSummary(saveId, indexById.get(saveId)))
+    .filter((summary): summary is SaveSummary => summary !== null)
     .sort((left, right) => right.savedAt.localeCompare(left.savedAt));
 
   return summaries;
 }
 
-export function hasSavedGame(): boolean {
-  return listSavedGames().length > 0;
+export function deleteSavedGame(saveId: string): void {
+  localStorage.removeItem(getSlotKey(saveId));
+  writeIndex(readIndex().filter((entry) => entry.id !== saveId));
 }
 
 function loadSlot(saveId: string): GameState | null {
@@ -81,10 +90,14 @@ function parseSave(rawSave: string): GameState | null {
 }
 
 function getLatestSaveId(): string | null {
-  return readIndex().sort((left, right) => right.savedAt.localeCompare(left.savedAt))[0]?.id ?? null;
+  const latestLoadable = listSavedGames()
+    .filter((summary) => summary.loadable)
+    .sort((left, right) => right.savedAt.localeCompare(left.savedAt))[0];
+
+  return latestLoadable?.id ?? null;
 }
 
-function upsertSaveSummary(summary: SaveSummary): void {
+function upsertSaveSummary(summary: SaveIndexEntry): void {
   const nextIndex = [
     summary,
     ...readIndex().filter((candidate) => candidate.id !== summary.id),
@@ -93,7 +106,7 @@ function upsertSaveSummary(summary: SaveSummary): void {
   writeIndex(nextIndex);
 }
 
-function readIndex(): SaveSummary[] {
+function readIndex(): SaveIndexEntry[] {
   const rawIndex = localStorage.getItem(SAVE_INDEX_KEY);
 
   if (!rawIndex) {
@@ -101,17 +114,90 @@ function readIndex(): SaveSummary[] {
   }
 
   try {
-    const parsed = JSON.parse(rawIndex) as SaveSummary[];
+    const parsed = JSON.parse(rawIndex) as SaveIndexEntry[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function writeIndex(index: SaveSummary[]): void {
+function writeIndex(index: SaveIndexEntry[]): void {
   localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index));
 }
 
 function getSlotKey(saveId: string): string {
   return `${SAVE_SLOT_PREFIX}${saveId}`;
+}
+
+function collectSaveIds(): string[] {
+  const ids = new Set(readIndex().map((entry) => entry.id));
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+
+    if (!key?.startsWith(SAVE_SLOT_PREFIX)) {
+      continue;
+    }
+
+    ids.add(key.slice(SAVE_SLOT_PREFIX.length));
+  }
+
+  return Array.from(ids);
+}
+
+function readSaveSummary(
+  saveId: string,
+  indexedSummary?: SaveIndexEntry,
+): SaveSummary | null {
+  const rawSave = localStorage.getItem(getSlotKey(saveId));
+
+  if (!rawSave) {
+    return null;
+  }
+
+  let parsedVersion: number | null = null;
+  let parsedSavedAt: string | null = null;
+  let parsedCommunityName: string | null = null;
+  let parsedElapsedSeconds: number | null = null;
+
+  try {
+    const parsed = JSON.parse(rawSave) as Partial<SaveFile>;
+
+    parsedVersion = typeof parsed.version === "number" ? parsed.version : null;
+    parsedSavedAt = typeof parsed.savedAt === "string" ? parsed.savedAt : null;
+
+    if (
+      parsed.state &&
+      typeof parsed.state === "object" &&
+      "communityName" in parsed.state &&
+      "elapsedSeconds" in parsed.state
+    ) {
+      const communityName = parsed.state.communityName;
+      const elapsedSeconds = parsed.state.elapsedSeconds;
+      parsedCommunityName = typeof communityName === "string" ? communityName : null;
+      parsedElapsedSeconds = typeof elapsedSeconds === "number" ? elapsedSeconds : null;
+    }
+  } catch {
+    // Keep summary from index when legacy/corrupted payload is not parseable.
+  }
+
+  const loadable = parsedVersion === SAVE_VERSION && loadSlot(saveId) !== null;
+
+  return {
+    id: saveId,
+    communityName:
+      parsedCommunityName ??
+      indexedSummary?.communityName ??
+      saveId,
+    savedAt:
+      parsedSavedAt ??
+      indexedSummary?.savedAt ??
+      new Date(0).toISOString(),
+    elapsedSeconds:
+      parsedElapsedSeconds ??
+      indexedSummary?.elapsedSeconds ??
+      0,
+    loadable,
+    version: parsedVersion,
+  };
 }

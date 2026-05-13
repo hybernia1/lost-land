@@ -190,6 +190,33 @@ type TerrainTintBinding = {
   sprite: Sprite;
   tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
 };
+
+export type FrontScreenMode = "menu" | "new-game" | "load-game" | "settings";
+
+export type FrontScreenLocaleOption = {
+  id: string;
+  label: string;
+};
+
+export type FrontScreenSaveEntry = {
+  id: string;
+  communityName: string;
+  elapsedSeconds: number;
+  loadable: boolean;
+  version: number | null;
+};
+
+export type FrontScreenModel = {
+  mode: FrontScreenMode;
+  translations: TranslationPack;
+  canContinue: boolean;
+  communityNameDraft: string;
+  locales: FrontScreenLocaleOption[];
+  activeLocale: string;
+  saves: FrontScreenSaveEntry[];
+  pendingDeleteSaveId: string | null;
+};
+
 const STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE = 4096;
 let cullerPluginRegistered = false;
 export type {
@@ -197,7 +224,7 @@ export type {
   GameOverPreview,
   PixiActionDetail,
   VillageInfoPanel,
-} from "./pixi/core/types";
+};
 
 export class PixiVillageRenderer {
   private app: Application | null = null;
@@ -281,6 +308,10 @@ export class PixiVillageRenderer {
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
   private lastFormattedLogEntries: FormattedLogEntry[] = [];
+  private frontScreenModel: FrontScreenModel | null = null;
+  private frontSaveScrollArea: Bounds | null = null;
+  private frontSaveScrollMax = 0;
+  private frontSaveScrollY = 0;
   private canvasTooltipText = "";
   private canvasTooltipWidth = 0;
   private canvasTooltipHeight = 0;
@@ -343,6 +374,7 @@ export class PixiVillageRenderer {
     conquestResultPreview?: ConquestResultPreview | null,
     gameOverPreview?: GameOverPreview | null,
   ): void {
+    this.frontScreenModel = null;
     this.lastState = state;
     this.lastTranslations = translations;
     this.activeModalPlotId = modalPlotId ?? null;
@@ -452,6 +484,48 @@ export class PixiVillageRenderer {
     this.app.render();
   }
 
+  renderFrontScreen(model: FrontScreenModel): void {
+    this.frontScreenModel = model;
+    this.cameraDragBlocked = true;
+    this.hadBlockingOverlayOpen = true;
+
+    if (!this.app) {
+      return;
+    }
+
+    const width = this.host.clientWidth;
+    const height = this.host.clientHeight;
+
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    const hudPixelScale = 1;
+    const hudRenderScale = HUD_DESIGN_SCALE * hudPixelScale;
+    const hudWidth = width / hudRenderScale;
+    const hudHeight = height / hudRenderScale;
+    this.hudPixelScale = hudRenderScale;
+
+    this.clearContainerChildren(this.cameraDynamicLayer);
+    this.clearContainerChildren(this.cameraStaticLayer);
+    this.clearContainerChildren(this.backgroundLayer);
+    this.clearContainerChildren(this.hudLayer);
+    this.resetTerrainTintBindings();
+    this.disableStaticWorldCache();
+    this.lastStaticWorldKey = null;
+    this.lastBackgroundKey = null;
+    this.hudInteractionAreas = [];
+    this.frontSaveScrollArea = null;
+    this.frontSaveScrollMax = 0;
+
+    this.drawFrontBackground(width, height);
+    this.drawFrontScreenContent(model, hudWidth, hudHeight);
+
+    this.applyHudPixelScale(this.hudLayer, hudRenderScale);
+    this.scaleHudInteractionBounds(hudRenderScale);
+    this.app.render();
+  }
+
   private clearContainerChildren(container: Container): void {
     const children = container.removeChildren();
 
@@ -499,6 +573,10 @@ export class PixiVillageRenderer {
   }
 
   private handleHostWheel(event: WheelEvent): void {
+    if (this.handleFrontSaveListWheel(event)) {
+      return;
+    }
+
     handleWheelWithCamera(
       {
         host: this.host,
@@ -544,6 +622,44 @@ export class PixiVillageRenderer {
       },
       event,
     );
+  }
+
+  private handleFrontSaveListWheel(event: WheelEvent): boolean {
+    if (
+      this.frontScreenModel?.mode !== "load-game" ||
+      this.frontScreenModel.pendingDeleteSaveId !== null ||
+      !this.frontSaveScrollArea ||
+      this.frontSaveScrollMax <= 0
+    ) {
+      return false;
+    }
+
+    const rect = this.host.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / this.hudPixelScale;
+    const y = (event.clientY - rect.top) / this.hudPixelScale;
+    const area = this.frontSaveScrollArea;
+
+    if (
+      x < area.x ||
+      x > area.x + area.width ||
+      y < area.y ||
+      y > area.y + area.height
+    ) {
+      return false;
+    }
+
+    const next = Math.max(
+      0,
+      Math.min(this.frontSaveScrollMax, this.frontSaveScrollY + event.deltaY * 0.45),
+    );
+
+    if (next !== this.frontSaveScrollY) {
+      this.frontSaveScrollY = next;
+      this.requestRender();
+    }
+
+    event.preventDefault();
+    return true;
   }
 
   private handleHostPointerDown(event: PointerEvent): void {
@@ -635,6 +751,419 @@ export class PixiVillageRenderer {
     await this.assets.load();
     this.canCacheStaticWorldAsTexture = this.computeStaticWorldCacheEligibility();
     this.requestRender();
+  }
+
+  private drawFrontBackground(width: number, height: number): void {
+    const sky = new Graphics();
+    sky.rect(0, 0, width, height).fill({ color: 0x171d22, alpha: 1 });
+    sky.rect(0, height * 0.48, width, height * 0.52).fill({ color: 0x0f1317, alpha: 0.94 });
+    this.backgroundLayer.addChild(sky);
+
+    const haze = new Graphics();
+    haze.rect(width * 0.06, height * 0.07, width * 0.88, height * 0.26)
+      .fill({ color: 0x38484f, alpha: 0.2 });
+    this.backgroundLayer.addChild(haze);
+  }
+
+  private drawFrontScreenContent(model: FrontScreenModel, width: number, height: number): void {
+    const panelWidth = Math.min(780, width - 36);
+    const panelHeight = model.mode === "load-game"
+      ? Math.min(560, height - 28)
+      : Math.min(470, height - 28);
+    const panelX = (width - panelWidth) / 2;
+    const panelY = (height - panelHeight) / 2;
+
+    this.drawPanel(this.hudLayer, panelX, panelY, panelWidth, panelHeight, 0.9);
+
+    let cursorY = panelY + 24;
+    if (model.mode !== "menu") {
+      this.createRectButton(this.hudLayer, {
+        label: model.translations.ui.back ?? "Back",
+        x: panelX + 22,
+        y: cursorY,
+        width: 100,
+        height: 34,
+        detail: { action: "back-menu" },
+        tone: "secondary",
+      });
+    }
+
+    this.drawText(this.hudLayer, model.translations.ui.menuKicker ?? "Single-player survival strategy", panelX + 22, cursorY + 46, {
+      fill: 0xd1b25d,
+      fontSize: 12,
+      fontWeight: "900",
+    });
+
+    this.drawText(this.hudLayer, model.translations.ui.menuTitle ?? "Lost Land", panelX + 22, cursorY + 62, {
+      fill: 0xf5efdf,
+      fontSize: 48,
+      fontWeight: "900",
+    });
+
+    cursorY += 128;
+
+    if (model.mode === "menu") {
+      this.drawFrontMainMenu(model, panelX, cursorY, panelWidth);
+      return;
+    }
+
+    if (model.mode === "new-game") {
+      this.drawFrontNewGame(model, panelX, cursorY, panelWidth);
+      return;
+    }
+
+    if (model.mode === "settings") {
+      this.drawFrontSettings(model, panelX, cursorY, panelWidth);
+      return;
+    }
+
+    this.drawFrontLoadGame(model, panelX, panelY, panelWidth, panelHeight, cursorY);
+  }
+
+  private drawFrontMainMenu(model: FrontScreenModel, panelX: number, cursorY: number, panelWidth: number): void {
+    const buttonWidth = Math.min(320, panelWidth - 44);
+    this.drawText(this.hudLayer, model.translations.ui.menuText ?? "", panelX + 22, cursorY - 12, {
+      fill: 0xbfc6c5,
+      fontSize: 14,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 44,
+      lineHeight: 20,
+    });
+
+    const buttonX = panelX + 22;
+    let buttonY = cursorY + 64;
+    this.createRectButton(this.hudLayer, {
+      label: model.translations.ui.newGame ?? "New Game",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 44,
+      detail: { action: "new-game" },
+      tone: "primary",
+    });
+
+    buttonY += 52;
+    this.createRectButton(this.hudLayer, {
+      label: model.translations.ui.continue ?? "Continue",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 44,
+      detail: { action: "continue" },
+      disabled: !model.canContinue,
+      tone: model.canContinue ? "toolbar" : "secondary",
+    });
+
+    buttonY += 52;
+    this.createRectButton(this.hudLayer, {
+      label: model.translations.ui.settings ?? "Settings",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 44,
+      detail: { action: "settings" },
+      tone: "toolbar",
+    });
+  }
+
+  private drawFrontNewGame(
+    model: FrontScreenModel,
+    panelX: number,
+    cursorY: number,
+    panelWidth: number,
+  ): void {
+    const t = model.translations;
+    this.drawText(this.hudLayer, t.ui.nameCommunity ?? "Name your community", panelX + 22, cursorY - 4, {
+      fill: 0xf1df9a,
+      fontSize: 21,
+      fontWeight: "900",
+    });
+    this.drawText(this.hudLayer, t.ui.nameCommunityText ?? "", panelX + 22, cursorY + 28, {
+      fill: 0xbfc6c5,
+      fontSize: 13,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 44,
+      lineHeight: 19,
+    });
+
+    const inputX = panelX + 22;
+    const inputY = cursorY + 94;
+    const inputWidth = panelWidth - 44;
+    const inputBox = new Graphics();
+    inputBox.rect(inputX, inputY, inputWidth, 44).fill({ color: 0x0f1316, alpha: 0.96 });
+    inputBox.rect(inputX, inputY, inputWidth, 44).stroke({ color: 0x475059, width: 1, alpha: 0.9 });
+    this.hudLayer.addChild(inputBox);
+
+    const draft = model.communityNameDraft.trim() || t.ui.defaultCommunityName || "New Haven";
+    this.drawText(this.hudLayer, draft.slice(0, 32), inputX + 12, inputY + 12, {
+      fill: 0xf5efdf,
+      fontSize: 16,
+      fontWeight: "800",
+    });
+
+    this.drawText(this.hudLayer, "Enter: start | Backspace: delete", inputX, inputY + 52, {
+      fill: 0x9fa8ae,
+      fontSize: 11,
+      fontWeight: "700",
+    });
+
+    const controlsY = inputY + 88;
+    this.createRectButton(this.hudLayer, {
+      label: "Backspace",
+      x: inputX,
+      y: controlsY,
+      width: 126,
+      height: 36,
+      detail: { action: "community-name-backspace" },
+      tone: "secondary",
+    });
+    this.createRectButton(this.hudLayer, {
+      label: "Clear",
+      x: inputX + 136,
+      y: controlsY,
+      width: 90,
+      height: 36,
+      detail: { action: "community-name-clear" },
+      tone: "secondary",
+    });
+    this.createRectButton(this.hudLayer, {
+      label: t.ui.startCommunity ?? "Start community",
+      x: panelX + panelWidth - 250,
+      y: controlsY,
+      width: 228,
+      height: 36,
+      detail: { action: "start-new-community" },
+      tone: "primary",
+    });
+  }
+
+  private drawFrontSettings(model: FrontScreenModel, panelX: number, cursorY: number, panelWidth: number): void {
+    const t = model.translations;
+    this.drawText(this.hudLayer, t.ui.settings ?? "Settings", panelX + 22, cursorY - 4, {
+      fill: 0xf1df9a,
+      fontSize: 21,
+      fontWeight: "900",
+    });
+    this.drawText(this.hudLayer, t.ui.languageText ?? "", panelX + 22, cursorY + 28, {
+      fill: 0xbfc6c5,
+      fontSize: 13,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 44,
+      lineHeight: 19,
+    });
+
+    let buttonX = panelX + 22;
+    const buttonY = cursorY + 90;
+    for (const locale of model.locales) {
+      const active = locale.id === model.activeLocale;
+      const widthHint = Math.max(110, Math.min(180, locale.label.length * 12 + 42));
+      this.createRectButton(this.hudLayer, {
+        label: locale.label,
+        x: buttonX,
+        y: buttonY,
+        width: widthHint,
+        height: 38,
+        detail: { action: "select-locale", value: locale.id },
+        active,
+        tone: active ? "primary" : "toolbar",
+      });
+      buttonX += widthHint + 10;
+    }
+  }
+
+  private drawFrontLoadGame(
+    model: FrontScreenModel,
+    panelX: number,
+    panelY: number,
+    panelWidth: number,
+    panelHeight: number,
+    cursorY: number,
+  ): void {
+    const t = model.translations;
+    this.drawText(this.hudLayer, t.ui.savedCommunities ?? "Saved communities", panelX + 22, cursorY - 4, {
+      fill: 0xf1df9a,
+      fontSize: 21,
+      fontWeight: "900",
+    });
+
+    const listX = panelX + 22;
+    const listY = cursorY + 36;
+    const listWidth = panelWidth - 44;
+    const listHeight = panelY + panelHeight - listY - 22;
+
+    this.drawPanel(this.hudLayer, listX, listY, listWidth, listHeight, 0.56);
+    this.frontSaveScrollArea = { x: listX, y: listY, width: listWidth, height: listHeight };
+
+    if (model.saves.length === 0) {
+      this.drawText(this.hudLayer, t.ui.noSavedCommunities ?? "No saved community yet.", listX + 14, listY + 14, {
+        fill: 0xaeb4b8,
+        fontSize: 13,
+        fontWeight: "700",
+      });
+      this.frontSaveScrollMax = 0;
+      this.frontSaveScrollY = 0;
+      return;
+    }
+
+    const rowHeight = 88;
+    const rowGap = 8;
+    const rowStride = rowHeight + rowGap;
+    const contentHeight = model.saves.length * rowStride - rowGap;
+    this.frontSaveScrollMax = Math.max(0, contentHeight - listHeight);
+    this.frontSaveScrollY = Math.max(0, Math.min(this.frontSaveScrollMax, this.frontSaveScrollY));
+
+    const rowStartY = listY - this.frontSaveScrollY;
+    for (let index = 0; index < model.saves.length; index += 1) {
+      const save = model.saves[index];
+      const rowY = rowStartY + index * rowStride;
+      if (rowY + rowHeight < listY || rowY > listY + listHeight) {
+        continue;
+      }
+
+      const cardFill = save.loadable ? 0x20262b : 0x1d2227;
+      const card = new Graphics();
+      card.rect(listX + 8, rowY, listWidth - 16, rowHeight)
+        .fill({ color: cardFill, alpha: 0.96 });
+      this.hudLayer.addChild(card);
+
+      this.drawText(this.hudLayer, save.communityName, listX + 20, rowY + 10, {
+        fill: 0xf5efdf,
+        fontSize: 16,
+        fontWeight: "900",
+      });
+      this.drawText(this.hudLayer, `${t.ui.day ?? "Day"} ${getGameDay(save.elapsedSeconds)} / ${formatGameClock(save.elapsedSeconds)}`, listX + 20, rowY + 34, {
+        fill: 0xd1b25d,
+        fontSize: 12,
+        fontWeight: "800",
+      });
+
+      if (!save.loadable) {
+        const versionTag = typeof save.version === "number" ? ` (v${save.version})` : "";
+        this.drawText(
+          this.hudLayer,
+          `${t.ui.legacySaveLocked ?? "Legacy save cannot be loaded."}${versionTag}`,
+          listX + 20,
+          rowY + 52,
+          {
+            fill: 0xb1b8be,
+            fontSize: 11,
+            fontWeight: "700",
+          },
+        );
+      }
+
+      this.createRectButton(this.hudLayer, {
+        label: t.ui.loadSave ?? "Load",
+        x: listX + listWidth - 210,
+        y: rowY + 14,
+        width: 92,
+        height: 30,
+        detail: { action: "load-save", value: save.id },
+        disabled: !save.loadable,
+        tone: save.loadable ? "primary" : "secondary",
+      });
+
+      this.createRectButton(this.hudLayer, {
+        label: t.ui.deleteSave ?? "Delete",
+        x: listX + listWidth - 110,
+        y: rowY + 14,
+        width: 92,
+        height: 30,
+        detail: { action: "delete-save", value: save.id },
+        tone: "secondary",
+      });
+    }
+
+    if (this.frontSaveScrollMax > 0) {
+      const trackX = listX + listWidth - 10;
+      const trackY = listY + 8;
+      const trackHeight = listHeight - 16;
+      const track = new Graphics();
+      track.rect(trackX, trackY, 4, trackHeight).fill({ color: 0x1b2024, alpha: 0.96 });
+      this.hudLayer.addChild(track);
+
+      const thumbHeight = Math.max(36, (listHeight / contentHeight) * trackHeight);
+      const thumbTravel = trackHeight - thumbHeight;
+      const thumbY = trackY + (this.frontSaveScrollY / this.frontSaveScrollMax) * thumbTravel;
+      const thumb = new Graphics();
+      thumb.rect(trackX, thumbY, 4, thumbHeight).fill({ color: 0x56606a, alpha: 0.98 });
+      this.hudLayer.addChild(thumb);
+    }
+
+    this.drawDeleteConfirmModal(model, panelX, panelY, panelWidth, panelHeight);
+  }
+
+  private drawDeleteConfirmModal(
+    model: FrontScreenModel,
+    panelX: number,
+    panelY: number,
+    panelWidth: number,
+    panelHeight: number,
+  ): void {
+    const saveId = model.pendingDeleteSaveId;
+    if (!saveId) {
+      return;
+    }
+
+    const save = model.saves.find((entry) => entry.id === saveId);
+    if (!save) {
+      return;
+    }
+
+    const backdrop = new Graphics();
+    backdrop.rect(panelX, panelY, panelWidth, panelHeight).fill({ color: 0x020304, alpha: 0.72 });
+    backdrop.eventMode = "static";
+    backdrop.cursor = "default";
+    backdrop.on("pointerdown", (event) => {
+      event.stopPropagation();
+      this.consumeHostClick();
+    });
+    this.hudLayer.addChild(backdrop);
+
+    const modalWidth = Math.min(520, panelWidth - 48);
+    const modalHeight = 178;
+    const modalX = panelX + (panelWidth - modalWidth) / 2;
+    const modalY = panelY + (panelHeight - modalHeight) / 2;
+    this.drawPanel(this.hudLayer, modalX, modalY, modalWidth, modalHeight, 0.94);
+
+    this.drawText(this.hudLayer, model.translations.ui.deleteSave ?? "Delete", modalX + 20, modalY + 16, {
+      fill: 0xf1df9a,
+      fontSize: 20,
+      fontWeight: "900",
+    });
+
+    const question = (model.translations.ui.confirmDeleteSave ?? "Delete save \"{community}\" permanently?")
+      .replace("{community}", save.communityName);
+    this.drawText(this.hudLayer, question, modalX + 20, modalY + 52, {
+      fill: 0xf5efdf,
+      fontSize: 14,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: modalWidth - 40,
+      lineHeight: 20,
+    });
+
+    this.createRectButton(this.hudLayer, {
+      label: model.translations.ui.back ?? "Back",
+      x: modalX + modalWidth - 226,
+      y: modalY + modalHeight - 48,
+      width: 96,
+      height: 32,
+      detail: { action: "cancel-delete-save", value: save.id },
+      tone: "secondary",
+    });
+    this.createRectButton(this.hudLayer, {
+      label: model.translations.ui.deleteSave ?? "Delete",
+      x: modalX + modalWidth - 118,
+      y: modalY + modalHeight - 48,
+      width: 96,
+      height: 32,
+      detail: { action: "confirm-delete-save", value: save.id },
+      tone: "primary",
+    });
   }
 
   private drawHud(

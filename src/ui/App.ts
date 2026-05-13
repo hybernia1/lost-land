@@ -1,12 +1,19 @@
 import type { Game } from "../game/Game";
 import { gameConfig } from "../game/config";
-import { formatGameClock, getDaylightState, getGameDay } from "../game/time";
-import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../game/types";
+import { getDaylightState } from "../game/time";
+import type { DecisionHistoryEntry, GameState } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
-import type { ConquestResultPreview, GameOverPreview, PixiActionDetail, VillageInfoPanel } from "../render/PixiVillageRenderer";
-import { hasSavedGame, listSavedGames } from "../systems/save";
+import type {
+  ConquestResultPreview,
+  FrontScreenModel,
+  FrontScreenSaveEntry,
+  GameOverPreview,
+  PixiActionDetail,
+  VillageInfoPanel,
+} from "../render/PixiVillageRenderer";
+import { deleteSavedGame, listSavedGames } from "../systems/save";
 import { getPopulation } from "../systems/population";
 import type { GodModeController } from "../dev/godMode";
 import modalOpenSoundUrl from "../assets/audio/modal-open.ogg";
@@ -59,6 +66,8 @@ export class App {
   private ambientCrossfadeFrameId: number | null = null;
   private ambientCrossfadeToken = 0;
   private godMode: GodModeController | null = null;
+  private communityNameDraft = "";
+  private pendingDeleteSaveId: string | null = null;
 
   constructor(
     private readonly root: HTMLDivElement,
@@ -66,7 +75,6 @@ export class App {
   ) {}
 
   mount(): void {
-    this.root.addEventListener("click", (event) => this.handleActionClick(event));
     this.root.addEventListener("mouseover", (event) => this.handleTooltipOver(event));
     this.root.addEventListener("mousemove", (event) => this.handleTooltipMove(event));
     this.root.addEventListener("mouseout", (event) => this.handleTooltipOut(event));
@@ -124,131 +132,48 @@ export class App {
   }
 
   private render(): void {
-    if (this.mode === "menu") {
-      this.renderMenu();
-      return;
-    }
-
-    if (this.mode === "new-game") {
-      this.renderNewGame();
-      return;
-    }
-
-    if (this.mode === "load-game") {
-      this.renderLoadGame();
-      return;
-    }
-
-    if (this.mode === "settings") {
-      this.renderSettings();
+    if (this.mode !== "game") {
+      this.renderFrontCanvas();
       return;
     }
 
     this.renderGame();
   }
 
-  private renderMenu(): void {
-    const t = this.t();
-    const canContinue = hasSavedGame();
+  private renderFrontCanvas(): void {
+    if (!this.shellReady) {
+      this.renderGameShell();
+    }
 
-    this.shellReady = false;
-    this.root.innerHTML = `
-      <main class="menu-screen">
-        <section class="menu-art" aria-hidden="true"></section>
-        <section class="menu-panel">
-          <p class="menu-kicker">${t.ui.menuKicker}</p>
-          <h1>${t.ui.menuTitle}</h1>
-          <p>${t.ui.menuText}</p>
-          <div class="menu-actions">
-            <button class="menu-button primary" data-action="new-game">${t.ui.newGame}</button>
-            <button class="menu-button" data-action="continue" ${canContinue ? "" : "disabled"}>${t.ui.continue}</button>
-            <button class="menu-button" data-action="settings">${t.ui.settings}</button>
-          </div>
-        </section>
-      </main>
-    `;
-  }
+    if (!this.villageRenderer) {
+      return;
+    }
 
-  private renderSettings(): void {
-    const t = this.t();
+    if (!this.communityNameDraft.trim()) {
+      this.communityNameDraft = this.t().ui.defaultCommunityName;
+    }
 
-    this.shellReady = false;
-    this.root.innerHTML = `
-      <main class="menu-screen settings-screen">
-        <section class="settings-panel">
-          <button class="text-button" data-action="back-menu">${t.ui.back}</button>
-          <h1>${t.ui.settings}</h1>
-          <p>${t.ui.languageText}</p>
-          <div class="setting-row">
-            <label>${t.ui.language}</label>
-            <div class="language-options">
-              ${Object.values(packs)
-                .map((pack) => `
-                  <button class="language-button ${pack.locale === this.locale ? "active" : ""}" data-locale="${pack.locale}">
-                    ${pack.label}
-                  </button>
-                `)
-                .join("")}
-            </div>
-          </div>
-        </section>
-      </main>
-    `;
-  }
-
-  private renderNewGame(): void {
-    const t = this.t();
-
-    this.shellReady = false;
-    this.root.innerHTML = `
-      <main class="menu-screen settings-screen">
-        <section class="settings-panel">
-          <button class="text-button" data-action="back-menu">${t.ui.back}</button>
-          <p class="menu-kicker">${t.ui.newGame}</p>
-          <h1>${t.ui.nameCommunity}</h1>
-          <p>${t.ui.nameCommunityText}</p>
-          <div class="setting-row">
-            <label for="community-name">${t.ui.communityName}</label>
-            <input id="community-name" class="menu-input" data-role="community-name" maxlength="32" value="${this.escapeHtml(t.ui.defaultCommunityName)}" />
-          </div>
-          <div class="menu-actions compact">
-            <button class="menu-button primary" data-action="start-new-community">${t.ui.startCommunity}</button>
-          </div>
-        </section>
-      </main>
-    `;
-
-    this.root.querySelector<HTMLInputElement>("[data-role='community-name']")?.select();
-  }
-
-  private renderLoadGame(): void {
-    const t = this.t();
     const saves = listSavedGames();
+    const frontMode = this.mode === "game" ? "menu" : this.mode;
+    const model: FrontScreenModel = {
+      mode: frontMode,
+      translations: this.t(),
+      canContinue: saves.some((save) => save.loadable),
+      communityNameDraft: this.communityNameDraft,
+      locales: Object.values(packs).map((pack) => ({ id: pack.locale, label: pack.label })),
+      activeLocale: this.locale,
+      saves: saves.map((save): FrontScreenSaveEntry => ({
+        id: save.id,
+        communityName: save.communityName,
+        elapsedSeconds: save.elapsedSeconds,
+        loadable: save.loadable,
+        version: save.version,
+      })),
+      pendingDeleteSaveId: this.pendingDeleteSaveId,
+    };
 
-    this.shellReady = false;
-    this.root.innerHTML = `
-      <main class="menu-screen settings-screen">
-        <section class="settings-panel save-select-panel">
-          <button class="text-button" data-action="back-menu">${t.ui.back}</button>
-          <p class="menu-kicker">${t.ui.continue}</p>
-          <h1>${t.ui.savedCommunities}</h1>
-          <div class="save-list">
-            ${
-              saves.length === 0
-                ? `<p class="muted">${t.ui.noSavedCommunities}</p>`
-                : saves
-                    .map((save) => `
-                      <button class="save-card" data-action="load-save" data-save-id="${save.id}">
-                        <span>${this.escapeHtml(save.communityName)}</span>
-                        <strong>${t.ui.day} ${getGameDay(save.elapsedSeconds)} / ${formatGameClock(save.elapsedSeconds)}</strong>
-                      </button>
-                    `)
-                    .join("")
-            }
-          </div>
-        </section>
-      </main>
-    `;
+    this.villageRenderer.renderFrontScreen(model);
+    this.updateShellMode();
   }
 
   private renderGame(): void {
@@ -323,7 +248,7 @@ export class App {
   }
 
   private handleCanvasClick(event: MouseEvent): void {
-    if (!this.state) {
+    if (this.mode !== "game" || !this.state) {
       return;
     }
 
@@ -359,6 +284,12 @@ export class App {
     this.suppressVillageClickUntil = Date.now() + 400;
     if (event.detail.action && event.detail.action !== "consume-pointer") {
       this.playUiSound(this.uiClickAudio);
+    }
+    if (this.handleAppModeAction(event.detail.action, event.detail.value)) {
+      return;
+    }
+    if (this.mode !== "game") {
+      return;
     }
     this.handleGameAction(event.detail);
   }
@@ -607,112 +538,6 @@ export class App {
     }
   }
 
-  private handleActionClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-
-    const button = target.closest<HTMLButtonElement>("button");
-
-    if (!button) {
-      return;
-    }
-
-    this.playUiSound(this.uiClickAudio);
-
-    if (button.dataset.locale) {
-      this.locale = button.dataset.locale as Locale;
-      saveLocale(this.locale);
-      this.requestRender();
-      return;
-    }
-
-    const action = button.dataset.action;
-
-    if (action === "new-game") {
-      this.mode = "new-game";
-      this.requestRender();
-      return;
-    }
-
-    if (action === "continue") {
-      this.mode = "load-game";
-      this.requestRender();
-      return;
-    }
-
-    if (action === "start-new-community") {
-      this.startNewCommunity();
-      return;
-    }
-
-    if (action === "load-save" && button.dataset.saveId) {
-      if (this.game.load(button.dataset.saveId)) {
-        this.startGameSession();
-      }
-      return;
-    }
-
-    if (action === "settings") {
-      this.mode = "settings";
-      this.requestRender();
-      return;
-    }
-
-    if (action === "back-menu") {
-      this.mode = "menu";
-      this.requestRender();
-      return;
-    }
-
-    const gameAction = this.getDomGameAction(button, action);
-
-    if (gameAction) {
-      this.handleGameAction(gameAction);
-    }
-  }
-
-  private getDomGameAction(
-    button: HTMLButtonElement,
-    action: string | undefined,
-  ): PixiActionDetail | null {
-    if (button.dataset.speed) {
-      return { speed: Number(button.dataset.speed) as GameSpeed };
-    }
-
-    if (
-      action === "close-village-modal" ||
-      action === "open-selected-plot" ||
-      action === "pause" ||
-      action === "home" ||
-      action === "barracks-worker-to-troop" ||
-      action === "barracks-troop-to-worker"
-    ) {
-      return {
-        action,
-        troopCount: button.dataset.troopCount
-          ? Number(button.dataset.troopCount)
-          : undefined,
-      };
-    }
-
-    if ((action === "upgrade" || action === "building-workers") && button.dataset.building) {
-      return {
-        action,
-        building: button.dataset.building as BuildingId,
-        delta: Number(button.dataset.delta ?? 0),
-      };
-    }
-
-    if (action === "build" && button.dataset.building && button.dataset.plot) {
-      return {
-        action,
-        building: button.dataset.building as BuildingId,
-        plot: button.dataset.plot,
-      };
-    }
-
-    return null;
-  }
-
   private handleTooltipOver(event: MouseEvent): void {
     const target = this.findTooltipTarget(event.target);
 
@@ -757,26 +582,48 @@ export class App {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
-    if (this.mode !== "new-game" || event.key !== "Enter") {
+    if (this.mode !== "new-game") {
       return;
     }
-
-    if (event.target instanceof HTMLInputElement) {
+    if (event.key === "Enter") {
       event.preventDefault();
       this.startNewCommunity();
+      return;
     }
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      this.communityNameDraft = this.communityNameDraft.slice(0, -1);
+      this.requestRender();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.mode = "menu";
+      this.requestRender();
+      return;
+    }
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+    if (this.communityNameDraft.length >= 32) {
+      return;
+    }
+    this.communityNameDraft += event.key;
+    this.requestRender();
   }
 
   private startNewCommunity(): void {
-    const input = this.root.querySelector<HTMLInputElement>("[data-role='community-name']");
-    const communityName = input?.value.trim() || this.t().ui.defaultCommunityName;
+    const communityName = this.communityNameDraft.trim() || this.t().ui.defaultCommunityName;
 
     this.game.newGame(communityName);
+    this.communityNameDraft = communityName;
+    this.pendingDeleteSaveId = null;
     this.startGameSession();
   }
 
   private startGameSession(): void {
     this.mode = "game";
+    this.pendingDeleteSaveId = null;
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
     this.gameOverPreview = null;
@@ -797,6 +644,7 @@ export class App {
   private returnHome(): void {
     const wasModalOpen = this.isAnyModalOpen();
     this.mode = "menu";
+    this.pendingDeleteSaveId = null;
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
@@ -806,8 +654,6 @@ export class App {
     this.godMode?.destroy();
     this.godMode = null;
     this.game.stop();
-    this.destroyVillageRenderer();
-    this.shellReady = false;
     this.stopAmbientLoops();
     this.requestRender();
     this.playModalTransitionSound(wasModalOpen);
@@ -1043,14 +889,6 @@ export class App {
     return audio;
   }
 
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
   private findTooltipTarget(target: EventTarget | null): HTMLElement | null {
     if (!(target instanceof HTMLElement)) {
       return null;
@@ -1240,5 +1078,98 @@ export class App {
         this.godMode.update(this.state);
       }
     });
+  }
+
+  private handleAppModeAction(action: string | undefined, value?: string): boolean {
+    if (!action) {
+      return false;
+    }
+
+    if (action !== "delete-save" && action !== "confirm-delete-save" && action !== "cancel-delete-save") {
+      this.pendingDeleteSaveId = null;
+    }
+
+    if (action === "new-game") {
+      this.mode = "new-game";
+      if (!this.communityNameDraft.trim()) {
+        this.communityNameDraft = this.t().ui.defaultCommunityName;
+      }
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "continue") {
+      this.mode = "load-game";
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "settings") {
+      this.mode = "settings";
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "back-menu") {
+      this.mode = "menu";
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "select-locale" && value) {
+      this.locale = value as Locale;
+      saveLocale(this.locale);
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "community-name-backspace") {
+      this.communityNameDraft = this.communityNameDraft.slice(0, -1);
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "community-name-clear") {
+      this.communityNameDraft = "";
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "start-new-community") {
+      this.startNewCommunity();
+      return true;
+    }
+
+    if (action === "load-save" && value) {
+      const selectedSave = listSavedGames().find((save) => save.id === value);
+      if (!selectedSave?.loadable) {
+        return true;
+      }
+      if (this.game.load(value)) {
+        this.startGameSession();
+      }
+      return true;
+    }
+
+    if (action === "delete-save" && value) {
+      this.pendingDeleteSaveId = value;
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "cancel-delete-save") {
+      this.pendingDeleteSaveId = null;
+      this.requestRender();
+      return true;
+    }
+
+    if (action === "confirm-delete-save" && value) {
+      deleteSavedGame(value);
+      this.pendingDeleteSaveId = null;
+      this.requestRender();
+      return true;
+    }
+
+    return false;
   }
 }
