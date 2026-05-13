@@ -50,6 +50,15 @@ without baking in a background.
 - source image extracted from `C:\Users\nikol\Desktop\krovi.png` (6-bush magenta sheet)
 - background removal uses the same magenta keying and boundary cleanup as `trees.png`
 
+`water.png` is a freeform water/decor atlas:
+- 20 frames (`5x4` grid)
+- frame size `256x256`
+- atlas layout `5 columns x 4 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `1280x1024`
+- source image extracted from `C:\Users\nikol\Desktop\water.png`
+- magenta sheet background is converted to real alpha and packed into normalized cells
+
 `nature-blocks.png` is an isometric block-style terrain atlas:
 - 20 frames (`5x4` grid; first 19 slots used, last slot left transparent)
 - frame size `128x128`

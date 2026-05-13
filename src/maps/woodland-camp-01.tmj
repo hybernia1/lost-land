@@ -139,6 +139,25 @@
         }, 
         {
          "draworder":"topdown",
+         "id":7,
+         "name":"water",
+         "objects":[],
+         "offsetx":10.6666666666656,
+         "offsety":-7.99999999999955,
+         "opacity":1,
+         "properties":[
+                {
+                 "name":"placementMode",
+                 "type":"string",
+                 "value":"free"
+                }],
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
+        }, 
+        {
+         "draworder":"topdown",
          "id":3,
          "name":"decor",
          "objects":[
@@ -1277,7 +1296,7 @@
          "x":0,
          "y":0
         }],
- "nextlayerid":7,
+ "nextlayerid":8,
  "nextobjectid":417,
  "orientation":"isometric",
  "properties":[
@@ -1313,6 +1332,10 @@
         {
          "firstgid":77,
          "source":"tilesets\/nature-blocks.tsj"
+        }, 
+        {
+         "firstgid":97,
+         "source":"tilesets\/water.tsj"
         }],
  "tilewidth":128,
  "type":"map",
