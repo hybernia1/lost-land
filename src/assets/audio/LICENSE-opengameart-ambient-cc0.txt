@@ -1,5 +1,5 @@
-OpenGameArt ambient files used in this project
-=============================================
+OpenGameArt CC0 audio files used in this project
+================================================
 
 1) ambient-day-birds.ogg
    - Source page: https://opengameart.org/content/ambient-bird-sounds
@@ -11,4 +11,11 @@ OpenGameArt ambient files used in this project
    - Source page: https://opengameart.org/content/crickets-ambient-noise-loopable
    - Direct download: https://opengameart.org/sites/default/files/crickets_1.mp3
    - Author on OpenGameArt: Wolfgang_
+   - License listed on source page: CC0
+
+3) ambient-rain-loop.ogg
+   - Source page: https://opengameart.org/content/rain-loopable
+   - Direct download package: https://opengameart.org/sites/default/files/Rain%20OGG.zip
+   - Selected file from package: 3.ogg
+   - Author on OpenGameArt: Ylmir
    - License listed on source page: CC0

@@ -1,7 +1,9 @@
 import {
   Application,
   CanvasTextMetrics,
+  CullerPlugin,
   Container,
+  extensions,
   Graphics,
   Rectangle,
   Text,
@@ -188,6 +190,8 @@ type TerrainTintBinding = {
   sprite: Sprite;
   tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
 };
+const STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE = 4096;
+let cullerPluginRegistered = false;
 export type {
   ConquestResultPreview,
   GameOverPreview,
@@ -269,6 +273,8 @@ export class PixiVillageRenderer {
   private cameraDragBlocked = false;
   private lastStaticWorldKey: string | null = null;
   private lastBackgroundKey: string | null = null;
+  private staticWorldCachedAsTexture = false;
+  private canCacheStaticWorldAsTexture = false;
   private readonly terrainTintBindings: TerrainTintBinding[] = [];
   private lastTerrainCondition: EnvironmentConditionId | null = null;
   private readonly ambientEffects: AmbientEffectsController;
@@ -302,6 +308,8 @@ export class PixiVillageRenderer {
     this.environmentOverlayLayer.addChild(this.environmentOverlayGraphic);
     this.daylightOverlayLayer.addChild(this.daylightOverlayGraphic);
     this.cameraLayer.addChild(this.cameraStaticLayer, this.cameraDynamicLayer);
+    this.cameraStaticLayer.cullable = true;
+    this.cameraStaticLayer.cullableChildren = true;
     this.worldLayer.addChild(
       this.backgroundLayer,
       this.cameraLayer,
@@ -386,13 +394,19 @@ export class PixiVillageRenderer {
     this.applyCameraTransform();
     const staticWorldKey = this.getStaticWorldKey();
     if (staticWorldKey !== this.lastStaticWorldKey) {
+      this.disableStaticWorldCache();
       this.clearContainerChildren(this.cameraStaticLayer);
       this.resetTerrainTintBindings();
       drawWorldTerrain(this.worldRendererHost());
       drawWorldDecorObjects(this.worldRendererHost());
+      this.updateStaticWorldCullArea();
       this.lastStaticWorldKey = staticWorldKey;
+      this.enableStaticWorldCacheIfEligible();
     }
-    this.applyTerrainTintForCondition(state.environment.condition);
+    const terrainTintChanged = this.applyTerrainTintForCondition(state.environment.condition);
+    if (terrainTintChanged && this.staticWorldCachedAsTexture) {
+      this.cameraStaticLayer.updateCacheTexture();
+    }
     const backgroundKey = `${Math.round(width)}x${Math.round(height)}`;
     if (backgroundKey !== this.lastBackgroundKey) {
       this.clearContainerChildren(this.backgroundLayer);
@@ -589,6 +603,7 @@ export class PixiVillageRenderer {
     this.host.removeEventListener("pointermove", this.handlePointerMove);
     this.host.removeEventListener("pointerup", this.handlePointerUp);
     this.host.removeEventListener("pointercancel", this.handlePointerUp);
+    this.disableStaticWorldCache();
     this.ambientEffects.stopAnimation();
     this.app?.destroy(true);
     this.app = null;
@@ -596,12 +611,19 @@ export class PixiVillageRenderer {
 
   private async initialize(): Promise<void> {
     const app = new Application();
+    if (!cullerPluginRegistered) {
+      extensions.add(CullerPlugin);
+      cullerPluginRegistered = true;
+    }
     await app.init({
       resizeTo: this.host,
       backgroundAlpha: 0,
       antialias: false,
       autoStart: false,
       autoDensity: true,
+      culler: {
+        updateTransform: true,
+      },
       resolution: Math.min(window.devicePixelRatio || 1, MAX_RENDER_RESOLUTION),
     });
 
@@ -611,6 +633,7 @@ export class PixiVillageRenderer {
     this.app = app;
 
     await this.assets.load();
+    this.canCacheStaticWorldAsTexture = this.computeStaticWorldCacheEligibility();
     this.requestRender();
   }
 
@@ -2492,16 +2515,72 @@ export class PixiVillageRenderer {
     this.lastTerrainCondition = null;
   }
 
+  private disableStaticWorldCache(): void {
+    if (!this.staticWorldCachedAsTexture) {
+      return;
+    }
+
+    this.cameraStaticLayer.cacheAsTexture(false);
+    this.staticWorldCachedAsTexture = false;
+  }
+
+  private enableStaticWorldCacheIfEligible(): void {
+    if (
+      !this.canCacheStaticWorldAsTexture ||
+      this.staticWorldCachedAsTexture ||
+      !this.isStaticWorldCacheSizeSafe()
+    ) {
+      return;
+    }
+
+    this.cameraStaticLayer.cacheAsTexture({
+      antialias: false,
+      resolution: 1,
+      scaleMode: "nearest",
+    });
+    this.staticWorldCachedAsTexture = true;
+  }
+
+  private isStaticWorldCacheSizeSafe(): boolean {
+    const mapWidth = defaultVillageLayout.width * this.layout.scale;
+    const mapHeight = defaultVillageLayout.height * this.layout.scale;
+
+    return mapWidth <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE &&
+      mapHeight <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE;
+  }
+
+  private computeStaticWorldCacheEligibility(): boolean {
+    return false;
+  }
+
+  private updateStaticWorldCullArea(): void {
+    const terrainWidth = defaultVillageLayout.width * this.layout.scale;
+    const terrainHeight = defaultVillageLayout.height * this.layout.scale;
+    const terrainOriginX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
+    const terrainOriginY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+
+    this.cameraStaticLayer.cullArea = new Rectangle(
+      terrainOriginX,
+      terrainOriginY,
+      terrainWidth,
+      terrainHeight,
+    );
+  }
+
   private trackTerrainSprite(
     sprite: Sprite,
     tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
   ): void {
+    if (!tintByEnvironment || Object.keys(tintByEnvironment).length === 0) {
+      return;
+    }
+
     this.terrainTintBindings.push({ sprite, tintByEnvironment });
   }
 
-  private applyTerrainTintForCondition(condition: EnvironmentConditionId): void {
+  private applyTerrainTintForCondition(condition: EnvironmentConditionId): boolean {
     if (condition === this.lastTerrainCondition) {
-      return;
+      return false;
     }
 
     for (const binding of this.terrainTintBindings) {
@@ -2509,6 +2588,7 @@ export class PixiVillageRenderer {
     }
 
     this.lastTerrainCondition = condition;
+    return true;
   }
 
   private getPlotBounds(plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">): Bounds {

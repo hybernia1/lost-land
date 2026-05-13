@@ -9,11 +9,29 @@ import {
   buildingVisualDefinitions,
   type BuildingVisualDefinition,
 } from "../data/buildingVisuals";
+import type { TerrainTextureDefinition } from "../data/terrainTiles";
 import { villageLayoutDefinitions } from "../data/villageLayouts";
 import type { BuildingId } from "../game/types";
 
 const terrainTextureCache = new Map<string, Texture>();
 const terrainAnimationCache = new Map<string, FrameObject[] | null>();
+const terrainTextureDefinitionByKey = new Map<string, TerrainTextureDefinition>();
+const terrainTextureKeysByAtlasUrl = new Map<string, string[]>();
+
+for (const layout of villageLayoutDefinitions) {
+  for (const [textureKey, definition] of Object.entries(layout.tileTextures)) {
+    if (!terrainTextureDefinitionByKey.has(textureKey)) {
+      terrainTextureDefinitionByKey.set(textureKey, definition);
+    }
+
+    const keys = terrainTextureKeysByAtlasUrl.get(definition.atlasUrl);
+    if (keys) {
+      keys.push(textureKey);
+    } else {
+      terrainTextureKeysByAtlasUrl.set(definition.atlasUrl, [textureKey]);
+    }
+  }
+}
 
 export class VillageAssets {
   private readonly buildingTextures = new Map<string, Texture>();
@@ -96,6 +114,11 @@ export class VillageAssets {
     return animationFrames;
   }
 
+  hasTerrainTileAnimation(textureKey: string): boolean {
+    const tile = this.getTerrainTextureDefinition(textureKey);
+    return Boolean(tile?.animation && tile.animation.length > 1);
+  }
+
   private async loadTextures(): Promise<void> {
     await Promise.all([
       this.loadBuildingTextures(),
@@ -115,41 +138,36 @@ export class VillageAssets {
     await Promise.all([
       ...Array.from(uniqueTextureUrls).map(async (textureUrl) => {
         const texture = await Assets.load<Texture>(textureUrl);
+        texture.source.scaleMode = "nearest";
         this.buildingTextures.set(textureUrl, texture);
       }),
       Assets.load<Texture>(constructionSiteTextureUrl).then((texture) => {
+        texture.source.scaleMode = "nearest";
         this.constructionSiteTexture = texture;
       }),
     ]);
   }
 
   private async loadTerrainAtlases(): Promise<void> {
-    const atlasUrls = new Set<string>();
-
-    for (const layout of villageLayoutDefinitions) {
-      for (const tile of Object.values(layout.tileTextures)) {
-        atlasUrls.add(tile.atlasUrl);
-      }
-    }
-
     await Promise.all(
-      Array.from(atlasUrls).map(async (atlasUrl) => {
+      Array.from(terrainTextureKeysByAtlasUrl.keys()).map(async (atlasUrl) => {
         const texture = await Assets.load<Texture>(atlasUrl);
+        texture.source.scaleMode = "nearest";
         this.terrainAtlases.set(atlasUrl, texture);
       }),
     );
+
+    this.prewarmTerrainTileTextures();
+  }
+
+  private prewarmTerrainTileTextures(): void {
+    for (const textureKey of terrainTextureDefinitionByKey.keys()) {
+      this.getTerrainTileTexture(textureKey);
+    }
   }
 
   private getTerrainTextureDefinition(textureKey: string) {
-    for (const layout of villageLayoutDefinitions) {
-      const tile = layout.tileTextures[textureKey];
-
-      if (tile) {
-        return tile;
-      }
-    }
-
-    return null;
+    return terrainTextureDefinitionByKey.get(textureKey) ?? null;
   }
 
   private getBuildingVisual(buildingId: BuildingId): BuildingVisualDefinition | null {

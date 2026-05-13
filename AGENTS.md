@@ -63,6 +63,9 @@ Python with Pillow is available in this workspace and is suitable for
 deterministic raster atlas work, especially isometric tile assets that must keep
 exact frame sizes and angles.
 
+Python audio toolchain is also available for local SFX generation/post-processing:
+`numpy`, `scipy`, `soundfile`, `librosa`, and `pedalboard`.
+
 Keep temporary implementation notes in this file only when they are useful for
 future Codex sessions. Do not put user-facing design docs, game lore, or task
 lists here unless they are also useful as agent guidance.
@@ -319,4 +322,63 @@ cleanly instead of carrying compatibility branches.
       - `src/render/pixi/modals/villageModals.ts`
       - `src/render/pixi/modals/buildingModals.ts`
   - Behavioral intent unchanged; this pass improves refactor safety and future maintainability.
+  - Verification: `npm run build` passes.
+- 2026-05-13: Map render performance and texture sampling pass.
+  - `PixiVillageRenderer` now enables `cameraStaticLayer.cacheAsTexture(...)` for static terrain + decor after rebuild, which reduces per-frame render overhead of large map tile counts.
+  - Static cache auto-disables when animated terrain textures are used, preventing frozen tile animations.
+  - Environment tint updates now trigger `updateCacheTexture()` so cached static visuals remain in sync with weather/condition tint changes.
+  - `VillageAssets` now pre-indexes terrain texture definitions by key, prewarms terrain sub-textures after atlas load, and applies `nearest` scale mode on loaded building/terrain textures for clearer pixel-art sampling.
+  - Verification: `npm run build` passes.
+- 2026-05-13: Hotfix for black map regression.
+  - Static world cache path is temporarily disabled (`computeStaticWorldCacheEligibility()` returns `false`) because some layouts/devices render cached terrain as black.
+  - Texture/index/prewarm changes remain active; map rendering falls back to stable pre-cache behavior.
+  - Verification: `npm run build` passes.
+- 2026-05-13: Safe follow-up map render optimization (no static texture cache).
+  - Enabled Pixi `CullerPlugin` during renderer init and configured `cameraStaticLayer` as cullable with `cullArea` based on current terrain bounds.
+  - Marked static terrain and decor sprites as `cullable = true` so off-screen sprites can be skipped by culling path.
+  - Reduced terrain tint bookkeeping overhead: `trackTerrainSprite` now stores bindings only when `tintByEnvironment` is actually defined and non-empty.
+  - Static world cache remains disabled to avoid black-map regression.
+  - Verification: `npm run build` passes.
+- 2026-05-13: Environment terrain tint defaults for weather.
+  - Added default `tintByEnvironment` assignment in `src/data/tiledMap.ts` while building `tileTextures` from Tiled tilesets.
+  - Current presets are data-driven by tileset id (`ground`, `brick`, `trees`, `objects`) and include:
+    - `rain` (cooler/darker tint)
+    - `snowFront` (colder/brighter tint)
+    - `radiation` (subtle green shift)
+  - `stable` remains un-tinted (`0xffffff` fallback in renderer).
+  - Verification: `npm run build` passes.
+- 2026-05-13: Rain ambient loop added to runtime audio switching.
+  - Added `src/assets/audio/ambient-rain-loop.ogg` from OpenGameArt `Rain (loopable)` (CC0), package file `3.ogg`.
+  - Updated `src/ui/App.ts` ambient selection:
+    - when `state.environment.condition === "rain"`, app now plays rain loop instead of day/night loop.
+    - day/night behavior remains unchanged for non-rain conditions.
+  - Updated source/license notes:
+    - `src/assets/audio/README.md`
+    - `src/assets/audio/LICENSE-opengameart-ambient-cc0.txt`
+  - Verification: `npm run build` passes.
+- 2026-05-13: Ambient loop transitions smoothed with crossfade.
+  - Replaced hard stop/start ambient switching in `src/ui/App.ts` with requestAnimationFrame-driven crossfade logic.
+  - Added shared ambient loop volume map and `AMBIENT_CROSSFADE_MS` timing (currently 900 ms).
+  - Transition behavior now:
+    - day/night/rain loop fades out and incoming loop fades in smoothly,
+    - active loop changes no longer produce abrupt audio cuts.
+  - `stopAmbientLoops()` now cancels in-flight crossfade and restores per-loop baseline volumes.
+  - Verification: `npm run build` passes.
+- 2026-05-13: Decision alert SFX replaced with heartbeat.
+  - Replaced quest decision alert import in `src/ui/App.ts` from `quest-decision-alert.wav` to `decision-heartbeat-alert.wav`.
+  - Decision alert asset is now a locally generated synthetic heartbeat (16-bit PCM WAV) with stronger mid-frequency attack for better audibility on laptop/mobile speakers.
+  - Latest render was regenerated through Python audio tooling (`numpy` + `scipy` + `soundfile` + `pedalboard`) for envelope shaping, filtering, and dynamics consistency.
+  - Extended variant length to ~3 seconds (repeating lub-dub phrase) for a less abrupt decision popup cue.
+  - Decision alert volume set to `0.72` via `createUiAudio(source, volume)` helper signature.
+  - Updated docs/license notes:
+    - `src/assets/audio/README.md`
+    - `src/assets/audio/LICENSE-opengameart-ambient-cc0.txt`
+  - Verification: `npm run build` passes.
+- 2026-05-13: Audio tuning centralized in config.
+  - Added `audio` section to `src/game/config.ts` for shared runtime tuning:
+    - base UI volume
+    - decision alert volume
+    - ambient loop volumes (`day/night/rain`)
+    - ambient crossfade duration
+  - `src/ui/App.ts` now reads these values from `gameConfig.audio` instead of hard-coded literals.
   - Verification: `npm run build` passes.

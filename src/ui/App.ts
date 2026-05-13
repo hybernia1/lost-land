@@ -1,4 +1,5 @@
 import type { Game } from "../game/Game";
+import { gameConfig } from "../game/config";
 import { formatGameClock, getDaylightState, getGameDay } from "../game/time";
 import type { BuildingId, DecisionHistoryEntry, GameSpeed, GameState } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
@@ -13,11 +14,16 @@ import modalCloseSoundUrl from "../assets/audio/modal-close.ogg";
 import tabSwitchSoundUrl from "../assets/audio/tab-switch.ogg";
 import uiClickSoundUrl from "../assets/audio/ui-click.ogg";
 import questRewardClaimSoundUrl from "../assets/audio/quest-reward-claim.ogg";
-import decisionQuestAlertSoundUrl from "../assets/audio/quest-decision-alert.wav";
+import decisionQuestAlertSoundUrl from "../assets/audio/decision-heartbeat-alert.wav";
 import dayAmbientLoopSoundUrl from "../assets/audio/ambient-day-birds.ogg";
 import nightAmbientLoopSoundUrl from "../assets/audio/ambient-night-crickets.mp3";
+import rainAmbientLoopSoundUrl from "../assets/audio/ambient-rain-loop.ogg";
 
 type AppMode = "menu" | "new-game" | "load-game" | "settings" | "game";
+type AmbientLoop = "day" | "night" | "rain";
+
+const AMBIENT_LOOP_VOLUME: Record<AmbientLoop, number> = gameConfig.audio.ambientLoopVolume;
+const AMBIENT_CROSSFADE_MS = gameConfig.audio.ambientCrossfadeMs;
 
 export class App {
   private villageRenderer: PixiVillageRenderer | null = null;
@@ -42,10 +48,16 @@ export class App {
   private readonly tabSwitchAudio = this.createUiAudio(tabSwitchSoundUrl);
   private readonly uiClickAudio = this.createUiAudio(uiClickSoundUrl);
   private readonly questRewardClaimAudio = this.createUiAudio(questRewardClaimSoundUrl);
-  private readonly decisionQuestAlertAudio = this.createUiAudio(decisionQuestAlertSoundUrl);
-  private readonly dayAmbientLoopAudio = this.createLoopingAudio(dayAmbientLoopSoundUrl, 0.24);
-  private readonly nightAmbientLoopAudio = this.createLoopingAudio(nightAmbientLoopSoundUrl, 0.28);
-  private activeAmbientLoop: "day" | "night" | null = null;
+  private readonly decisionQuestAlertAudio = this.createUiAudio(
+    decisionQuestAlertSoundUrl,
+    gameConfig.audio.decisionAlertVolume,
+  );
+  private readonly dayAmbientLoopAudio = this.createLoopingAudio(dayAmbientLoopSoundUrl, AMBIENT_LOOP_VOLUME.day);
+  private readonly nightAmbientLoopAudio = this.createLoopingAudio(nightAmbientLoopSoundUrl, AMBIENT_LOOP_VOLUME.night);
+  private readonly rainAmbientLoopAudio = this.createLoopingAudio(rainAmbientLoopSoundUrl, AMBIENT_LOOP_VOLUME.rain);
+  private activeAmbientLoop: AmbientLoop | null = null;
+  private ambientCrossfadeFrameId: number | null = null;
+  private ambientCrossfadeToken = 0;
   private godMode: GodModeController | null = null;
 
   constructor(
@@ -853,41 +865,147 @@ export class App {
     }
 
     const phase = getDaylightState(this.state.elapsedSeconds).phase;
-    const targetLoop = phase === "night" || phase === "dawn" ? "night" : "day";
+    const targetLoop = this.state.environment.condition === "rain"
+      ? "rain"
+      : phase === "night" || phase === "dawn"
+        ? "night"
+        : "day";
 
-    if (this.activeAmbientLoop === targetLoop) {
-      return;
-    }
-
-    const nextAudio =
-      targetLoop === "day" ? this.dayAmbientLoopAudio : this.nightAmbientLoopAudio;
-    const previousAudio =
-      targetLoop === "day" ? this.nightAmbientLoopAudio : this.dayAmbientLoopAudio;
-
-    if (previousAudio) {
-      previousAudio.pause();
-      previousAudio.currentTime = 0;
-    }
-
-    this.activeAmbientLoop = targetLoop;
-    if (nextAudio) {
-      nextAudio.currentTime = 0;
-      void nextAudio.play().catch(() => undefined);
-    }
+    this.transitionAmbientLoop(targetLoop);
   }
 
   private stopAmbientLoops(): void {
+    this.cancelAmbientCrossfade();
+
     if (this.dayAmbientLoopAudio) {
       this.dayAmbientLoopAudio.pause();
       this.dayAmbientLoopAudio.currentTime = 0;
+      this.dayAmbientLoopAudio.volume = AMBIENT_LOOP_VOLUME.day;
     }
 
     if (this.nightAmbientLoopAudio) {
       this.nightAmbientLoopAudio.pause();
       this.nightAmbientLoopAudio.currentTime = 0;
+      this.nightAmbientLoopAudio.volume = AMBIENT_LOOP_VOLUME.night;
+    }
+    if (this.rainAmbientLoopAudio) {
+      this.rainAmbientLoopAudio.pause();
+      this.rainAmbientLoopAudio.currentTime = 0;
+      this.rainAmbientLoopAudio.volume = AMBIENT_LOOP_VOLUME.rain;
     }
 
     this.activeAmbientLoop = null;
+  }
+
+  private transitionAmbientLoop(targetLoop: AmbientLoop): void {
+    if (this.activeAmbientLoop === targetLoop) {
+      return;
+    }
+
+    const nextAudio = this.getAmbientLoopAudio(targetLoop);
+
+    if (!nextAudio) {
+      this.stopAmbientLoops();
+      return;
+    }
+
+    this.cancelAmbientCrossfade();
+    const previousLoop = this.activeAmbientLoop;
+    const previousAudio = previousLoop
+      ? this.getAmbientLoopAudio(previousLoop)
+      : null;
+
+    this.activeAmbientLoop = targetLoop;
+
+    if (!previousAudio || previousAudio === nextAudio) {
+      nextAudio.volume = AMBIENT_LOOP_VOLUME[targetLoop];
+      if (nextAudio.paused) {
+        nextAudio.currentTime = 0;
+        void nextAudio.play().catch(() => undefined);
+      }
+      return;
+    }
+
+    const keepLoops: AmbientLoop[] = [targetLoop];
+    if (previousLoop) {
+      keepLoops.push(previousLoop);
+    }
+    this.pauseAmbientLoopsExcept(keepLoops);
+    const previousStartVolume = previousAudio.volume;
+    nextAudio.volume = 0;
+    nextAudio.currentTime = 0;
+    void nextAudio.play().catch(() => undefined);
+
+    const token = ++this.ambientCrossfadeToken;
+    const startMs = performance.now();
+    const step = (nowMs: number) => {
+      if (token !== this.ambientCrossfadeToken) {
+        return;
+      }
+
+      const progress = Math.min(1, Math.max(0, (nowMs - startMs) / AMBIENT_CROSSFADE_MS));
+      const eased = progress * progress * (3 - 2 * progress);
+      const nextVolume = AMBIENT_LOOP_VOLUME[targetLoop] * eased;
+      const previousVolume = previousStartVolume * (1 - eased);
+      nextAudio.volume = nextVolume;
+      previousAudio.volume = previousVolume;
+
+      if (progress >= 1) {
+        previousAudio.pause();
+        previousAudio.currentTime = 0;
+        if (previousLoop) {
+          previousAudio.volume = AMBIENT_LOOP_VOLUME[previousLoop];
+        }
+        nextAudio.volume = AMBIENT_LOOP_VOLUME[targetLoop];
+        this.ambientCrossfadeFrameId = null;
+        return;
+      }
+
+      this.ambientCrossfadeFrameId = window.requestAnimationFrame(step);
+    };
+
+    this.ambientCrossfadeFrameId = window.requestAnimationFrame(step);
+  }
+
+  private cancelAmbientCrossfade(): void {
+    if (this.ambientCrossfadeFrameId !== null) {
+      window.cancelAnimationFrame(this.ambientCrossfadeFrameId);
+      this.ambientCrossfadeFrameId = null;
+    }
+    this.ambientCrossfadeToken += 1;
+  }
+
+  private pauseAmbientLoopsExcept(keep: AmbientLoop[]): void {
+    const keepSet = new Set<AmbientLoop>(keep);
+    const loops: AmbientLoop[] = ["day", "night", "rain"];
+
+    for (const loop of loops) {
+      if (keepSet.has(loop)) {
+        continue;
+      }
+
+      const audio = this.getAmbientLoopAudio(loop);
+
+      if (!audio) {
+        continue;
+      }
+
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = AMBIENT_LOOP_VOLUME[loop];
+    }
+  }
+
+  private getAmbientLoopAudio(loop: AmbientLoop): HTMLAudioElement | null {
+    if (loop === "day") {
+      return this.dayAmbientLoopAudio;
+    }
+
+    if (loop === "night") {
+      return this.nightAmbientLoopAudio;
+    }
+
+    return this.rainAmbientLoopAudio;
   }
 
   private playUiSound(audio: HTMLAudioElement | null): void {
@@ -899,14 +1017,14 @@ export class App {
     void audio.play().catch(() => undefined);
   }
 
-  private createUiAudio(source: string): HTMLAudioElement | null {
+  private createUiAudio(source: string, volume: number = gameConfig.audio.uiVolume): HTMLAudioElement | null {
     if (typeof Audio === "undefined") {
       return null;
     }
 
     const audio = new Audio(source);
     audio.preload = "auto";
-    audio.volume = 0.45;
+    audio.volume = volume;
     return audio;
   }
 

@@ -24,4 +24,14 @@ export const gameConfig = {
   market: {
     tradeCooldownHours: 4,
   },
+  audio: {
+    uiVolume: 0.45,
+    decisionAlertVolume: 0.86,
+    ambientCrossfadeMs: 900,
+    ambientLoopVolume: {
+      day: 0.24,
+      night: 0.28,
+      rain: 0.3,
+    },
+  },
 } as const;
