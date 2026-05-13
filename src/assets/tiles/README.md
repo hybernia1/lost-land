@@ -39,3 +39,11 @@ without baking in a background.
 - no spacing between frames (`spacing=0`)
 - atlas size `1536x1024`
 - source images copied from `C:\Users\nikol\Desktop\shadowApartFromTree\*_img.png` (shadow variants excluded)
+
+`nature-blocks.png` is an isometric block-style terrain atlas:
+- 20 frames (`5x4` grid; first 19 slots used, last slot left transparent)
+- frame size `128x128`
+- atlas layout `5 columns x 4 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `640x512`
+- source images copied from `C:\Users\nikol\Desktop\iso grass\*.png`, then normalized into fixed `128x128` cells while preserving proportions

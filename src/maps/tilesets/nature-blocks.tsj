@@ -1,0 +1,207 @@
+{
+  "columns": 5,
+  "image": "../../assets/tiles/nature-blocks.png",
+  "imageheight": 512,
+  "imagewidth": 640,
+  "margin": 0,
+  "name": "natureBlocks",
+  "spacing": 0,
+  "tilecount": 20,
+  "tiledversion": "1.12.1",
+  "tileheight": 128,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass1"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass2"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass3"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass4"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass5"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass6"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass7"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass8"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass9"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "grass10"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt1"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt2"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt3"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt4"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone1"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone2"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone3"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone4"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairstone1"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}
