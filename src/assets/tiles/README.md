@@ -33,13 +33,22 @@ without baking in a background.
 - source images resized from `C:\Users\nikol\Desktop\objects\*.png` (including `brana.png`)
 
 `trees.png` is a freeform decor/tree atlas:
-- 24 frames (`6x4` grid; first 22 slots currently used, remaining slots left transparent for future assets)
+- 6 frames (`3x2` grid; no duplicates)
 - frame size `256x256`
-- atlas layout `6 columns x 4 rows`
+- atlas layout `3 columns x 2 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `1536x1024`
-- source image extracted from `C:\Users\nikol\Desktop\stromecky.png`
-- checkerboard preview background was reconstructed into real alpha by edge-connected background masking before atlas packing
+- atlas size `768x512`
+- source image extracted from `C:\Users\nikol\Desktop\stromecky.png` (6-tree magenta sheet)
+- background removal uses magenta keying plus boundary cleanup to produce real alpha in branch gaps before atlas packing
+
+`bush.png` is a freeform decor/bush atlas:
+- 6 frames (`3x2` grid)
+- frame size `256x256`
+- atlas layout `3 columns x 2 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `768x512`
+- source image extracted from `C:\Users\nikol\Desktop\krovi.png` (6-bush magenta sheet)
+- background removal uses the same magenta keying and boundary cleanup as `trees.png`
 
 `nature-blocks.png` is an isometric block-style terrain atlas:
 - 20 frames (`5x4` grid; first 19 slots used, last slot left transparent)
