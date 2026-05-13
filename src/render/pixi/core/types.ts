@@ -112,6 +112,7 @@ export type TextureAnimationBinding = {
 
 export type PixiActionDetail = {
   action?: string;
+  value?: string;
   building?: BuildingId;
   plot?: string;
   resourceSiteId?: string;

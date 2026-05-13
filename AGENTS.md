@@ -382,3 +382,17 @@ cleanly instead of carrying compatibility branches.
     - ambient crossfade duration
   - `src/ui/App.ts` now reads these values from `gameConfig.audio` instead of hard-coded literals.
   - Verification: `npm run build` passes.
+- 2026-05-13: Title/menu/settings/load moved to canvas runtime.
+  - Added front-screen rendering path to `PixiVillageRenderer` (`renderFrontScreen`) for:
+    - main menu
+    - new game naming flow
+    - settings language selection
+    - load-game list with in-canvas scrolling
+  - `App` now routes non-game modes through the same Pixi runtime instead of DOM start pages.
+  - Return-to-menu no longer destroys the renderer; session switches back to front-screen mode in the same canvas.
+  - Save list actions in canvas:
+    - load only for loadable/current-version saves
+    - legacy saves visible but locked
+    - delete via in-canvas confirm modal (no browser confirm dialog).
+  - Removed legacy DOM menu/start screen CSS and old DOM action routing in `App` (front flow is canvas-only).
+  - Verification: `npm run build` passes.
