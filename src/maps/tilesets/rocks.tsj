@@ -1,0 +1,77 @@
+﻿{
+  "columns": 3,
+  "image": "../../assets/tiles/rocks.png",
+  "imageheight": 512,
+  "imagewidth": 768,
+  "margin": 0,
+  "name": "rocks",
+  "spacing": 0,
+  "tilecount": 6,
+  "tiledversion": "1.12.1",
+  "tileheight": 256,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock01"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock02"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock03"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock04"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock05"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "rock06"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 256,
+  "type": "tileset",
+  "version": "1.10"
+}
