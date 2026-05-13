@@ -38,7 +38,8 @@ without baking in a background.
 - atlas layout `6 columns x 4 rows`
 - no spacing between frames (`spacing=0`)
 - atlas size `1536x1024`
-- source images copied from `C:\Users\nikol\Desktop\shadowApartFromTree\*_img.png` (shadow variants excluded)
+- source image extracted from `C:\Users\nikol\Desktop\stromecky.png`
+- checkerboard preview background was reconstructed into real alpha by edge-connected background masking before atlas packing
 
 `nature-blocks.png` is an isometric block-style terrain atlas:
 - 20 frames (`5x4` grid; first 19 slots used, last slot left transparent)
