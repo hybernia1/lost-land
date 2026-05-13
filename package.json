@@ -3,16 +3,48 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env ELECTRON_START_URL=http://127.0.0.1:5173 electron .\"",
+    "electron:start": "electron .",
+    "electron:pack": "npm run build && electron-builder --win --x64 --dir",
+    "electron:build": "npm run build && electron-builder --win nsis --x64"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^37.0.2",
+    "electron-builder": "^26.0.12",
     "typescript": "^5.4.5",
     "vite": "^5.2.0"
   },
   "dependencies": {
     "pixi.js": "^8.18.1"
+  },
+  "build": {
+    "appId": "cz.lostland.game",
+    "productName": "Lost Land",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
   }
 }
