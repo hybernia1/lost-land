@@ -5,7 +5,7 @@ import {
   Sprite,
   type FrameObject,
 } from "pixi.js";
-import { DAYLIGHT_DARKNESS_BUCKET_STEP, DAYLIGHT_TRANSITION_FRAME_MIN_MS, RADIATION_MOTE_MAX_COUNT, RADIATION_MOTE_MIN_COUNT, RAIN_LAYER_A_MAX_COUNT, RAIN_LAYER_A_MIN_COUNT, RAIN_LAYER_B_MAX_COUNT, RAIN_LAYER_B_MIN_COUNT, TEXTURE_ANIMATION_FRAME_MIN_MS, VISUAL_FRAME_MIN_MS, WEATHER_OVERLAY_FRAME_MIN_MS } from "../core/constants";
+import { DAYLIGHT_DARKNESS_BUCKET_STEP, DAYLIGHT_TRANSITION_FRAME_MIN_MS, RAIN_LAYER_A_MAX_COUNT, RAIN_LAYER_A_MIN_COUNT, RAIN_LAYER_B_MAX_COUNT, RAIN_LAYER_B_MIN_COUNT, TEXTURE_ANIMATION_FRAME_MIN_MS, VISUAL_FRAME_MIN_MS, WEATHER_OVERLAY_FRAME_MIN_MS } from "../core/constants";
 import type { TextureAnimationBinding, TextureAnimationFrame } from "../core/types";
 import { ENVIRONMENT_MAX_INTENSITY } from "../../../data/environment";
 import { getDaylightState } from "../../../game/time";
@@ -228,16 +228,12 @@ export class AmbientEffectsController {
     }
 
     const intensity = Math.max(1, Math.min(ENVIRONMENT_MAX_INTENSITY, intensityRaw));
-    const hazeColor = condition === "radiation"
-      ? 0x98cf6a
-      : condition === "snowFront"
-        ? 0xd9e6f2
-        : 0x4d7694;
-    const hazeAlpha = condition === "radiation"
-      ? 0.07 + intensity * 0.03
-      : condition === "snowFront"
-        ? 0.06 + intensity * 0.022
-        : 0.055 + intensity * 0.018;
+    const hazeColor = condition === "snowFront"
+      ? 0xd9e6f2
+      : 0x4d7694;
+    const hazeAlpha = condition === "snowFront"
+      ? 0.06 + intensity * 0.022
+      : 0.055 + intensity * 0.018;
 
     graphic.rect(0, 0, width, height).fill({ color: hazeColor, alpha: hazeAlpha });
 
@@ -339,38 +335,6 @@ export class AmbientEffectsController {
       }
     }
 
-    if (condition === "radiation") {
-      const bandSpacing = Math.max(20, 34 - intensity * 3);
-      const scanOffset = (visualTime * (24 + intensity * 5)) % bandSpacing;
-      for (let y = scanOffset; y < height + bandSpacing; y += bandSpacing) {
-        const bend = this.triangleWave(y * 0.01 + visualTime * 0.48) * (3.6 + intensity);
-        graphic.moveTo(-6, y);
-        graphic.lineTo(width + 6, y + bend);
-      }
-      graphic.stroke({ color: 0xc9f187, alpha: 0.09 + intensity * 0.035, width: 1 });
-
-      const area = width * height;
-      const moteCount = Math.max(
-        RADIATION_MOTE_MIN_COUNT,
-        Math.min(
-          RADIATION_MOTE_MAX_COUNT,
-          Math.round((area / 5600) * (0.88 + intensity * 0.2)),
-        ),
-      );
-      for (let index = 0; index < moteCount; index += 1) {
-        const seedX = this.getNoiseSeed(index * 3 + 1801);
-        const seedY = this.getNoiseSeed(index * 3 + 1811);
-        const seedPhase = this.getNoiseSeed(index * 3 + 1831);
-        const x = seedX * width;
-        const y = seedY * height;
-        const jitterX = this.triangleWave(visualTime * (1.18 + seedPhase * 0.8) + seedX * 8.2) * 5.5;
-        const jitterY = this.triangleWave(visualTime * (0.96 + seedPhase * 0.7) + seedY * 7.4) * 4.8;
-        graphic.circle(x + jitterX, y + jitterY, 1 + intensity * 0.2).fill({
-          color: 0xd8f8a6,
-          alpha: 0.06 + intensity * 0.025,
-        });
-      }
-    }
   }
 
   private redrawDaylightOverlay(

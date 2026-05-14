@@ -69,10 +69,6 @@ export function getLogEntryIconId(entry: GameState["log"][number]): string {
     return "crisis-snow";
   }
 
-  if (key === "logEnvironmentRadiationStarted" || key === "logEnvironmentRadiationEnded") {
-    return "crisis-radiation";
-  }
-
   if (
     key === "logShelterCrisisStarted" ||
     key === "logShelterCrisisWarning" ||

@@ -11,7 +11,7 @@ Current baseline:
 - DOM title menu/settings/save-load flow
 - localStorage save slots
 - shared game tuning in `src/game/config.ts`
-- environment conditions: stable, rain, snow front, radiation
+- environment conditions: stable, rain, snow front
 - day/night lighting driven by the game clock
 - main building atlas: 20 static upgrade levels in a `5x4` `256x256` sheet
 

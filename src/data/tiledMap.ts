@@ -361,12 +361,6 @@ function getTerrainTintByEnvironment(
         "tintSnowFront",
         `Tileset "${tileset.name}" is missing required tintSnowFront color property.`,
       ),
-    radiation: getColorProperty(tile?.properties, "tintRadiation") ??
-      requireColorProperty(
-        tileset.properties,
-        "tintRadiation",
-        `Tileset "${tileset.name}" is missing required tintRadiation color property.`,
-      ),
   };
 }
 

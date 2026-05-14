@@ -14,14 +14,13 @@ Spojujeme proto dve vrstvy:
 ## Aktualni rozhodnuti
 
 - Nepouzivat rocni obdobi jako hlavni osu. Svet kolem roku 2045 muze posilat
-  nahodne fronty, radiacni vlny a dalsi anomalie.
+  nahodne fronty a dalsi anomalie.
 - Nepojmenovavat system jen `weather`. Pouzivame sirsi pojem `environment`,
-  protoze radiace, toxicka mlha nebo popelovy spad patri do stejne rodiny
-  systemu jako dest nebo snih.
+  protoze sirsi hrozby prostredi patri do stejne rodiny systemu jako dest nebo
+  snih.
 - Mechaniky maji mit prednost pred finalnim artem. Vizuály nasleduji pravidla
   hry, ne obracene.
-- Aktualni implementovane condition jsou `stable`, `rain`, `snowFront` a
-  `radiation`.
+- Aktualni implementovane condition jsou `stable`, `rain` a `snowFront`.
 - Vliv environmentu na mapu zatim delaji Pixi overlaye/tinty nad Tiled
   tilemapou. Samostatne backgroundy podle condition ted nejsou soucasti in-game
   renderu.
@@ -36,8 +35,7 @@ Spojujeme proto dve vrstvy:
 type EnvironmentConditionId =
   | "stable"
   | "rain"
-  | "snowFront"
-  | "radiation";
+  | "snowFront";
 
 type EnvironmentState = {
   condition: EnvironmentConditionId;
@@ -84,22 +82,6 @@ Pravidla:
   pokles moralky
 - dormitory bez uhli se nepocita jako funkcni ubytovani, coz sedi na existujici
   pravidlo vytapeni
-
-## Radiace
-
-Radiace je `environment` condition:
-
-- ma zacatek, intenzitu, trvani a dalsi naplanovanou zmenu
-- zvysuje sanci na zdravotni incidenty
-- ubira moralku podle intenzity
-- vizualne pouziva zeleny tint/scanline overlay
-
-Pozdejsi smer:
-
-- navazat ochranu pred radiaci na upgrade hlavni budovy, Clinic nebo specialni
-  modul
-- pridat toxickou mlhu/popelovy spad jako dalsi environment condition, az bude
-  jasne, jak se maji mechanicky lisit
 
 ## Textury Budov
 
@@ -150,7 +132,7 @@ Pozdejsi smer:
 
 1. Manualne projit day/night prechod v herni scene na casech 06:00, 08:00,
    20:00, 22:00 a 00:00.
-2. Udelat samostatne backgroundy pro `rain`, `snowFront` a `radiation`.
+2. Udelat samostatne backgroundy pro `rain` a `snowFront`.
 3. Pridat dalsi budovu do atlas pipeline, idealne Dormitory nebo Storage.
 4. Rozhodnout, jestli vsechny budovy budou mit 20 levelu, nebo jen hlavni
    budova a ostatni zustanou u mensiho poctu vizualnich stupnu.
@@ -162,7 +144,5 @@ Pozdejsi smer:
 - Nedelat seasonal kalendar.
 - Nedelat finalni detailni art pro vsechny budovy pred overenim prvni atlas
   pipeline.
-- Nedelat radiaci jako samostatny questovy system mimo environment.
-- Nedavat snih, radiaci nebo vypnute uhli jako dalsi atlasove varianty kazde
-  budovy. Tyto stavy maji byt overlay/tint/effect vrstva, pokud zustanou
-  citelne.
+- Nedavat snih nebo vypnute uhli jako dalsi atlasove varianty kazde budovy.
+  Tyto stavy maji byt overlay/tint/effect vrstva, pokud zustanou citelne.

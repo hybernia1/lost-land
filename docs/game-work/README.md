@@ -12,9 +12,8 @@ ktere nechceme ztratit mezi jednotlivymi implementacnimi tahy.
 
 - Environment mechaniky jsou ve hre jako sirsi system, ne jen pocasi.
 - Globální herni nastaveni je v `src/game/config.ts`.
-- Aktivni condition jsou `stable`, `rain`, `snowFront` a `radiation`.
+- Aktivni condition jsou `stable`, `rain` a `snowFront`.
 - Snehova fronta umi spustit shelter crisis pro bezdomovce.
-- Radiace zvysuje zdravotni incidenty a tlaci na moralku.
 - Day/night overlay je napojeny na herni clock: den 08:00-22:00, soumrak
   20:00-22:00, svitani 06:00-08:00.
 - Budovy pouzivaji explicitni pixel-art atlasove assety.

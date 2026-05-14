@@ -101,8 +101,7 @@ export type WorkMode = "day" | "continuous";
 export type EnvironmentConditionId =
   | "stable"
   | "rain"
-  | "snowFront"
-  | "radiation";
+  | "snowFront";
 
 export type EnvironmentCrisisState = {
   kind: "shelter";

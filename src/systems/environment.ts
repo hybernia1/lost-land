@@ -19,7 +19,6 @@ import { addResources } from "./resources";
 const activeConditionIds: Exclude<EnvironmentConditionId, "stable">[] = [
   "rain",
   "snowFront",
-  "radiation",
 ];
 const ACTIVE_CONDITION_ROLL_THRESHOLD = 80;
 
@@ -244,7 +243,7 @@ function pickNextCondition(state: GameState): Exclude<EnvironmentConditionId, "s
   }
 
   const roll = stableRoll(`condition:${Math.floor(state.environment.nextConditionAt)}:${state.saveId}`);
-  const index = roll < 38 ? 0 : roll < 70 ? 1 : 2;
+  const index = roll < 55 ? 0 : 1;
 
   return activeConditionIds[index];
 }

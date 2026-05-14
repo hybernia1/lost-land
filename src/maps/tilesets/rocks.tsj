@@ -21,11 +21,6 @@
         "name": "tintSnowFront",
         "type": "color",
         "value": "#ffd5e0ef"
-      },
-      {
-        "name": "tintRadiation",
-        "type": "color",
-        "value": "#ffa8c284"
       }
   ],
   "spacing": 0,
