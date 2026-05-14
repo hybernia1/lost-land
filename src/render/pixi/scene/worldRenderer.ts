@@ -76,12 +76,14 @@ export function drawTerrain(host: WorldRenderHost): void {
       const tileDefinition = layout.tileTextures[tile.textureKey];
       const tileWidth = tileDefinition.frame.width * scale;
       const tileHeight = tileDefinition.frame.height * scale;
+      const edgeOverscan = tileDefinition.tilesetId === "water" ? 0 : 0.5;
       const offsetX = 0;
       const offsetY = gridTileHeight - tileHeight;
       const drawX = tileX + offsetX;
       const drawY = tileY + offsetY;
       host.trackTerrainSprite(sprite, tileDefinition.tintByEnvironment);
       sprite.alpha = layer.opacity;
+      sprite.roundPixels = true;
 
       if (tile.rotation || tile.flipX || tile.flipY) {
         sprite.anchor.set(0.5);
@@ -89,14 +91,14 @@ export function drawTerrain(host: WorldRenderHost): void {
         sprite.x = drawX + tileWidth / 2;
         sprite.y = drawY + tileHeight / 2;
         sprite.scale.set(
-          (tile.flipX ? -1 : 1) * ((tileWidth + 0.5) / sprite.texture.width),
-          (tile.flipY ? -1 : 1) * ((tileHeight + 0.5) / sprite.texture.height),
+          (tile.flipX ? -1 : 1) * ((tileWidth + edgeOverscan) / sprite.texture.width),
+          (tile.flipY ? -1 : 1) * ((tileHeight + edgeOverscan) / sprite.texture.height),
         );
       } else {
         sprite.x = drawX;
         sprite.y = drawY;
-        sprite.width = tileWidth + 0.5;
-        sprite.height = tileHeight + 0.5;
+        sprite.width = tileWidth + edgeOverscan;
+        sprite.height = tileHeight + edgeOverscan;
       }
       sprite.cullable = true;
 
@@ -135,8 +137,11 @@ export function drawDecorObjects(host: WorldRenderHost): void {
         continue;
       }
 
-      const usesTileObjectAnchor = layout.orientation === "isometric" && object.tileId !== null;
-      sprite.anchor.set(usesTileObjectAnchor ? 0.5 : 0, 1);
+      const tileDefinition = layout.tileTextures[object.textureKey];
+      const tileAnchor = object.tileId !== null
+        ? resolveTileObjectAnchor(tileDefinition?.objectAlignment, layout.orientation)
+        : { x: 0, y: 1 };
+      sprite.anchor.set(tileAnchor.x, tileAnchor.y);
       sprite.x = objectX;
       sprite.y = objectY;
       sprite.width = objectWidth;
@@ -150,7 +155,40 @@ export function drawDecorObjects(host: WorldRenderHost): void {
 }
 
 function isStaticVisualObjectLayer(layerName: string): boolean {
-  return layerName === "decor";
+  return layerName === "decor" || layerName === "walls";
+}
+
+function resolveTileObjectAnchor(
+  objectAlignment: "unspecified" | "topleft" | "top" | "topright" | "left" | "center" | "right" | "bottomleft" | "bottom" | "bottomright" | undefined,
+  orientation: "orthogonal" | "isometric",
+): { x: number; y: number } {
+  const alignment = objectAlignment && objectAlignment !== "unspecified"
+    ? objectAlignment
+    : orientation === "isometric"
+      ? "bottom"
+      : "bottomleft";
+
+  switch (alignment) {
+    case "topleft":
+      return { x: 0, y: 0 };
+    case "top":
+      return { x: 0.5, y: 0 };
+    case "topright":
+      return { x: 1, y: 0 };
+    case "left":
+      return { x: 0, y: 0.5 };
+    case "center":
+      return { x: 0.5, y: 0.5 };
+    case "right":
+      return { x: 1, y: 0.5 };
+    case "bottom":
+      return { x: 0.5, y: 1 };
+    case "bottomright":
+      return { x: 1, y: 1 };
+    case "bottomleft":
+    default:
+      return { x: 0, y: 1 };
+  }
 }
 
 

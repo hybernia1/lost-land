@@ -1,10 +1,10 @@
 {
   "columns": 3,
-  "image": "../../assets/tiles/trees.png",
+  "image": "../../assets/tiles/rocks.png",
   "imageheight": 512,
   "imagewidth": 768,
   "margin": 0,
-  "name": "trees",
+  "name": "rocks",
   "spacing": 0,
   "tilecount": 6,
   "tiledversion": "1.12.1",
@@ -16,7 +16,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree01"
+          "value": "rock01"
         }
       ]
     },
@@ -26,7 +26,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree02"
+          "value": "rock02"
         }
       ]
     },
@@ -36,7 +36,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree03"
+          "value": "rock03"
         }
       ]
     },
@@ -46,7 +46,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree04"
+          "value": "rock04"
         }
       ]
     },
@@ -56,7 +56,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree05"
+          "value": "rock05"
         }
       ]
     },
@@ -66,7 +66,7 @@
         {
           "name": "tileId",
           "type": "string",
-          "value": "tree06"
+          "value": "rock06"
         }
       ]
     }

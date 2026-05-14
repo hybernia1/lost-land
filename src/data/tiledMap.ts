@@ -45,6 +45,17 @@ type TiledTileset = {
   tilecount?: number;
   tilewidth: number;
   tileheight: number;
+  objectalignment?:
+    | "unspecified"
+    | "topleft"
+    | "top"
+    | "topright"
+    | "left"
+    | "center"
+    | "right"
+    | "bottomleft"
+    | "bottom"
+    | "bottomright";
   tiles?: TiledTilesetTile[];
 };
 
@@ -80,6 +91,8 @@ type TiledObjectLayer = {
   objects?: TiledObject[];
   opacity?: number;
   visible?: boolean;
+  offsetx?: number;
+  offsety?: number;
 };
 
 type TiledLayer = TiledTileLayer | TiledObjectLayer | {
@@ -217,6 +230,7 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tilesetId: tileset.name,
         atlasUrl,
         frame,
+        objectAlignment: tileset.objectalignment,
         tintByEnvironment: getDefaultTerrainTintByEnvironment(tileset.name),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
@@ -442,6 +456,9 @@ function getMapObjects(
   layer: TiledObjectLayer,
   gidToTile: Map<number, GidTileReference>,
 ): VillageMapObjectDefinition[] {
+  const layerOffsetX = layer.offsetx ?? 0;
+  const layerOffsetY = layer.offsety ?? 0;
+
   return (layer.objects ?? [])
     .filter((object) => object.visible !== false)
     .map((object) => {
@@ -451,8 +468,8 @@ function getMapObjects(
         id: String(object.id),
         name: object.name ?? "",
         type: object.type ?? "",
-        x: position.x,
-        y: position.y,
+        x: position.x + layerOffsetX,
+        y: position.y + layerOffsetY,
         width: object.width ?? 0,
         height: object.height ?? 0,
         rotation: object.rotation ?? 0,

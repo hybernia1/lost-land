@@ -16,6 +16,17 @@ export type TerrainTextureDefinition = {
   tilesetId: string;
   atlasUrl: string;
   frame: TerrainTileFrame;
+  objectAlignment?:
+    | "unspecified"
+    | "topleft"
+    | "top"
+    | "topright"
+    | "left"
+    | "center"
+    | "right"
+    | "bottomleft"
+    | "bottom"
+    | "bottomright";
   animation?: TerrainTileAnimationFrame[];
   tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
 };
