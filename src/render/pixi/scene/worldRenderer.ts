@@ -1,6 +1,15 @@
 import { Container, Graphics, Sprite } from "pixi.js";
 import { buildingById } from "../../../data/buildings";
-import { defaultVillageLayout } from "../../../data/villageLayouts";
+import {
+  buildingVisualDefinitions,
+  type BuildingVisualFitDefinition,
+  type BuildingVisualPlacementDefinition,
+} from "../../../data/buildingVisuals";
+import {
+  defaultVillageLayout,
+  type VillageMapObjectDefinition,
+  type VillageObjectLayerDefinition,
+} from "../../../data/villageLayouts";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../../../data/villagePlots";
 import type { BuildingId, EnvironmentConditionId, GameState } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
@@ -8,6 +17,17 @@ import { getBuildingWorkerLimit, isBuildingInactiveDueToCoal } from "../../../sy
 import { VILLAGE_BUILDING_RENDER_SCALE, resourceSiteDefinitions } from "../core/constants";
 import type { Bounds, DrawTextFn, DrawIconFn, SceneLayout } from "../core/types";
 import { upgradingTooltip } from "../core/constants";
+import { getMapRenderBounds } from "./mapGeometry";
+
+const DEFAULT_BUILDING_VISUAL_PLACEMENT: Required<BuildingVisualPlacementDefinition> = {
+  anchor: { x: 0.5, y: 0.5 },
+  offset: { x: 0, y: 0 },
+};
+
+const DEFAULT_BUILDING_VISUAL_FIT: Required<BuildingVisualFitDefinition> = {
+  footprintWidthScale: VILLAGE_BUILDING_RENDER_SCALE,
+  visualHeightScale: VILLAGE_BUILDING_RENDER_SCALE * 4,
+};
 
 export type WorldRenderHost = {
   cameraStaticLayer: Container;
@@ -58,16 +78,12 @@ export function drawBackground(host: WorldRenderHost, width: number, height: num
 export function drawTerrain(host: WorldRenderHost): void {
   const layout = defaultVillageLayout;
   const scale = host.layout.scale;
-  const gridTileHeight = layout.tileHeight * scale;
-  const terrainWidth = layout.width * scale;
-  const terrainHeight = layout.height * scale;
-  const originX = host.layout.originX + host.layout.width / 2 - terrainWidth / 2;
-  const originY = host.layout.originY + host.layout.height / 2 - terrainHeight / 2;
+  const mapBounds = getMapRenderBounds(layout, host.layout);
 
   for (const layer of layout.tileLayers) {
     for (const tile of layer.tiles) {
-      const tileX = originX + tile.x * scale;
-      const tileY = originY + tile.y * scale;
+      const tileX = mapBounds.x + tile.x * scale;
+      const tileY = mapBounds.y + tile.y * scale;
       const sprite = host.createTerrainSprite(tile.textureKey);
 
       if (!sprite) {
@@ -76,9 +92,9 @@ export function drawTerrain(host: WorldRenderHost): void {
       const tileDefinition = layout.tileTextures[tile.textureKey];
       const tileWidth = tileDefinition.frame.width * scale;
       const tileHeight = tileDefinition.frame.height * scale;
-      const edgeOverscan = tileDefinition.tilesetId === "water" ? 0 : 0.5;
-      const offsetX = 0;
-      const offsetY = gridTileHeight - tileHeight;
+      const edgeOverscan = tileDefinition.edgeOverscan;
+      const offsetX = tileDefinition.tileLayerOffset.x * scale;
+      const offsetY = tileDefinition.tileLayerOffset.y * scale;
       const drawX = tileX + offsetX;
       const drawY = tileY + offsetY;
       host.trackTerrainSprite(sprite, tileDefinition.tintByEnvironment);
@@ -110,87 +126,61 @@ export function drawTerrain(host: WorldRenderHost): void {
 export function drawDecorObjects(host: WorldRenderHost): void {
   const layout = defaultVillageLayout;
   const scale = host.layout.scale;
-  const terrainWidth = layout.width * scale;
-  const terrainHeight = layout.height * scale;
-  const originX = host.layout.originX + host.layout.width / 2 - terrainWidth / 2;
-  const originY = host.layout.originY + host.layout.height / 2 - terrainHeight / 2;
+  const mapBounds = getMapRenderBounds(layout, host.layout);
 
   for (const layer of layout.objectLayers) {
-    if (!isStaticVisualObjectLayer(layer.name)) {
+    if (!layer.isStaticVisualLayer) {
       continue;
     }
 
-    const objects = [...layer.objects].sort((left, right) => left.y - right.y);
+    const objects = getObjectDrawOrder(layer);
 
     for (const object of objects) {
       if (!object.textureKey) {
         continue;
       }
 
-      const objectX = originX + object.x * scale;
-      const objectY = originY + object.y * scale;
-      const objectWidth = object.width * scale;
-      const objectHeight = object.height * scale;
+      const render = object.render;
+      const objectX = mapBounds.x + render.x * scale;
+      const objectY = mapBounds.y + render.y * scale;
+      const objectWidth = render.width * scale;
+      const objectHeight = render.height * scale;
       const sprite = host.createTerrainSprite(object.textureKey);
 
       if (!sprite) {
         continue;
       }
 
-      const tileDefinition = layout.tileTextures[object.textureKey];
-      const tileAnchor = object.tileId !== null
-        ? resolveTileObjectAnchor(tileDefinition?.objectAlignment, layout.orientation)
-        : { x: 0, y: 1 };
-      sprite.anchor.set(tileAnchor.x, tileAnchor.y);
+      if (!render.anchor) {
+        throw new Error(`Map object "${object.id}" has a texture but no render anchor.`);
+      }
+
+      sprite.anchor.set(render.anchor.x, render.anchor.y);
       sprite.x = objectX;
       sprite.y = objectY;
       sprite.width = objectWidth;
       sprite.height = objectHeight;
-      sprite.rotation = (object.rotation * Math.PI) / 180;
-      sprite.alpha = object.opacity * layer.opacity;
+      sprite.rotation = (render.rotation * Math.PI) / 180;
+      if (render.flipX) {
+        sprite.scale.x *= -1;
+      }
+      if (render.flipY) {
+        sprite.scale.y *= -1;
+      }
+      sprite.alpha = render.opacity * layer.opacity;
       sprite.cullable = true;
       host.cameraStaticLayer.addChild(sprite);
     }
   }
 }
 
-function isStaticVisualObjectLayer(layerName: string): boolean {
-  return layerName === "decor" || layerName === "walls";
-}
-
-function resolveTileObjectAnchor(
-  objectAlignment: "unspecified" | "topleft" | "top" | "topright" | "left" | "center" | "right" | "bottomleft" | "bottom" | "bottomright" | undefined,
-  orientation: "orthogonal" | "isometric",
-): { x: number; y: number } {
-  const alignment = objectAlignment && objectAlignment !== "unspecified"
-    ? objectAlignment
-    : orientation === "isometric"
-      ? "bottom"
-      : "bottomleft";
-
-  switch (alignment) {
-    case "topleft":
-      return { x: 0, y: 0 };
-    case "top":
-      return { x: 0.5, y: 0 };
-    case "topright":
-      return { x: 1, y: 0 };
-    case "left":
-      return { x: 0, y: 0.5 };
-    case "center":
-      return { x: 0.5, y: 0.5 };
-    case "right":
-      return { x: 1, y: 0.5 };
-    case "bottom":
-      return { x: 0.5, y: 1 };
-    case "bottomright":
-      return { x: 1, y: 1 };
-    case "bottomleft":
-    default:
-      return { x: 0, y: 1 };
+function getObjectDrawOrder(layer: VillageObjectLayerDefinition): VillageMapObjectDefinition[] {
+  if (layer.drawOrder === "index") {
+    return layer.objects;
   }
-}
 
+  return [...layer.objects].sort((left, right) => left.render.y - right.render.y);
+}
 
 export function drawResourceSites(host: WorldRenderHost, state: GameState, translations?: TranslationPack): void {
   for (const siteDefinition of resourceSiteDefinitions) {
@@ -299,15 +289,20 @@ export function drawPlot(
   if (buildingId && building) {
     host.bindTooltip(plotLayer, upgradingTooltip(name, building.level, building.upgradingRemaining, translations?.ui.level ?? "Lvl"));
 
-    const asset = host.createBuildingSprite(buildingId, Math.max(1, building.level), building.level > 0);
-    asset.anchor.set(0.5);
-    // Allow taller assets (e.g. 256x512) to keep their footprint width while extending upward.
+    const built = building.level > 0;
+    const visual = built ? buildingVisualDefinitions[buildingId] : null;
+    const placement = resolveBuildingVisualPlacement(visual?.placement);
+    const fit = resolveBuildingVisualFit(visual?.fit);
+    const asset = host.createBuildingSprite(buildingId, Math.max(1, building.level), built);
+    asset.anchor.set(placement.anchor.x, placement.anchor.y);
+    asset.x = placement.offset.x * host.layout.scale;
+    asset.y = placement.offset.y * host.layout.scale;
     host.fitSprite(
       asset,
-      bounds.width * VILLAGE_BUILDING_RENDER_SCALE,
-      bounds.height * VILLAGE_BUILDING_RENDER_SCALE * 4,
+      bounds.width * fit.footprintWidthScale,
+      bounds.height * fit.visualHeightScale,
     );
-    asset.alpha = building.level > 0 || isMainPlot ? 1 : 0.62;
+    asset.alpha = built || isMainPlot ? 1 : 0.62;
     plotLayer.addChild(asset);
 
     if (isBuildingInactiveDueToCoal(state, buildingId)) {
@@ -342,5 +337,23 @@ export function drawPlot(
   plotLayer.addChild(empty);
   const addMarker = host.drawIcon(plotLayer, "plus", 0, 0, Math.max(14, markerSize * 0.78));
   addMarker.alpha = selected ? 0.95 : 0.58;
+}
+
+function resolveBuildingVisualPlacement(
+  placement: BuildingVisualPlacementDefinition | undefined,
+): Required<BuildingVisualPlacementDefinition> {
+  return {
+    anchor: placement?.anchor ?? DEFAULT_BUILDING_VISUAL_PLACEMENT.anchor,
+    offset: placement?.offset ?? DEFAULT_BUILDING_VISUAL_PLACEMENT.offset,
+  };
+}
+
+function resolveBuildingVisualFit(
+  fit: BuildingVisualFitDefinition | undefined,
+): Required<BuildingVisualFitDefinition> {
+  return {
+    footprintWidthScale: fit?.footprintWidthScale ?? DEFAULT_BUILDING_VISUAL_FIT.footprintWidthScale,
+    visualHeightScale: fit?.visualHeightScale ?? DEFAULT_BUILDING_VISUAL_FIT.visualHeightScale,
+  };
 }
 

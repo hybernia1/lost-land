@@ -10,23 +10,20 @@ export type TerrainTileFrame = {
   height: number;
 };
 
+export type TerrainRenderPoint = {
+  x: number;
+  y: number;
+};
+
 export type TerrainTextureDefinition = {
   key: TerrainTextureKey;
   tileId: TerrainTileId;
   tilesetId: string;
   atlasUrl: string;
   frame: TerrainTileFrame;
-  objectAlignment?:
-    | "unspecified"
-    | "topleft"
-    | "top"
-    | "topright"
-    | "left"
-    | "center"
-    | "right"
-    | "bottomleft"
-    | "bottom"
-    | "bottomright";
+  tileLayerOffset: TerrainRenderPoint;
+  objectAnchor: TerrainRenderPoint;
+  edgeOverscan: number;
   animation?: TerrainTileAnimationFrame[];
   tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>;
 };

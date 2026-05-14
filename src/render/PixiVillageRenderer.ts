@@ -149,6 +149,7 @@ import {
   drawResourceSites as drawWorldResourceSites,
   drawTerrain as drawWorldTerrain,
 } from "./pixi/scene/worldRenderer";
+import { getMapRenderBounds, mapRectToSceneBounds } from "./pixi/scene/mapGeometry";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
@@ -3071,11 +3072,10 @@ export class PixiVillageRenderer {
   }
 
   private isStaticWorldCacheSizeSafe(): boolean {
-    const mapWidth = defaultVillageLayout.width * this.layout.scale;
-    const mapHeight = defaultVillageLayout.height * this.layout.scale;
+    const mapBounds = getMapRenderBounds(defaultVillageLayout, this.layout);
 
-    return mapWidth <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE &&
-      mapHeight <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE;
+    return mapBounds.width <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE &&
+      mapBounds.height <= STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE;
   }
 
   private computeStaticWorldCacheEligibility(): boolean {
@@ -3083,16 +3083,13 @@ export class PixiVillageRenderer {
   }
 
   private updateStaticWorldCullArea(): void {
-    const terrainWidth = defaultVillageLayout.width * this.layout.scale;
-    const terrainHeight = defaultVillageLayout.height * this.layout.scale;
-    const terrainOriginX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
-    const terrainOriginY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
+    const mapBounds = getMapRenderBounds(defaultVillageLayout, this.layout);
 
     this.cameraStaticLayer.cullArea = new Rectangle(
-      terrainOriginX,
-      terrainOriginY,
-      terrainWidth,
-      terrainHeight,
+      mapBounds.x,
+      mapBounds.y,
+      mapBounds.width,
+      mapBounds.height,
     );
   }
 
@@ -3121,19 +3118,7 @@ export class PixiVillageRenderer {
   }
 
   private getPlotBounds(plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">): Bounds {
-    const width = plot.width * this.layout.scale;
-    const height = plot.height * this.layout.scale;
-    const terrainWidth = defaultVillageLayout.width * this.layout.scale;
-    const terrainHeight = defaultVillageLayout.height * this.layout.scale;
-    const terrainOriginX = this.layout.originX + this.layout.width / 2 - terrainWidth / 2;
-    const terrainOriginY = this.layout.originY + this.layout.height / 2 - terrainHeight / 2;
-
-    return {
-      x: terrainOriginX + plot.x * this.layout.scale,
-      y: terrainOriginY + plot.y * this.layout.scale,
-      width,
-      height,
-    };
+    return mapRectToSceneBounds(defaultVillageLayout, this.layout, plot);
   }
 
   private getDefenseScore(state: GameState): number {

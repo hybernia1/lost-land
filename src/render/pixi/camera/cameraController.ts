@@ -2,6 +2,7 @@ import type { Container } from "pixi.js";
 import { defaultVillageLayout } from "../../../data/villageLayouts";
 import { CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM, CAMERA_OFFSET_SNAP_EPSILON, CAMERA_SMOOTH_FACTOR, CAMERA_ZOOM_SNAP_EPSILON, CAMERA_ZOOM_STEP, HUD_DESIGN_SCALE, HUD_LEFT_PANEL_WIDTH, HUD_TOP_STRIP_HEIGHT } from "../core/constants";
 import type { Bounds, SceneLayout } from "../core/types";
+import { getMapRenderBounds } from "../scene/mapGeometry";
 
 export type CameraDragState = {
   x: number;
@@ -286,11 +287,11 @@ export function clampCamera(
   viewportWidth: number,
   viewportHeight: number,
 ): { zoom: number; offsetX: number; offsetY: number } {
-  const scale = layout.scale;
-  const terrainWidth = defaultVillageLayout.width * scale;
-  const terrainHeight = defaultVillageLayout.height * scale;
-  const originX = layout.originX + layout.width / 2 - terrainWidth / 2;
-  const originY = layout.originY + layout.height / 2 - terrainHeight / 2;
+  const mapBounds = getMapRenderBounds(defaultVillageLayout, layout);
+  const terrainWidth = mapBounds.width;
+  const terrainHeight = mapBounds.height;
+  const originX = mapBounds.x;
+  const originY = mapBounds.y;
   const insets = getCameraViewportInsets(viewportWidth, viewportHeight);
   const safeLeft = insets.left;
   const safeTop = insets.top;

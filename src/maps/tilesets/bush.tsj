@@ -5,6 +5,29 @@
   "imagewidth": 768,
   "margin": 0,
   "name": "bush",
+  "objectalignment": "bottom",
+  "properties": [
+      {
+        "name": "edgeOverscan",
+        "type": "float",
+        "value": 0.5
+      },
+      {
+        "name": "tintRain",
+        "type": "color",
+        "value": "#ff909fb2"
+      },
+      {
+        "name": "tintSnowFront",
+        "type": "color",
+        "value": "#ffd5e0ef"
+      },
+      {
+        "name": "tintRadiation",
+        "type": "color",
+        "value": "#ffa8c284"
+      }
+  ],
   "spacing": 0,
   "tilecount": 6,
   "tiledversion": "1.12.1",
