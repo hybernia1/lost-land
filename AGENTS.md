@@ -396,6 +396,13 @@ cleanly instead of carrying compatibility branches.
     - delete via in-canvas confirm modal (no browser confirm dialog).
   - Removed legacy DOM menu/start screen CSS and old DOM action routing in `App` (front flow is canvas-only).
   - Verification: `npm run build` passes.
+- 2026-05-14: Ambient humanoids moved from map spawn zones to settlement emitters.
+  - Added render-only settlement NPC definitions for production buildings, barracks, and watchtower.
+  - Peon/soldier sprites now spawn only around built relevant buildings, only when workers/troops exist.
+  - Day-shift mode hides settlement humanoids outside daylight hours; continuous shifts keep them visible.
+  - Settlement NPCs use the same camera-gated materialization pattern as wildlife, so off-screen emitters do not create sprites or update movement.
+  - Removed manual peon/soldier objects from the hidden `npcSpawns` map layer; deer wildlife remains map-spawned.
+  - Verification: `npm run build` passes.
 - 2026-05-14: Lightweight map NPC ambient movement added.
   - Added hidden Tiled object layer `npcSpawns` in `src/maps/woodland-camp-01.tmj`; loader reads it as data even when `visible:false`.
   - Added `src/data/mapNpcs.ts` for NPC kind tuning and a small local test atlas at `src/assets/npcs/deer-flea-atlas.png`.

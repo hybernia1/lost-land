@@ -152,6 +152,7 @@ import {
 import { getMapRenderBounds, mapRectToSceneBounds } from "./pixi/scene/mapGeometry";
 import { MapBirdController } from "./pixi/scene/mapBirds";
 import { MapNpcController } from "./pixi/scene/mapNpcs";
+import { SettlementNpcController } from "./pixi/scene/settlementNpcs";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
@@ -237,6 +238,8 @@ export class PixiVillageRenderer {
   private readonly cameraLayer = new Container();
   private readonly cameraStaticLayer = new Container();
   private readonly cameraNpcLayer = new Container();
+  private readonly cameraMapNpcLayer = new Container();
+  private readonly cameraSettlementNpcLayer = new Container();
   private readonly cameraForegroundDecorLayer = new Container();
   private readonly cameraDynamicLayer = new Container();
   private readonly cameraSkyLayer = new Container();
@@ -314,6 +317,7 @@ export class PixiVillageRenderer {
   private readonly ambientEffects: AmbientEffectsController;
   private readonly mapBirds = new MapBirdController();
   private readonly mapNpcs = new MapNpcController();
+  private readonly settlementNpcs = new SettlementNpcController();
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
   private lastFormattedLogEntries: FormattedLogEntry[] = [];
@@ -359,12 +363,19 @@ export class PixiVillageRenderer {
     this.cameraNpcLayer.cullable = true;
     this.cameraNpcLayer.cullableChildren = true;
     this.cameraNpcLayer.sortableChildren = true;
+    this.cameraMapNpcLayer.cullable = true;
+    this.cameraMapNpcLayer.cullableChildren = true;
+    this.cameraMapNpcLayer.sortableChildren = true;
+    this.cameraSettlementNpcLayer.cullable = true;
+    this.cameraSettlementNpcLayer.cullableChildren = true;
+    this.cameraSettlementNpcLayer.sortableChildren = true;
     this.cameraForegroundDecorLayer.cullable = true;
     this.cameraForegroundDecorLayer.cullableChildren = true;
     this.cameraSkyLayer.cullable = true;
     this.cameraSkyLayer.cullableChildren = true;
     this.cameraBirdLayer.cullable = true;
     this.cameraBirdLayer.cullableChildren = true;
+    this.cameraNpcLayer.addChild(this.cameraMapNpcLayer, this.cameraSettlementNpcLayer);
     this.cameraSkyLayer.addChild(this.cameraBirdLayer);
     this.worldLayer.addChild(
       this.backgroundLayer,
@@ -388,8 +399,12 @@ export class PixiVillageRenderer {
       refreshCameraTransform: () => this.refreshCameraTransform(),
       shouldAnimateMapBirds: () => this.mapBirds.shouldAnimate(),
       refreshMapBirds: (timestampMs: number) => this.mapBirds.update(timestampMs, this.getCameraVisibleWorldBounds()),
-      shouldAnimateMapNpcs: () => this.mapNpcs.shouldAnimate(),
-      refreshMapNpcs: (timestampMs: number) => this.mapNpcs.update(timestampMs, this.getCameraVisibleWorldBounds()),
+      shouldAnimateMapNpcs: () => this.mapNpcs.shouldAnimate() || this.settlementNpcs.shouldAnimate(),
+      refreshMapNpcs: (timestampMs: number) => {
+        const visibleBounds = this.getCameraVisibleWorldBounds();
+        this.mapNpcs.update(timestampMs, visibleBounds);
+        this.settlementNpcs.update(timestampMs, visibleBounds);
+      },
     });
     void this.initialize();
   }
@@ -471,7 +486,16 @@ export class PixiVillageRenderer {
       this.cameraStaticLayer.updateCacheTexture();
     }
     this.mapNpcs.sync(
-      this.cameraNpcLayer,
+      this.cameraMapNpcLayer,
+      defaultVillageLayout,
+      this.layout,
+      (kindId) => this.assets.getMapNpcTextures(kindId),
+      state.paused,
+      this.getCameraVisibleWorldBounds(),
+    );
+    this.settlementNpcs.sync(
+      this.cameraSettlementNpcLayer,
+      state,
       defaultVillageLayout,
       this.layout,
       (kindId) => this.assets.getMapNpcTextures(kindId),
@@ -3182,7 +3206,9 @@ export class PixiVillageRenderer {
 
   private clearMapNpcs(): void {
     this.mapNpcs.clear();
-    this.cameraNpcLayer.removeChildren();
+    this.settlementNpcs.clear();
+    this.cameraMapNpcLayer.removeChildren();
+    this.cameraSettlementNpcLayer.removeChildren();
   }
 
   private clearMapBirds(): void {

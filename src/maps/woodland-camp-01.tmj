@@ -1288,52 +1288,6 @@
                  "width":280,
                  "x":4920,
                  "y":3600
-                }, 
-                {
-                 "height":260,
-                 "id":448,
-                 "name":"camp-peons",
-                 "opacity":1,
-                 "properties":[
-                        {
-                         "name":"npcKindId",
-                         "type":"string",
-                         "value":"peonFlea"
-                        }, 
-                        {
-                         "name":"npcCount",
-                         "type":"int",
-                         "value":5
-                        }],
-                 "rotation":0,
-                 "type":"npc-spawn",
-                 "visible":true,
-                 "width":420,
-                 "x":4260,
-                 "y":3460
-                }, 
-                {
-                 "height":180,
-                 "id":449,
-                 "name":"gate-soldiers",
-                 "opacity":1,
-                 "properties":[
-                        {
-                         "name":"npcKindId",
-                         "type":"string",
-                         "value":"soldierFlea"
-                        }, 
-                        {
-                         "name":"npcCount",
-                         "type":"int",
-                         "value":3
-                        }],
-                 "rotation":0,
-                 "type":"npc-spawn",
-                 "visible":true,
-                 "width":300,
-                 "x":4330,
-                 "y":3980
                 }],
          "opacity":1,
          "type":"objectgroup",
