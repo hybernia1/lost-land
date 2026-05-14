@@ -137,8 +137,11 @@ export function drawDecorObjects(host: WorldRenderHost): void {
         continue;
       }
 
-      const usesTileObjectAnchor = layout.orientation === "isometric" && object.tileId !== null;
-      sprite.anchor.set(usesTileObjectAnchor ? 0.5 : 0, 1);
+      const tileDefinition = layout.tileTextures[object.textureKey];
+      const tileAnchor = object.tileId !== null
+        ? resolveTileObjectAnchor(tileDefinition?.objectAlignment, layout.orientation)
+        : { x: 0, y: 1 };
+      sprite.anchor.set(tileAnchor.x, tileAnchor.y);
       sprite.x = objectX;
       sprite.y = objectY;
       sprite.width = objectWidth;
@@ -153,6 +156,39 @@ export function drawDecorObjects(host: WorldRenderHost): void {
 
 function isStaticVisualObjectLayer(layerName: string): boolean {
   return layerName === "decor" || layerName === "walls";
+}
+
+function resolveTileObjectAnchor(
+  objectAlignment: "unspecified" | "topleft" | "top" | "topright" | "left" | "center" | "right" | "bottomleft" | "bottom" | "bottomright" | undefined,
+  orientation: "orthogonal" | "isometric",
+): { x: number; y: number } {
+  const alignment = objectAlignment && objectAlignment !== "unspecified"
+    ? objectAlignment
+    : orientation === "isometric"
+      ? "bottomleft"
+      : "bottomleft";
+
+  switch (alignment) {
+    case "topleft":
+      return { x: 0, y: 0 };
+    case "top":
+      return { x: 0.5, y: 0 };
+    case "topright":
+      return { x: 1, y: 0 };
+    case "left":
+      return { x: 0, y: 0.5 };
+    case "center":
+      return { x: 0.5, y: 0.5 };
+    case "right":
+      return { x: 1, y: 0.5 };
+    case "bottom":
+      return { x: 0.5, y: 1 };
+    case "bottomright":
+      return { x: 1, y: 1 };
+    case "bottomleft":
+    default:
+      return { x: 0, y: 1 };
+  }
 }
 
 

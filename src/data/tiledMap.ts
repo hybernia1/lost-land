@@ -45,6 +45,17 @@ type TiledTileset = {
   tilecount?: number;
   tilewidth: number;
   tileheight: number;
+  objectalignment?:
+    | "unspecified"
+    | "topleft"
+    | "top"
+    | "topright"
+    | "left"
+    | "center"
+    | "right"
+    | "bottomleft"
+    | "bottom"
+    | "bottomright";
   tiles?: TiledTilesetTile[];
 };
 
@@ -219,6 +230,7 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tilesetId: tileset.name,
         atlasUrl,
         frame,
+        objectAlignment: tileset.objectalignment,
         tintByEnvironment: getDefaultTerrainTintByEnvironment(tileset.name),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
