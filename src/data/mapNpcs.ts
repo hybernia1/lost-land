@@ -1,8 +1,9 @@
 import deerFleaAtlasUrl from "../assets/npcs/deer-flea-atlas.png";
+import enemyFleaAtlasUrl from "../assets/npcs/enemy-flea-atlas.png";
 import peonFleaAtlasUrl from "../assets/npcs/peon-flea-atlas.png";
 import soldierFleaAtlasUrl from "../assets/npcs/soldier-flea-atlas.png";
 
-export type MapNpcKindId = "deerFlea" | "peonFlea" | "soldierFlea";
+export type MapNpcKindId = "deerFlea" | "peonFlea" | "soldierFlea" | "enemyFlea";
 
 export type MapNpcDefinition = {
   id: MapNpcKindId;
@@ -79,6 +80,25 @@ export const mapNpcDefinitions: Record<MapNpcKindId, MapNpcDefinition> = {
     idleSeconds: {
       min: 1.0,
       max: 3.2,
+    },
+    animationFrameSeconds: 0.13,
+  },
+  enemyFlea: {
+    id: "enemyFlea",
+    atlasUrl: enemyFleaAtlasUrl,
+    frameWidth: 32,
+    frameHeight: 32,
+    frames: {
+      west: [0, 1, 2, 3],
+      east: [4, 5, 6, 7],
+    },
+    renderWidth: 24,
+    renderHeight: 29,
+    speedPixelsPerSecond: 16,
+    idleChance: 0.34,
+    idleSeconds: {
+      min: 0.7,
+      max: 2.4,
     },
     animationFrameSeconds: 0.13,
   },

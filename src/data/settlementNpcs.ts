@@ -11,6 +11,14 @@ export type SettlementNpcDefinition = {
   wanderRadius: number;
 };
 
+export type ResourceSiteNpcPhase = "uncaptured" | "occupied";
+
+export type ResourceSiteNpcDefinition = {
+  npcKindId: MapNpcKindId;
+  maxCount: number;
+  wanderRadius: number;
+};
+
 export const settlementNpcDefinitions: SettlementNpcDefinition[] = [
   {
     buildingId: "hydroponics",
@@ -59,3 +67,16 @@ export const settlementNpcDefinitions: SettlementNpcDefinition[] = [
 export const settlementNpcByBuildingId = Object.fromEntries(
   settlementNpcDefinitions.map((definition) => [definition.buildingId, definition]),
 ) as Partial<Record<BuildingId, SettlementNpcDefinition>>;
+
+export const resourceSiteNpcDefinitions: Record<ResourceSiteNpcPhase, ResourceSiteNpcDefinition> = {
+  uncaptured: {
+    npcKindId: "enemyFlea",
+    maxCount: 4,
+    wanderRadius: 112,
+  },
+  occupied: {
+    npcKindId: "peonFlea",
+    maxCount: 2,
+    wanderRadius: 92,
+  },
+};

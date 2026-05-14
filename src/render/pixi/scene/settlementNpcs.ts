@@ -9,7 +9,9 @@ import {
   type MapNpcKindId,
 } from "../../../data/mapNpcs";
 import {
+  resourceSiteNpcDefinitions,
   settlementNpcByBuildingId,
+  type ResourceSiteNpcDefinition,
   type SettlementNpcDefinition,
 } from "../../../data/settlementNpcs";
 import type { VillageLayoutDefinition } from "../../../data/villageLayouts";
@@ -42,7 +44,7 @@ type SettlementNpcEntity = {
 
 type SettlementNpcEmitterRuntime = {
   id: string;
-  settlementDefinition: SettlementNpcDefinition;
+  settlementDefinition: SettlementNpcEmitterDefinition;
   npcDefinition: MapNpcDefinition;
   textures: MapNpcTextureSet;
   bounds: Bounds;
@@ -51,8 +53,11 @@ type SettlementNpcEmitterRuntime = {
   active: boolean;
 };
 
+type SettlementNpcEmitterDefinition = Pick<SettlementNpcDefinition, "npcKindId" | "maxCount" | "wanderRadius"> |
+  ResourceSiteNpcDefinition;
+
 const SETTLEMENT_NPC_UPDATE_MIN_MS = 1000 / 15;
-const SETTLEMENT_NPC_MAX_TOTAL_COUNT = 18;
+const SETTLEMENT_NPC_MAX_TOTAL_COUNT = 28;
 const SETTLEMENT_NPC_TARGET_EPSILON = 1.8;
 const SETTLEMENT_NPC_VIEWPORT_PADDING = 160;
 
@@ -175,6 +180,50 @@ export class SettlementNpcController {
         npcDefinition: mapNpcDefinitions[settlementDefinition.npcKindId],
         textures,
         bounds: getSettlementNpcBounds(mapLayout, sceneLayout, plot, settlementDefinition),
+        sceneLayout,
+        count,
+        active: false,
+      });
+    }
+
+    for (const siteState of state.resourceSites) {
+      const siteDefinition = mapLayout.resourceSites.find((candidate) => candidate.id === siteState.id);
+
+      if (!siteDefinition) {
+        continue;
+      }
+
+      const phaseDefinition = siteState.captured
+        ? siteState.assignedWorkers > 0
+          ? resourceSiteNpcDefinitions.occupied
+          : null
+        : resourceSiteNpcDefinitions.uncaptured;
+
+      if (!phaseDefinition) {
+        continue;
+      }
+
+      const count = siteState.captured
+        ? Math.min(phaseDefinition.maxCount, siteState.assignedWorkers)
+        : phaseDefinition.maxCount;
+
+      if (count <= 0) {
+        continue;
+      }
+
+      const textures = getTextures(phaseDefinition.npcKindId);
+
+      if (!textures) {
+        continue;
+      }
+
+      const phase = siteState.captured ? "occupied" : "uncaptured";
+      this.emitters.push({
+        id: `resource-site:${siteDefinition.id}:${phase}`,
+        settlementDefinition: phaseDefinition,
+        npcDefinition: mapNpcDefinitions[phaseDefinition.npcKindId],
+        textures,
+        bounds: getSettlementNpcBounds(mapLayout, sceneLayout, siteDefinition, phaseDefinition),
         sceneLayout,
         count,
         active: false,
@@ -396,6 +445,16 @@ export class SettlementNpcController {
       .filter(([buildingId]) => Boolean(settlementNpcByBuildingId[buildingId as BuildingId]))
       .map(([buildingId, building]) => `${buildingId}:${building.level}:${building.workers}`)
       .join("|");
+    const resourceSiteStateKey = state.resourceSites
+      .map((site) => `${site.id}:${site.captured ? 1 : 0}:${site.assignedWorkers}`)
+      .join("|");
+    const resourceSiteLayoutKey = mapLayout.resourceSites.map((site) => [
+      site.id,
+      site.x.toFixed(2),
+      site.y.toFixed(2),
+      site.width.toFixed(2),
+      site.height.toFixed(2),
+    ].join(":")).join("|");
 
     return [
       active ? "active" : "sleeping",
@@ -411,8 +470,10 @@ export class SettlementNpcController {
         plot.width.toFixed(2),
         plot.height.toFixed(2),
       ].join(":")).join("|"),
+      resourceSiteLayoutKey,
       plotKey,
       buildingKey,
+      resourceSiteStateKey,
     ].join("/");
   }
 }
@@ -425,7 +486,7 @@ function getSettlementNpcBounds(
   mapLayout: VillageLayoutDefinition,
   sceneLayout: SceneLayout,
   plot: { x: number; y: number; width: number; height: number },
-  settlementDefinition: SettlementNpcDefinition,
+  settlementDefinition: SettlementNpcEmitterDefinition,
 ): Bounds {
   const plotBounds = mapRectToSceneBounds(mapLayout, sceneLayout, plot);
   const radius = settlementDefinition.wanderRadius * sceneLayout.scale;

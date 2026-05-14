@@ -1,0 +1,600 @@
+{
+  "columns": 8,
+  "image": "../../assets/tiles/fence.png",
+  "imageheight": 1792,
+  "imagewidth": 1024,
+  "margin": 0,
+  "name": "fence",
+  "objectalignment": "bottom",
+  "properties": [
+    {
+      "name": "edgeOverscan",
+      "type": "float",
+      "value": 0.5
+    },
+    {
+      "name": "tintRain",
+      "type": "color",
+      "value": "#ff909fb2"
+    },
+    {
+      "name": "tintSnowFront",
+      "type": "color",
+      "value": "#ffd5e0ef"
+    },
+    {
+      "name": "tintRadiation",
+      "type": "color",
+      "value": "#ffa8c284"
+    }
+  ],
+  "spacing": 0,
+  "tilecount": 56,
+  "tiledversion": "1.12.1",
+  "tileheight": 256,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "crate_E"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "crate_N"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "crate_S"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "crate_W"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "doorClosed_E"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "doorClosed_N"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "doorClosed_S"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "doorClosed_W"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_E"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_N"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_S"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_W"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wall_E"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wall_N"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wall_S"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wall_W"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallBattlement_E"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallBattlement_N"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallBattlement_S"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallBattlement_W"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCorner_E"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCorner_N"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCorner_S"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCorner_W"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCornerHalf_E"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCornerHalf_N"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCornerHalf_S"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCornerHalf_W"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurve_E"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurve_N"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurve_S"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurve_W"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurveHalf_E"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurveHalf_N"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurveHalf_S"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallCurveHalf_W"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallHalf_E"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallHalf_N"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallHalf_S"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "wallHalf_W"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "window_E"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "window_N"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "window_S"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "window_W"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowLeft_E"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowLeft_N"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowLeft_S"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowLeft_W"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowMiddle_E"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowMiddle_N"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowMiddle_S"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowMiddle_W"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowRight_E"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowRight_N"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowRight_S"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "windowRight_W"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}
