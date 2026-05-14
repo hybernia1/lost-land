@@ -61,7 +61,7 @@ export const mapNpcDefinitions: Record<MapNpcKindId, MapNpcDefinition> = {
       min: 0.8,
       max: 2.8,
     },
-    animationFrameSeconds: 0.28,
+    animationFrameSeconds: 0.14,
   },
   soldierFlea: {
     id: "soldierFlea",
@@ -80,7 +80,7 @@ export const mapNpcDefinitions: Record<MapNpcKindId, MapNpcDefinition> = {
       min: 1.0,
       max: 3.2,
     },
-    animationFrameSeconds: 0.26,
+    animationFrameSeconds: 0.13,
   },
 };
 

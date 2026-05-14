@@ -47,7 +47,7 @@ type MapNpcSpawnRuntime = {
   active: boolean;
 };
 
-const MAP_NPC_UPDATE_MIN_MS = 100;
+const MAP_NPC_UPDATE_MIN_MS = 1000 / 15;
 const MAP_NPC_MAX_TOTAL_COUNT = 24;
 const MAP_NPC_TARGET_EPSILON = 1.8;
 const MAP_NPC_VIEWPORT_PADDING = 160;

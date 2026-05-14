@@ -12,6 +12,7 @@ import { getDaylightState } from "../../../game/time";
 import type { EnvironmentConditionId, GameSpeed, GameState } from "../../../game/types";
 
 const LOW_PRIORITY_VISUAL_FRAME_MIN_MS = TEXTURE_ANIMATION_FRAME_MIN_MS;
+const AMBIENT_ENTITY_FRAME_MIN_MS = 1000 / 15;
 
 type AmbientEffectsHost = {
   host: HTMLElement;
@@ -203,6 +204,10 @@ export class AmbientEffectsController {
   private getVisualFrameMinMs(): number {
     if (this.shouldAnimateAmbientOverlays() || this.hostState.shouldAnimateCamera()) {
       return VISUAL_FRAME_MIN_MS;
+    }
+
+    if (this.hostState.shouldAnimateMapNpcs()) {
+      return AMBIENT_ENTITY_FRAME_MIN_MS;
     }
 
     return LOW_PRIORITY_VISUAL_FRAME_MIN_MS;
