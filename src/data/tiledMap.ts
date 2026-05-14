@@ -80,6 +80,8 @@ type TiledObjectLayer = {
   objects?: TiledObject[];
   opacity?: number;
   visible?: boolean;
+  offsetx?: number;
+  offsety?: number;
 };
 
 type TiledLayer = TiledTileLayer | TiledObjectLayer | {
@@ -442,6 +444,9 @@ function getMapObjects(
   layer: TiledObjectLayer,
   gidToTile: Map<number, GidTileReference>,
 ): VillageMapObjectDefinition[] {
+  const layerOffsetX = layer.offsetx ?? 0;
+  const layerOffsetY = layer.offsety ?? 0;
+
   return (layer.objects ?? [])
     .filter((object) => object.visible !== false)
     .map((object) => {
@@ -451,8 +456,8 @@ function getMapObjects(
         id: String(object.id),
         name: object.name ?? "",
         type: object.type ?? "",
-        x: position.x,
-        y: position.y,
+        x: position.x + layerOffsetX,
+        y: position.y + layerOffsetY,
         width: object.width ?? 0,
         height: object.height ?? 0,
         rotation: object.rotation ?? 0,
