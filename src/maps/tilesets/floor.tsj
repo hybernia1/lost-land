@@ -1,0 +1,240 @@
+{
+  "columns": 5,
+  "image": "../../assets/tiles/floor.png",
+  "imageheight": 512,
+  "imagewidth": 640,
+  "margin": 0,
+  "name": "floor",
+  "objectalignment": "bottom",
+  "properties": [
+    {
+      "name": "edgeOverscan",
+      "type": "float",
+      "value": 0.5
+    },
+    {
+      "name": "tintRain",
+      "type": "color",
+      "value": "#ff909fb2"
+    },
+    {
+      "name": "tintSnowFront",
+      "type": "color",
+      "value": "#ffd5e0ef"
+    },
+    {
+      "name": "tintRadiation",
+      "type": "color",
+      "value": "#ffa8c284"
+    }
+  ],
+  "spacing": 0,
+  "tilecount": 20,
+  "tiledversion": "1.12.1",
+  "tileheight": 128,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor01"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor02"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor03"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor04"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor05"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor06"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor07"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor08"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor09"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor10"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor11"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor12"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor13"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor14"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor15"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor16"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor17"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor18"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor19"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "floor20"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}
