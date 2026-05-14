@@ -31,6 +31,7 @@ const DEFAULT_BUILDING_VISUAL_FIT: Required<BuildingVisualFitDefinition> = {
 
 export type WorldRenderHost = {
   cameraStaticLayer: Container;
+  cameraForegroundDecorLayer: Container;
   cameraDynamicLayer: Container;
   backgroundLayer: Container;
   layout: SceneLayout;
@@ -123,13 +124,13 @@ export function drawTerrain(host: WorldRenderHost): void {
   }
 }
 
-export function drawDecorObjects(host: WorldRenderHost): void {
+export function drawDecorObjects(host: WorldRenderHost, renderBand: "base" | "foreground" = "base"): void {
   const layout = defaultVillageLayout;
   const scale = host.layout.scale;
   const mapBounds = getMapRenderBounds(layout, host.layout);
 
   for (const layer of layout.objectLayers) {
-    if (!layer.isStaticVisualLayer) {
+    if (!layer.isStaticVisualLayer || layer.renderBand !== renderBand) {
       continue;
     }
 
@@ -169,7 +170,10 @@ export function drawDecorObjects(host: WorldRenderHost): void {
       }
       sprite.alpha = render.opacity * layer.opacity;
       sprite.cullable = true;
-      host.cameraStaticLayer.addChild(sprite);
+      const targetLayer = renderBand === "foreground"
+        ? host.cameraForegroundDecorLayer
+        : host.cameraStaticLayer;
+      targetLayer.addChild(sprite);
     }
   }
 }

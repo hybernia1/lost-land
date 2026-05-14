@@ -1,11 +1,13 @@
 import { gunzipSync, unzlibSync } from "fflate";
 import type { TerrainTextureDefinition, TerrainTextureKey, TerrainTileId } from "./terrainTiles";
+import { isMapNpcKindId } from "./mapNpcs";
 import { getTileAssetUrl, getTiledTilesetSource } from "./tiledAssets";
 import type {
   TerrainTileLayerDefinition,
   TerrainTilePlacement,
   VillageLayoutDefinition,
   VillageMapObjectDefinition,
+  VillageNpcSpawnDefinition,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
 import type { ResourceSiteResourceId } from "../game/types";
@@ -183,6 +185,7 @@ export function createVillageLayoutFromTiled(
     tileTextures: registry.tileTextures,
     tileLayers: getTileLayers(map, orientation, registry.gidToTile),
     objectLayers: getObjectLayers(map, orientation, registry),
+    npcSpawns: getNpcSpawns(map, orientation),
     plots: getVillagePlots(map, orientation),
     resourceSites: getResourceSites(map, orientation),
   };
@@ -441,6 +444,7 @@ function getObjectLayers(
         name: layer.name,
         opacity: layer.opacity ?? 1,
         drawOrder: requireObjectLayerDrawOrder(layer),
+        renderBand: getObjectLayerRenderBand(layer),
         offset,
         placementMode,
         isStaticVisualLayer: placementMode === "free",
@@ -699,6 +703,11 @@ function requireObjectLayerDrawOrder(layer: Pick<TiledObjectLayer, "name" | "dra
   throw new Error(`Tiled object layer "${layer.name}" is missing required draworder.`);
 }
 
+function getObjectLayerRenderBand(layer: Pick<TiledObjectLayer, "properties">): "base" | "foreground" {
+  const value = getStringProperty(layer.properties, "renderBand");
+  return value === "foreground" ? "foreground" : "base";
+}
+
 function getVillagePlots(
   map: TiledMap,
   orientation: "orthogonal" | "isometric",
@@ -817,6 +826,55 @@ function getResourceSites(
         yieldPerWorker,
       };
     })
+    .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
+}
+
+function getNpcSpawns(
+  map: TiledMap,
+  orientation: "orthogonal" | "isometric",
+): VillageNpcSpawnDefinition[] {
+  const layer = getNamedObjectLayer(map, "npcSpawns", true);
+
+  if (!layer) {
+    return [];
+  }
+
+  const layerOffset = getObjectLayerOffset(layer);
+
+  return (layer.objects ?? [])
+    .filter((object) => object.visible !== false)
+    .map((object) => {
+      const id = object.name || `npc-spawn-${object.id}`;
+      const npcKindId = getStringProperty(object.properties, "npcKindId");
+
+      if (!npcKindId || !isMapNpcKindId(npcKindId)) {
+        throw new Error(`NPC spawn "${id}" has invalid or missing npcKindId property.`);
+      }
+
+      const position = getObjectPixelPosition(map, orientation, object.x, object.y);
+      const count = Math.max(
+        0,
+        Math.min(
+          24,
+          Math.floor(
+            getNumberProperty(object.properties, "npcCount") ??
+            getNumberProperty(object.properties, "count") ??
+            1,
+          ),
+        ),
+      );
+
+      return {
+        id,
+        npcKindId,
+        count,
+        x: position.x + layerOffset.x,
+        y: position.y + layerOffset.y,
+        width: object.width ?? 0,
+        height: object.height ?? 0,
+      };
+    })
+    .filter((spawn) => spawn.count > 0 && spawn.width > 0 && spawn.height > 0)
     .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
 }
 
@@ -971,10 +1029,11 @@ function getResourceSiteResourceId(
 function getNamedObjectLayer(
   map: TiledMap,
   name: string,
+  includeHidden = false,
 ): TiledObjectLayer | null {
   return map.layers.find((candidate): candidate is TiledObjectLayer =>
     candidate.type === "objectgroup" &&
     candidate.name === name &&
-    candidate.visible !== false,
+    (includeHidden || candidate.visible !== false),
   ) ?? null;
 }

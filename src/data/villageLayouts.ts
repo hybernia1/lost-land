@@ -1,6 +1,7 @@
 import woodlandCampMapRaw from "../maps/woodland-camp-01.tmj?raw";
 import { createVillageLayoutFromTiled } from "./tiledMap";
 import type { TerrainTextureDefinition, TerrainTextureKey, TerrainTileId } from "./terrainTiles";
+import type { MapNpcKindId } from "./mapNpcs";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "./villagePlots";
 
 export type TerrainTilePlacement = {
@@ -28,6 +29,7 @@ export type VillageObjectLayerDefinition = {
   name: string;
   opacity: number;
   drawOrder: "index" | "topdown";
+  renderBand: "base" | "foreground";
   offset: {
     x: number;
     y: number;
@@ -58,6 +60,16 @@ export type VillageMapObjectDefinition = {
   render: VillageMapObjectRenderDefinition;
 };
 
+export type VillageNpcSpawnDefinition = {
+  id: string;
+  npcKindId: MapNpcKindId;
+  count: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type VillageLayoutDefinition = {
   id: string;
   orientation: "orthogonal" | "isometric";
@@ -70,6 +82,7 @@ export type VillageLayoutDefinition = {
   tileTextures: Record<TerrainTextureKey, TerrainTextureDefinition>;
   tileLayers: TerrainTileLayerDefinition[];
   objectLayers: VillageObjectLayerDefinition[];
+  npcSpawns: VillageNpcSpawnDefinition[];
   plots: VillagePlotDefinition[];
   resourceSites: VillageResourceSiteDefinition[];
 };
