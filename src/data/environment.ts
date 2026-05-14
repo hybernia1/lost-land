@@ -44,16 +44,6 @@ export const environmentDefinitions: Record<EnvironmentConditionId, EnvironmentD
     healthIncidentChanceByIntensity: [3, 6],
     shelterDeadlineHoursByIntensity: [10, 7],
   },
-  radiation: {
-    id: "radiation",
-    labelKey: "environmentRadiation",
-    logStartKey: "logEnvironmentRadiationStarted",
-    logEndKey: "logEnvironmentRadiationEnded",
-    minDurationHours: 5,
-    maxDurationHours: 9,
-    moralePenaltyPerHourByIntensity: [0.55, 0.95],
-    healthIncidentChanceByIntensity: [8, 14],
-  },
 };
 
 export const ENVIRONMENT_MIN_INTENSITY = gameConfig.environment.minIntensity;

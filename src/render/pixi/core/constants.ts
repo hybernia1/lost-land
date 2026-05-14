@@ -29,13 +29,11 @@ export const decisionProfileLabelKeyByKind: Record<DecisionProfileKind, string> 
 export const environmentAlertIconByCondition: Record<ActiveEnvironmentConditionId, string> = {
   rain: "crisis-rain",
   snowFront: "crisis-snow",
-  radiation: "crisis-radiation",
 };
 
 export const environmentAlertToneByCondition: Record<ActiveEnvironmentConditionId, BrandAlertTone> = {
   rain: "neutral",
   snowFront: "cold",
-  radiation: "danger",
 };
 
 export const resourceColors: Record<ResourceId, number> = {
@@ -82,8 +80,6 @@ export const RAIN_LAYER_A_MIN_COUNT = 540;
 export const RAIN_LAYER_A_MAX_COUNT = 1300;
 export const RAIN_LAYER_B_MIN_COUNT = 360;
 export const RAIN_LAYER_B_MAX_COUNT = 880;
-export const RADIATION_MOTE_MIN_COUNT = 260;
-export const RADIATION_MOTE_MAX_COUNT = 760;
 export const HUD_FONT_FAMILY = "\"Segoe UI\", \"Noto Sans\", Arial, sans-serif";
 export const HUD_FONT_WEIGHT_NORMAL: TextStyleFontWeight = "400";
 export const HUD_FONT_WEIGHT_BOLD: TextStyleFontWeight = "700";

@@ -206,7 +206,6 @@ const warningLogKeys = new Set<string>([
   "logShelterCrisisWarning",
   "logShelterExposureInjury",
   "logEnvironmentSnowStarted",
-  "logEnvironmentRadiationStarted",
   "logResourceSiteAssaultFailed",
   "logResourceSiteAssaultOverrun",
   "logResourceSiteNoTroops",
@@ -221,6 +220,5 @@ const positiveLogKeys = new Set<string>([
   "logShelterCrisisResolved",
   "logEnvironmentRainEnded",
   "logEnvironmentSnowEnded",
-  "logEnvironmentRadiationEnded",
   "logResourceSiteCaptured",
 ]);

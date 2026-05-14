@@ -58,8 +58,6 @@ export function installGodMode(root: HTMLElement, game: Game): GodModeController
           <button data-dev-action="set-environment" data-condition="rain" data-intensity="2">Rain 2</button>
           <button data-dev-action="set-environment" data-condition="snowFront" data-intensity="1">Snow 1</button>
           <button data-dev-action="set-environment" data-condition="snowFront" data-intensity="2">Snow 2</button>
-          <button data-dev-action="set-environment" data-condition="radiation" data-intensity="1">Rad 1</button>
-          <button data-dev-action="set-environment" data-condition="radiation" data-intensity="2">Rad 2</button>
         </div>
       </div>
     `;

@@ -2049,7 +2049,7 @@ export class PixiVillageRenderer {
         label: remaining,
         tooltip,
         action: { action: "open-weather-overview" },
-        tone: condition === "radiation" ? "danger" : "warning",
+        tone: "warning",
       });
     }
 

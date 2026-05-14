@@ -923,10 +923,6 @@ function getEnvironmentPanelIconId(condition: EnvironmentConditionId): string {
     return "crisis-snow";
   }
 
-  if (condition === "radiation") {
-    return "crisis-radiation";
-  }
-
   return "clock";
 }
 
@@ -941,11 +937,6 @@ function getEnvironmentDescription(state: GameState, translations: TranslationPa
   if (condition === "snowFront") {
     return translations.ui.weatherSnowDescription ??
       "Snow front increases pressure on health and morale. Homeless survivors risk losses.";
-  }
-
-  if (condition === "radiation") {
-    return translations.ui.weatherRadiationDescription ??
-      "Radiation heavily strains community health and lowers morale.";
   }
 
   return translations.ui.weatherStableDescription ??

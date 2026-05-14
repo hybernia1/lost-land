@@ -245,7 +245,7 @@ cleanly instead of carrying compatibility branches.
 - The Main Building currently uses `src/assets/buildings/main-building-atlas.png`
   as a `5x4` static atlas with 20 level frames at `256x256`. Do not animate the
   building by cycling atlas frames; use Pixi effects for smoke, lights, weather,
-  radiation, disabled-power warnings, and similar state overlays.
+  disabled-power warnings, and similar state overlays.
 - The village screen renders through PixiJS. Keep menu, settings, and save/load
   flows in DOM for now, but avoid adding DOM fallback for in-game HUD, build
   modals, or scene overlays.
@@ -303,7 +303,7 @@ cleanly instead of carrying compatibility branches.
 - 2026-05-11: Renderer refactor wave continued (ambient/weather + texture animations).
   - Added `src/render/pixi/ambient/ambientEffects.ts` with `AmbientEffectsController`.
   - Moved out of `PixiVillageRenderer.ts`:
-    - full ambient overlay rendering (rain/snow/radiation/daylight)
+    - full ambient overlay rendering (rain/snow/daylight)
     - ambient animation loop lifecycle
     - texture animation binding/frame update lifecycle
     - noise helpers used by ambient and texture animation phases
@@ -344,7 +344,6 @@ cleanly instead of carrying compatibility branches.
   - Current presets are data-driven by tileset id (`ground`, `brick`, `trees`, `objects`) and include:
     - `rain` (cooler/darker tint)
     - `snowFront` (colder/brighter tint)
-    - `radiation` (subtle green shift)
   - `stable` remains un-tinted (`0xffffff` fallback in renderer).
   - Verification: `npm run build` passes.
 - 2026-05-13: Rain ambient loop added to runtime audio switching.
