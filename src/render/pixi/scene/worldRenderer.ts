@@ -165,7 +165,7 @@ function resolveTileObjectAnchor(
   const alignment = objectAlignment && objectAlignment !== "unspecified"
     ? objectAlignment
     : orientation === "isometric"
-      ? "bottomleft"
+      ? "bottom"
       : "bottomleft";
 
   switch (alignment) {
