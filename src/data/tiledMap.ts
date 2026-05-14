@@ -1,3 +1,4 @@
+import { gunzipSync, unzlibSync } from "fflate";
 import type { TerrainTextureDefinition, TerrainTextureKey, TerrainTileId } from "./terrainTiles";
 import { getTileAssetUrl, getTiledTilesetSource } from "./tiledAssets";
 import type {
@@ -65,7 +66,9 @@ type TiledTileLayer = {
   type: "tilelayer";
   width: number;
   height: number;
-  data: number[];
+  data: number[] | string;
+  encoding?: "csv" | "base64";
+  compression?: "gzip" | "zlib" | "zstd" | "";
   opacity?: number;
   visible?: boolean;
 };
@@ -354,10 +357,11 @@ function validateTileLayer(map: TiledMap, layer: TiledTileLayer): void {
   }
 
   const expectedTileCount = layer.width * layer.height;
+  const layerData = getLayerTileData(layer);
 
-  if (layer.data.length !== expectedTileCount) {
+  if (layerData.length !== expectedTileCount) {
     throw new Error(
-      `Tiled layer "${layer.name}" has ${layer.data.length} tiles, expected ${expectedTileCount}.`,
+      `Tiled layer "${layer.name}" has ${layerData.length} tiles, expected ${expectedTileCount}.`,
     );
   }
 }
@@ -387,8 +391,9 @@ function getTerrainTiles(
 ): Pick<TerrainTileLayerDefinition, "tiles" | "tileByIndex"> {
   const tileByIndex: Array<TerrainTilePlacement | null> = [];
   const tiles: TerrainTilePlacement[] = [];
+  const layerData = getLayerTileData(layer);
 
-  layer.data.forEach((rawGid, index) => {
+  layerData.forEach((rawGid, index) => {
     const tile = getTileReference(rawGid, gidToTile);
 
     if (!tile) {
@@ -410,6 +415,112 @@ function getTerrainTiles(
   });
 
   return { tiles, tileByIndex };
+}
+
+function getLayerTileData(layer: TiledTileLayer): number[] {
+  if (Array.isArray(layer.data)) {
+    return layer.data;
+  }
+
+  if (layer.encoding === "base64") {
+    return decodeBase64LayerData(layer.name, layer.data, layer.compression);
+  }
+
+  if (layer.encoding === "csv" || layer.encoding === undefined) {
+    return parseCsvLayerData(layer.name, layer.data);
+  }
+
+  throw new Error(
+    `Tiled layer "${layer.name}" has unsupported encoding "${layer.encoding}".`,
+  );
+}
+
+function decodeBase64LayerData(
+  layerName: string,
+  base64Data: string,
+  compression: TiledTileLayer["compression"],
+): number[] {
+  const encodedBytes = decodeBase64ToBytes(base64Data);
+  const decodedBytes = decompressLayerBytes(layerName, encodedBytes, compression);
+
+  if (decodedBytes.byteLength % 4 !== 0) {
+    throw new Error(
+      `Tiled layer "${layerName}" base64 payload has invalid byte length ${decodedBytes.byteLength}.`,
+    );
+  }
+
+  const view = new DataView(decodedBytes.buffer, decodedBytes.byteOffset, decodedBytes.byteLength);
+  const tiles: number[] = [];
+
+  for (let offset = 0; offset < decodedBytes.byteLength; offset += 4) {
+    tiles.push(view.getUint32(offset, true));
+  }
+
+  return tiles;
+}
+
+function decodeBase64ToBytes(base64Data: string): Uint8Array {
+  if (typeof atob === "function") {
+    const normalized = base64Data.replace(/\s+/g, "");
+    const decoded = atob(normalized);
+    const bytes = new Uint8Array(decoded.length);
+
+    for (let index = 0; index < decoded.length; index += 1) {
+      bytes[index] = decoded.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  const bufferFactory = (globalThis as { Buffer?: { from(data: string, encoding: string): Uint8Array } }).Buffer;
+
+  if (!bufferFactory) {
+    throw new Error("No base64 decoder available in this environment.");
+  }
+
+  return bufferFactory.from(base64Data, "base64");
+}
+
+function decompressLayerBytes(
+  layerName: string,
+  bytes: Uint8Array,
+  compression: TiledTileLayer["compression"],
+): Uint8Array {
+  if (!compression) {
+    return bytes;
+  }
+
+  if (compression === "gzip") {
+    return gunzipSync(bytes);
+  }
+
+  if (compression === "zlib") {
+    return unzlibSync(bytes);
+  }
+
+  if (compression === "zstd") {
+    throw new Error(
+      `Tiled layer "${layerName}" uses zstd compression, which is not supported by the runtime loader.`,
+    );
+  }
+
+  throw new Error(
+    `Tiled layer "${layerName}" has unsupported compression "${compression}".`,
+  );
+}
+
+function parseCsvLayerData(layerName: string, csvData: string): number[] {
+  const values = csvData
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  const tiles = values.map((value) => Number.parseInt(value, 10));
+
+  if (tiles.some((value) => Number.isNaN(value))) {
+    throw new Error(`Tiled layer "${layerName}" contains invalid CSV tile data.`);
+  }
+
+  return tiles;
 }
 
 function getTilePixelPosition(
