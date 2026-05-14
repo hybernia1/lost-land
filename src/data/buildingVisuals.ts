@@ -15,14 +15,35 @@ import workshopTextureUrl from "../assets/buildings/workshop.png";
 export type BuildingTextureVisualDefinition = {
   kind: "texture";
   textureUrl: string;
+  placement?: BuildingVisualPlacementDefinition;
+  fit?: BuildingVisualFitDefinition;
 };
 
 export type BuildingVisualDefinition = BuildingTextureVisualDefinition;
 
-function singleTexture(textureUrl: string): BuildingTextureVisualDefinition {
+export type BuildingVisualPoint = {
+  x: number;
+  y: number;
+};
+
+export type BuildingVisualPlacementDefinition = {
+  anchor?: BuildingVisualPoint;
+  offset?: BuildingVisualPoint;
+};
+
+export type BuildingVisualFitDefinition = {
+  footprintWidthScale?: number;
+  visualHeightScale?: number;
+};
+
+function singleTexture(
+  textureUrl: string,
+  options: Omit<BuildingTextureVisualDefinition, "kind" | "textureUrl"> = {},
+): BuildingTextureVisualDefinition {
   return {
     kind: "texture",
     textureUrl,
+    ...options,
   };
 }
 
@@ -35,7 +56,11 @@ export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisua
   workshop: singleTexture(workshopTextureUrl),
   generator: singleTexture(generatorTextureUrl),
   market: singleTexture(marketTextureUrl),
-  watchtower: singleTexture(watchtowerTextureUrl),
+  watchtower: singleTexture(watchtowerTextureUrl, {
+    placement: {
+      anchor: { x: 0.476, y: 0.802 },
+    },
+  }),
   barracks: singleTexture(barracksTextureUrl),
   academy: singleTexture(academyTextureUrl),
   clinic: singleTexture(clinicTextureUrl),

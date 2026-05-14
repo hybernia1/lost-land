@@ -6,7 +6,6 @@ import type {
   TerrainTilePlacement,
   VillageLayoutDefinition,
   VillageMapObjectDefinition,
-  VillageMapObjectPropertyValue,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
 import type { ResourceSiteResourceId } from "../game/types";
@@ -57,6 +56,7 @@ type TiledTileset = {
     | "bottomleft"
     | "bottom"
     | "bottomright";
+  properties?: TiledProperty[];
   tiles?: TiledTilesetTile[];
 };
 
@@ -83,6 +83,7 @@ type TiledObject = {
   width?: number;
   height?: number;
   rotation?: number;
+  opacity?: number;
   visible?: boolean;
   properties?: TiledProperty[];
 };
@@ -91,11 +92,13 @@ type TiledObjectLayer = {
   id: number;
   name: string;
   type: "objectgroup";
+  draworder?: "index" | "topdown";
   objects?: TiledObject[];
   opacity?: number;
   visible?: boolean;
   offsetx?: number;
   offsety?: number;
+  properties?: TiledProperty[];
 };
 
 type TiledLayer = TiledTileLayer | TiledObjectLayer | {
@@ -161,13 +164,17 @@ export function createVillageLayoutFromTiled(
   if (!orientation) {
     throw new Error(`Unsupported Tiled map orientation "${map.orientation ?? "unknown"}".`);
   }
-  const registry = createTilesetRegistry(id, map.tilesets);
+  const registry = createTilesetRegistry(id, map.tilesets, map.tileheight);
   const mapPixelBounds = getMapPixelBounds(map, orientation);
 
   return {
     id,
     orientation,
-    tilesetId: getStringProperty(map.properties, "tilesetId") ?? map.tilesets[0]?.name ?? "default",
+    tilesetId: requireStringProperty(
+      map.properties,
+      "tilesetId",
+      `Tiled map ${id} is missing required tilesetId property.`,
+    ),
     tileWidth: map.tilewidth,
     tileHeight: map.tileheight,
     tileSize: map.tilewidth,
@@ -175,7 +182,7 @@ export function createVillageLayoutFromTiled(
     height: mapPixelBounds.height,
     tileTextures: registry.tileTextures,
     tileLayers: getTileLayers(map, orientation, registry.gidToTile),
-    objectLayers: getObjectLayers(map, orientation, registry.gidToTile),
+    objectLayers: getObjectLayers(map, orientation, registry),
     plots: getVillagePlots(map, orientation),
     resourceSites: getResourceSites(map, orientation),
   };
@@ -198,7 +205,11 @@ function getMapPixelBounds(
   };
 }
 
-function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTilesetRegistry {
+function createTilesetRegistry(
+  id: string,
+  tilesets: TiledTileset[],
+  mapTileHeight: number,
+): TiledTilesetRegistry {
   if (tilesets.length === 0) {
     throw new Error(`Tiled map ${id} has no tilesets.`);
   }
@@ -208,17 +219,36 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
 
   for (const mapTileset of tilesets) {
     const tileset = resolveTileset(mapTileset);
-    const atlasUrl = getTileAssetUrl(tileset.image ?? "");
-    const tileCount = tileset.tilecount ?? ((tileset.columns ?? 1) * Math.ceil((tileset.imageheight ?? tileset.tileheight) / tileset.tileheight));
-    const columns = tileset.columns ?? Math.max(1, Math.floor((tileset.imagewidth ?? tileset.tilewidth) / tileset.tilewidth));
-    const margin = tileset.margin ?? 0;
-    const spacing = tileset.spacing ?? 0;
+    const atlasUrl = getTileAssetUrl(requireDefined(
+      tileset.image,
+      `Tileset "${tileset.name}" is missing required image.`,
+    ));
+    const tileCount = requireDefined(
+      tileset.tilecount,
+      `Tileset "${tileset.name}" is missing required tilecount.`,
+    );
+    const columns = requireDefined(
+      tileset.columns,
+      `Tileset "${tileset.name}" is missing required columns.`,
+    );
+    const margin = requireDefined(
+      tileset.margin,
+      `Tileset "${tileset.name}" is missing required margin.`,
+    );
+    const spacing = requireDefined(
+      tileset.spacing,
+      `Tileset "${tileset.name}" is missing required spacing.`,
+    );
     const tilesById = new Map((tileset.tiles ?? []).map((tile) => [tile.id, tile]));
     const textureKeyByTileIndex = new Map<number, TerrainTextureKey>();
 
     for (let tileIndex = 0; tileIndex < tileCount; tileIndex += 1) {
       const tile = tilesById.get(tileIndex);
-      const tileId = getStringProperty(tile?.properties, "tileId") ?? `${tileset.name}_${tileIndex}`;
+      const tileId = requireStringProperty(
+        tile?.properties,
+        "tileId",
+        `Tileset "${tileset.name}" tile ${tileIndex} is missing required tileId property.`,
+      );
       const textureKey = `${tileset.name}:${tileId}`;
       const frame = {
         x: margin + (tileIndex % columns) * (tileset.tilewidth + spacing),
@@ -233,8 +263,18 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
         tilesetId: tileset.name,
         atlasUrl,
         frame,
-        objectAlignment: tileset.objectalignment,
-        tintByEnvironment: getDefaultTerrainTintByEnvironment(tileset.name),
+        tileLayerOffset: {
+          x: 0,
+          y: mapTileHeight - tileset.tileheight,
+        },
+        objectAnchor: resolveTileObjectAnchor(tileset.objectalignment, tileset.name),
+        edgeOverscan: getNumberProperty(tile?.properties, "edgeOverscan") ??
+          requireNumberProperty(
+            tileset.properties,
+            "edgeOverscan",
+            `Tileset "${tileset.name}" is missing required edgeOverscan property.`,
+          ),
+        tintByEnvironment: getTerrainTintByEnvironment(tileset, tile),
       };
       gidToTile.set(tileset.firstgid + tileIndex, { tileId, textureKey });
       textureKeyByTileIndex.set(tileIndex, textureKey);
@@ -268,45 +308,62 @@ function createTilesetRegistry(id: string, tilesets: TiledTileset[]): TiledTiles
   return { tileTextures, gidToTile };
 }
 
-function getDefaultTerrainTintByEnvironment(tilesetId: string): TerrainEnvironmentTint | undefined {
-  const normalized = tilesetId.trim().toLowerCase();
-
-  if (normalized === "ground") {
-    return {
-      rain: 0x8fa2b8,
-      snowFront: 0xd2dff0,
-      radiation: 0xa8c483,
-    };
+function resolveTileObjectAnchor(
+  objectAlignment: TiledTileset["objectalignment"],
+  tilesetName: string,
+): { x: number; y: number } {
+  if (!objectAlignment || objectAlignment === "unspecified") {
+    throw new Error(
+      `Tileset "${tilesetName}" is missing required explicit objectalignment.`,
+    );
   }
 
-  if (normalized === "brick") {
-    return {
-      rain: 0x8f9098,
-      snowFront: 0xd7ddea,
-      radiation: 0xb1be89,
-    };
+  switch (objectAlignment) {
+    case "topleft":
+      return { x: 0, y: 0 };
+    case "top":
+      return { x: 0.5, y: 0 };
+    case "topright":
+      return { x: 1, y: 0 };
+    case "left":
+      return { x: 0, y: 0.5 };
+    case "center":
+      return { x: 0.5, y: 0.5 };
+    case "right":
+      return { x: 1, y: 0.5 };
+    case "bottom":
+      return { x: 0.5, y: 1 };
+    case "bottomright":
+      return { x: 1, y: 1 };
+    case "bottomleft":
+    default:
+      return { x: 0, y: 1 };
   }
+}
 
-  if (normalized === "trees") {
-    return {
-      rain: 0x7f93aa,
-      snowFront: 0xd6e4f4,
-      radiation: 0x9db97a,
-    };
-  }
-
-  if (normalized === "objects") {
-    return {
-      rain: 0x8d9aae,
-      snowFront: 0xd3deee,
-      radiation: 0xa6c27f,
-    };
-  }
-
+function getTerrainTintByEnvironment(
+  tileset: Pick<TiledTileset, "name" | "properties">,
+  tile: TiledTilesetTile | undefined,
+): TerrainEnvironmentTint {
   return {
-    rain: 0x909fb2,
-    snowFront: 0xd5e0ef,
-    radiation: 0xa8c284,
+    rain: getColorProperty(tile?.properties, "tintRain") ??
+      requireColorProperty(
+        tileset.properties,
+        "tintRain",
+        `Tileset "${tileset.name}" is missing required tintRain color property.`,
+      ),
+    snowFront: getColorProperty(tile?.properties, "tintSnowFront") ??
+      requireColorProperty(
+        tileset.properties,
+        "tintSnowFront",
+        `Tileset "${tileset.name}" is missing required tintSnowFront color property.`,
+      ),
+    radiation: getColorProperty(tile?.properties, "tintRadiation") ??
+      requireColorProperty(
+        tileset.properties,
+        "tintRadiation",
+        `Tileset "${tileset.name}" is missing required tintRadiation color property.`,
+      ),
   };
 }
 
@@ -369,18 +426,27 @@ function validateTileLayer(map: TiledMap, layer: TiledTileLayer): void {
 function getObjectLayers(
   map: TiledMap,
   orientation: "orthogonal" | "isometric",
-  gidToTile: Map<number, GidTileReference>,
+  registry: TiledTilesetRegistry,
 ): VillageObjectLayerDefinition[] {
   return map.layers
     .filter((layer): layer is TiledObjectLayer =>
       layer.type === "objectgroup" && layer.visible !== false,
     )
-    .map((layer) => ({
-      id: String(layer.id),
-      name: layer.name,
-      opacity: layer.opacity ?? 1,
-      objects: getMapObjects(map, orientation, layer, gidToTile),
-    }));
+    .map((layer) => {
+      const placementMode = getStringProperty(layer.properties, "placementMode");
+      const offset = getObjectLayerOffset(layer);
+
+      return {
+        id: String(layer.id),
+        name: layer.name,
+        opacity: layer.opacity ?? 1,
+        drawOrder: requireObjectLayerDrawOrder(layer),
+        offset,
+        placementMode,
+        isStaticVisualLayer: placementMode === "free",
+        objects: getMapObjects(map, orientation, layer, registry, offset),
+      };
+    });
 }
 
 function getTerrainTiles(
@@ -549,7 +615,7 @@ function getObjectPixelPosition(
   orientation: "orthogonal" | "isometric",
   objectX: number,
   objectY: number,
-): Pick<VillageMapObjectDefinition, "x" | "y"> {
+): { x: number; y: number } {
   if (orientation === "orthogonal") {
     return { x: objectX, y: objectY };
   }
@@ -558,38 +624,79 @@ function getObjectPixelPosition(
   // where both axes are scaled by tileHeight.
   const tileX = objectX / map.tileheight;
   const tileY = objectY / map.tileheight;
-  return getTilePixelPosition(map, orientation, tileX, tileY);
+  const originX = map.height * (map.tilewidth / 2);
+  return {
+    x: (tileX - tileY) * (map.tilewidth / 2) + originX,
+    y: (tileX + tileY) * (map.tileheight / 2),
+  };
 }
 
 function getMapObjects(
   map: TiledMap,
   orientation: "orthogonal" | "isometric",
   layer: TiledObjectLayer,
-  gidToTile: Map<number, GidTileReference>,
+  registry: TiledTilesetRegistry,
+  layerOffset: { x: number; y: number },
 ): VillageMapObjectDefinition[] {
-  const layerOffsetX = layer.offsetx ?? 0;
-  const layerOffsetY = layer.offsety ?? 0;
-
   return (layer.objects ?? [])
     .filter((object) => object.visible !== false)
     .map((object) => {
-      const tile = object.gid ? getTileReference(object.gid, gidToTile) : null;
+      const tile = object.gid ? getTileReference(object.gid, registry.gidToTile) : null;
+      const tileTransform = object.gid ? getTileTransform(object.gid) : {};
+      const tileTexture = tile
+        ? getRequiredTerrainTexture(registry, tile.textureKey)
+        : null;
       const position = getObjectPixelPosition(map, orientation, object.x, object.y);
+      const width = object.width ?? 0;
+      const height = object.height ?? 0;
+      const rotation = object.rotation ?? 0;
+      const opacity = object.opacity ?? 1;
+      const render = {
+        x: position.x + layerOffset.x,
+        y: position.y + layerOffset.y,
+        width,
+        height,
+        anchor: tileTexture?.objectAnchor ?? null,
+        rotation: rotation + (tileTransform.rotation ?? 0),
+        flipX: Boolean(tileTransform.flipX),
+        flipY: Boolean(tileTransform.flipY),
+        opacity,
+      };
+
       return {
         id: String(object.id),
-        name: object.name ?? "",
-        type: object.type ?? "",
-        x: position.x + layerOffsetX,
-        y: position.y + layerOffsetY,
-        width: object.width ?? 0,
-        height: object.height ?? 0,
-        rotation: object.rotation ?? 0,
-        opacity: layer.opacity ?? 1,
-        tileId: tile?.tileId ?? null,
         textureKey: tile?.textureKey ?? null,
-        properties: getObjectProperties(object.properties),
+        render,
       };
     });
+}
+
+function getRequiredTerrainTexture(
+  registry: TiledTilesetRegistry,
+  textureKey: TerrainTextureKey,
+): TerrainTextureDefinition {
+  const texture = registry.tileTextures[textureKey];
+
+  if (!texture) {
+    throw new Error(`Tiled object references unknown texture "${textureKey}".`);
+  }
+
+  return texture;
+}
+
+function getObjectLayerOffset(layer: Pick<TiledObjectLayer, "offsetx" | "offsety">): { x: number; y: number } {
+  return {
+    x: layer.offsetx ?? 0,
+    y: layer.offsety ?? 0,
+  };
+}
+
+function requireObjectLayerDrawOrder(layer: Pick<TiledObjectLayer, "name" | "draworder">): "index" | "topdown" {
+  if (layer.draworder === "index" || layer.draworder === "topdown") {
+    return layer.draworder;
+  }
+
+  throw new Error(`Tiled object layer "${layer.name}" is missing required draworder.`);
 }
 
 function getVillagePlots(
@@ -602,6 +709,7 @@ function getVillagePlots(
     throw new Error("Tiled map is missing object layer \"plots\".");
   }
 
+  const layerOffset = getObjectLayerOffset(plotsLayer);
   const plotObjects = (plotsLayer.objects ?? []).map((object) => ({
     object,
     id: getPlotObjectId(object),
@@ -618,8 +726,8 @@ function getVillagePlots(
 
       return {
         id,
-        x: position.x,
-        y: position.y,
+        x: position.x + layerOffset.x,
+        y: position.y + layerOffset.y,
         width: object.width ?? 0,
         height: object.height ?? 0,
         ...villagePlotRulesById[id],
@@ -647,6 +755,8 @@ function getResourceSites(
   if (!layer) {
     return [];
   }
+
+  const layerOffset = getObjectLayerOffset(layer);
 
   return (layer.objects ?? [])
     .filter((object) => object.visible !== false)
@@ -696,8 +806,8 @@ function getResourceSites(
 
       return {
         id,
-        x: position.x,
-        y: object.gid ? position.y - (object.height ?? 0) : position.y,
+        x: position.x + layerOffset.x,
+        y: position.y + layerOffset.y,
         width: object.width ?? 0,
         height: object.height ?? 0,
         resourceId,
@@ -762,27 +872,84 @@ function getStringProperty(properties: TiledProperty[] | undefined, name: string
   return typeof property?.value === "string" ? property.value : null;
 }
 
+function requireStringProperty(
+  properties: TiledProperty[] | undefined,
+  name: string,
+  errorMessage: string,
+): string {
+  const value = getStringProperty(properties, name);
+
+  if (value === null) {
+    throw new Error(errorMessage);
+  }
+
+  return value;
+}
+
+function requireDefined<T>(value: T | null | undefined, errorMessage: string): T {
+  if (value === null || value === undefined) {
+    throw new Error(errorMessage);
+  }
+
+  return value;
+}
+
 function getNumberProperty(properties: TiledProperty[] | undefined, name: string): number | null {
   const property = properties?.find((candidate) => candidate.name === name);
   return typeof property?.value === "number" ? property.value : null;
 }
 
-function getObjectProperties(
+function requireNumberProperty(
   properties: TiledProperty[] | undefined,
-): Record<string, VillageMapObjectPropertyValue> {
-  const objectProperties: Record<string, VillageMapObjectPropertyValue> = {};
+  name: string,
+  errorMessage: string,
+): number {
+  const value = getNumberProperty(properties, name);
 
-  for (const property of properties ?? []) {
-    if (
-      typeof property.value === "string" ||
-      typeof property.value === "number" ||
-      typeof property.value === "boolean"
-    ) {
-      objectProperties[property.name] = property.value;
-    }
+  if (value === null) {
+    throw new Error(errorMessage);
   }
 
-  return objectProperties;
+  return value;
+}
+
+function getColorProperty(properties: TiledProperty[] | undefined, name: string): number | null {
+  const property = properties?.find((candidate) => candidate.name === name);
+  return parseTiledColor(property?.value);
+}
+
+function requireColorProperty(
+  properties: TiledProperty[] | undefined,
+  name: string,
+  errorMessage: string,
+): number {
+  const value = getColorProperty(properties, name);
+
+  if (value === null) {
+    throw new Error(errorMessage);
+  }
+
+  return value;
+}
+
+function parseTiledColor(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value & 0xffffff;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(normalized) && !/^#[0-9a-fA-F]{8}$/.test(normalized)) {
+    return null;
+  }
+
+  const rgbHex = normalized.length === 9
+    ? normalized.slice(3)
+    : normalized.slice(1);
+  return Number.parseInt(rgbHex, 16);
 }
 
 function getResourceSiteResourceId(

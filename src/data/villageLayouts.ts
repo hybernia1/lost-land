@@ -27,24 +27,35 @@ export type VillageObjectLayerDefinition = {
   id: string;
   name: string;
   opacity: number;
+  drawOrder: "index" | "topdown";
+  offset: {
+    x: number;
+    y: number;
+  };
+  placementMode: string | null;
+  isStaticVisualLayer: boolean;
   objects: VillageMapObjectDefinition[];
 };
 
-export type VillageMapObjectPropertyValue = string | number | boolean;
-
-export type VillageMapObjectDefinition = {
-  id: string;
-  name: string;
-  type: string;
+export type VillageMapObjectRenderDefinition = {
   x: number;
   y: number;
   width: number;
   height: number;
+  anchor: {
+    x: number;
+    y: number;
+  } | null;
   rotation: number;
+  flipX: boolean;
+  flipY: boolean;
   opacity: number;
-  tileId: TerrainTileId | null;
+};
+
+export type VillageMapObjectDefinition = {
+  id: string;
   textureKey: TerrainTextureKey | null;
-  properties: Record<string, VillageMapObjectPropertyValue>;
+  render: VillageMapObjectRenderDefinition;
 };
 
 export type VillageLayoutDefinition = {

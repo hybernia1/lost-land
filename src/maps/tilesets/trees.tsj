@@ -5,6 +5,29 @@
   "imagewidth": 768,
   "margin": 0,
   "name": "trees",
+  "objectalignment": "bottom",
+  "properties": [
+      {
+        "name": "edgeOverscan",
+        "type": "float",
+        "value": 0.5
+      },
+      {
+        "name": "tintRain",
+        "type": "color",
+        "value": "#ff7f93aa"
+      },
+      {
+        "name": "tintSnowFront",
+        "type": "color",
+        "value": "#ffd6e4f4"
+      },
+      {
+        "name": "tintRadiation",
+        "type": "color",
+        "value": "#ff9db97a"
+      }
+  ],
   "spacing": 0,
   "tilecount": 6,
   "tiledversion": "1.12.1",
