@@ -152,7 +152,7 @@ export function drawDecorObjects(host: WorldRenderHost): void {
 }
 
 function isStaticVisualObjectLayer(layerName: string): boolean {
-  return layerName === "decor";
+  return layerName === "decor" || layerName === "walls";
 }
 
 
