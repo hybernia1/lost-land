@@ -16652,27 +16652,27 @@
  "tileheight": 64,
  "tilesets": [
   {
-   "firstgid": 53,
+   "firstgid": 1,
    "source": "tilesets/trees.tsj"
   },
   {
-   "firstgid": 59,
+   "firstgid": 7,
    "source": "tilesets/bush.tsj"
   },
   {
-   "firstgid": 65,
+   "firstgid": 13,
    "source": "tilesets/nature-blocks.tsj"
   },
   {
-   "firstgid": 85,
+   "firstgid": 33,
    "source": "tilesets/water.tsj"
   },
   {
-   "firstgid": 105,
+   "firstgid": 53,
    "source": "tilesets/rocks.tsj"
   },
   {
-   "firstgid": 111,
+   "firstgid": 59,
    "source": "tilesets/walls.tsj"
   }
  ],
