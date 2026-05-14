@@ -1,0 +1,23 @@
+{
+  "columns": 3,
+  "image": "../../assets/tiles/walls.png",
+  "imageheight": 512,
+  "imagewidth": 768,
+  "margin": 0,
+  "name": "walls",
+  "spacing": 0,
+  "tilecount": 6,
+  "tiledversion": "1.12.1",
+  "tileheight": 256,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "wallA" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "wallB" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "wallCorner" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "gateClosedA" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "gateClosedB" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "wallEndA" }] }
+  ],
+  "tilewidth": 256,
+  "type": "tileset",
+  "version": "1.10"
+}

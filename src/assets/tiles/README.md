@@ -1,4 +1,4 @@
-# Tile Atlases
+﻿# Tile Atlases
 
 Map tiles are grouped by Tiled layer purpose. Legacy top-down atlases use a
 128x128 grid. Isometric tiles can use their own map grid sizes.
@@ -49,3 +49,10 @@ without baking in a background.
 - no spacing between frames (`spacing=0`)
 - atlas size `640x512`
 - source images copied from `C:\Users\nikol\Desktop\iso grass\*.png`, then normalized into fixed `128x128` cells while preserving proportions
+
+
+walls.png is a freeform isometric wall/gate atlas:
+- 6 frames (3x2 grid)
+- frame size 256x256`n- atlas layout 3 columns x 2 rows`n- no spacing between frames (spacing=0)
+- atlas size 768x512`n- includes wall segments in both diagonals, corner, end piece, and closed gate variants
+
