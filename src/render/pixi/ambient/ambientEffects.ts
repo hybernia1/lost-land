@@ -11,6 +11,9 @@ import { ENVIRONMENT_MAX_INTENSITY } from "../../../data/environment";
 import { getDaylightState } from "../../../game/time";
 import type { EnvironmentConditionId, GameSpeed, GameState } from "../../../game/types";
 
+const LOW_PRIORITY_VISUAL_FRAME_MIN_MS = TEXTURE_ANIMATION_FRAME_MIN_MS;
+const AMBIENT_ENTITY_FRAME_MIN_MS = 1000 / 15;
+
 type AmbientEffectsHost = {
   host: HTMLElement;
   getApp: () => Application | null;
@@ -18,6 +21,10 @@ type AmbientEffectsHost = {
   daylightOverlayGraphic: Graphics;
   shouldAnimateCamera: () => boolean;
   refreshCameraTransform: () => void;
+  shouldAnimateMapBirds: () => boolean;
+  refreshMapBirds: (timestampMs: number) => void;
+  shouldAnimateMapNpcs: () => boolean;
+  refreshMapNpcs: (timestampMs: number) => void;
 };
 
 export class AmbientEffectsController {
@@ -145,7 +152,11 @@ export class AmbientEffectsController {
   }
 
   private shouldAnimateVisuals(): boolean {
-    return this.shouldAnimateAmbientOverlays() || this.textureAnimationBindings.size > 0 || this.hostState.shouldAnimateCamera();
+    return this.shouldAnimateAmbientOverlays() ||
+      this.textureAnimationBindings.size > 0 ||
+      this.hostState.shouldAnimateCamera() ||
+      this.hostState.shouldAnimateMapBirds() ||
+      this.hostState.shouldAnimateMapNpcs();
   }
 
   private startAnimation(): void {
@@ -166,7 +177,7 @@ export class AmbientEffectsController {
 
     if (
       this.lastVisualFrameAtMs > 0 &&
-      timestamp - this.lastVisualFrameAtMs < VISUAL_FRAME_MIN_MS
+      timestamp - this.lastVisualFrameAtMs < this.getVisualFrameMinMs()
     ) {
       if (this.shouldAnimateVisuals()) {
         this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
@@ -180,12 +191,26 @@ export class AmbientEffectsController {
     }
 
     this.refreshTextureAnimations(timestamp);
+    this.hostState.refreshMapBirds(timestamp);
+    this.hostState.refreshMapNpcs(timestamp);
     this.hostState.refreshCameraTransform();
     app.render();
 
     if (this.shouldAnimateVisuals()) {
       this.ambientAnimationFrameId = window.requestAnimationFrame(this.handleAmbientAnimationFrame);
     }
+  }
+
+  private getVisualFrameMinMs(): number {
+    if (this.shouldAnimateAmbientOverlays() || this.hostState.shouldAnimateCamera()) {
+      return VISUAL_FRAME_MIN_MS;
+    }
+
+    if (this.hostState.shouldAnimateMapNpcs()) {
+      return AMBIENT_ENTITY_FRAME_MIN_MS;
+    }
+
+    return LOW_PRIORITY_VISUAL_FRAME_MIN_MS;
   }
 
   private redrawEnvironmentOverlay(

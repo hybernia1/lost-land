@@ -6,6 +6,14 @@ import {
 } from "pixi.js";
 import constructionSiteTextureUrl from "../assets/buildings/construction-site.png";
 import {
+  mapBirdDefinitions,
+  type MapBirdKindId,
+} from "../data/mapBirds";
+import {
+  mapNpcDefinitions,
+  type MapNpcKindId,
+} from "../data/mapNpcs";
+import {
   buildingVisualDefinitions,
   type BuildingVisualDefinition,
 } from "../data/buildingVisuals";
@@ -17,6 +25,16 @@ const terrainTextureCache = new Map<string, Texture>();
 const terrainAnimationCache = new Map<string, FrameObject[] | null>();
 const terrainTextureDefinitionByKey = new Map<string, TerrainTextureDefinition>();
 const terrainTextureKeysByAtlasUrl = new Map<string, string[]>();
+
+export type MapNpcTextureSet = {
+  west: Texture[];
+  east: Texture[];
+};
+
+export type MapBirdTextureSet = {
+  west: Texture[];
+  east: Texture[];
+};
 
 for (const layout of villageLayoutDefinitions) {
   for (const [textureKey, definition] of Object.entries(layout.tileTextures)) {
@@ -37,6 +55,10 @@ export class VillageAssets {
   private readonly buildingTextures = new Map<string, Texture>();
   private constructionSiteTexture: Texture | null = null;
   private readonly terrainAtlases = new Map<string, Texture>();
+  private readonly mapBirdAtlases = new Map<string, Texture>();
+  private readonly mapBirdTextures = new Map<MapBirdKindId, MapBirdTextureSet>();
+  private readonly mapNpcAtlases = new Map<string, Texture>();
+  private readonly mapNpcTextures = new Map<MapNpcKindId, MapNpcTextureSet>();
   private loadPromise: Promise<void> | null = null;
 
   load(): Promise<void> {
@@ -119,10 +141,20 @@ export class VillageAssets {
     return Boolean(tile?.animation && tile.animation.length > 1);
   }
 
+  getMapNpcTextures(kindId: MapNpcKindId): MapNpcTextureSet | null {
+    return this.mapNpcTextures.get(kindId) ?? null;
+  }
+
+  getMapBirdTextures(kindId: MapBirdKindId): MapBirdTextureSet | null {
+    return this.mapBirdTextures.get(kindId) ?? null;
+  }
+
   private async loadTextures(): Promise<void> {
     await Promise.all([
       this.loadBuildingTextures(),
       this.loadTerrainAtlases(),
+      this.loadMapBirdAtlases(),
+      this.loadMapNpcAtlases(),
     ]);
   }
 
@@ -164,6 +196,73 @@ export class VillageAssets {
     for (const textureKey of terrainTextureDefinitionByKey.keys()) {
       this.getTerrainTileTexture(textureKey);
     }
+  }
+
+  private async loadMapNpcAtlases(): Promise<void> {
+    const atlasUrls = new Set(Object.values(mapNpcDefinitions).map((definition) => definition.atlasUrl));
+
+    await Promise.all(
+      Array.from(atlasUrls).map(async (atlasUrl) => {
+        const texture = await Assets.load<Texture>(atlasUrl);
+        texture.source.scaleMode = "nearest";
+        this.mapNpcAtlases.set(atlasUrl, texture);
+      }),
+    );
+
+    for (const definition of Object.values(mapNpcDefinitions)) {
+      const atlas = this.mapNpcAtlases.get(definition.atlasUrl);
+
+      if (!atlas) {
+        continue;
+      }
+
+      this.mapNpcTextures.set(definition.id, {
+        west: definition.frames.west.map((frameIndex) => this.createAtlasFrame(atlas, frameIndex, definition.frameWidth, definition.frameHeight)),
+        east: definition.frames.east.map((frameIndex) => this.createAtlasFrame(atlas, frameIndex, definition.frameWidth, definition.frameHeight)),
+      });
+    }
+  }
+
+  private async loadMapBirdAtlases(): Promise<void> {
+    const atlasUrls = new Set(Object.values(mapBirdDefinitions).map((definition) => definition.atlasUrl));
+
+    await Promise.all(
+      Array.from(atlasUrls).map(async (atlasUrl) => {
+        const texture = await Assets.load<Texture>(atlasUrl);
+        texture.source.scaleMode = "nearest";
+        this.mapBirdAtlases.set(atlasUrl, texture);
+      }),
+    );
+
+    for (const definition of Object.values(mapBirdDefinitions)) {
+      const atlas = this.mapBirdAtlases.get(definition.atlasUrl);
+
+      if (!atlas) {
+        continue;
+      }
+
+      this.mapBirdTextures.set(definition.id, {
+        west: definition.frames.west.map((frameIndex) => this.createAtlasFrame(atlas, frameIndex, definition.frameWidth, definition.frameHeight)),
+        east: definition.frames.east.map((frameIndex) => this.createAtlasFrame(atlas, frameIndex, definition.frameWidth, definition.frameHeight)),
+      });
+    }
+  }
+
+  private createAtlasFrame(
+    atlas: Texture,
+    frameIndex: number,
+    frameWidth: number,
+    frameHeight: number,
+  ): Texture {
+    return new Texture({
+      source: atlas.source,
+      frame: new Rectangle(
+        (frameIndex % Math.max(1, Math.floor(atlas.width / frameWidth))) * frameWidth,
+        Math.floor(frameIndex / Math.max(1, Math.floor(atlas.width / frameWidth))) * frameHeight,
+        frameWidth,
+        frameHeight,
+      ),
+    });
   }
 
   private getTerrainTextureDefinition(textureKey: string) {

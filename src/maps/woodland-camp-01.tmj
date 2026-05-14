@@ -26,25 +26,6 @@
         }, 
         {
          "draworder":"topdown",
-         "id":7,
-         "name":"water",
-         "objects":[],
-         "offsetx":10.6666666666656,
-         "offsety":-7.99999999999955,
-         "opacity":1,
-         "properties":[
-                {
-                 "name":"placementMode",
-                 "type":"string",
-                 "value":"free"
-                }],
-         "type":"objectgroup",
-         "visible":true,
-         "x":0,
-         "y":0
-        }, 
-        {
-         "draworder":"topdown",
          "id":3,
          "name":"decor",
          "objects":[
@@ -846,6 +827,11 @@
          "opacity":1,
          "properties":[
                 {
+                 "name":"renderBand",
+                 "type":"string",
+                 "value":"foreground"
+                }, 
+                {
                  "name":"placementMode",
                  "type":"string",
                  "value":"free"
@@ -1231,6 +1217,86 @@
         }, 
         {
          "draworder":"topdown",
+         "id":9,
+         "name":"npcSpawns",
+         "objects":[
+                {
+                 "height":180,
+                 "id":445,
+                 "name":"north-scrub-deer",
+                 "opacity":1,
+                 "properties":[
+                        {
+                         "name":"npcKindId",
+                         "type":"string",
+                         "value":"deerFlea"
+                        }, 
+                        {
+                         "name":"npcCount",
+                         "type":"int",
+                         "value":4
+                        }],
+                 "rotation":0,
+                 "type":"npc-spawn",
+                 "visible":true,
+                 "width":320,
+                 "x":3900,
+                 "y":3200
+                }, 
+                {
+                 "height":200,
+                 "id":446,
+                 "name":"forest-gate-deer",
+                 "opacity":1,
+                 "properties":[
+                        {
+                         "name":"npcKindId",
+                         "type":"string",
+                         "value":"deerFlea"
+                        }, 
+                        {
+                         "name":"npcCount",
+                         "type":"int",
+                         "value":5
+                        }],
+                 "rotation":0,
+                 "type":"npc-spawn",
+                 "visible":true,
+                 "width":380,
+                 "x":4170,
+                 "y":4260
+                }, 
+                {
+                 "height":220,
+                 "id":447,
+                 "name":"east-scrub-deer",
+                 "opacity":1,
+                 "properties":[
+                        {
+                         "name":"npcKindId",
+                         "type":"string",
+                         "value":"deerFlea"
+                        }, 
+                        {
+                         "name":"npcCount",
+                         "type":"int",
+                         "value":3
+                        }],
+                 "rotation":0,
+                 "type":"npc-spawn",
+                 "visible":true,
+                 "width":280,
+                 "x":4920,
+                 "y":3600
+                }],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":false,
+         "x":0,
+         "y":0
+        }, 
+        {
+         "draworder":"topdown",
          "id":8,
          "name":"walls",
          "objects":[],
@@ -1246,8 +1312,8 @@
          "x":0,
          "y":0
         }],
- "nextlayerid":9,
- "nextobjectid":445,
+ "nextlayerid":10,
+ "nextobjectid":450,
  "orientation":"isometric",
  "properties":[
         {

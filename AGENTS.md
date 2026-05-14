@@ -396,3 +396,36 @@ cleanly instead of carrying compatibility branches.
     - delete via in-canvas confirm modal (no browser confirm dialog).
   - Removed legacy DOM menu/start screen CSS and old DOM action routing in `App` (front flow is canvas-only).
   - Verification: `npm run build` passes.
+- 2026-05-14: Ambient humanoids moved from map spawn zones to settlement emitters.
+  - Added render-only settlement NPC definitions for production buildings, barracks, and watchtower.
+  - Peon/soldier sprites now spawn only around built relevant buildings, only when workers/troops exist.
+  - Day-shift mode hides settlement humanoids outside daylight hours; continuous shifts keep them visible.
+  - Settlement NPCs use the same camera-gated materialization pattern as wildlife, so off-screen emitters do not create sprites or update movement.
+  - Removed manual peon/soldier objects from the hidden `npcSpawns` map layer; deer wildlife remains map-spawned.
+  - Verification: `npm run build` passes.
+- 2026-05-14: Lightweight map NPC ambient movement added.
+  - Added hidden Tiled object layer `npcSpawns` in `src/maps/woodland-camp-01.tmj`; loader reads it as data even when `visible:false`.
+  - Added `src/data/mapNpcs.ts` for NPC kind tuning and a small local test atlas at `src/assets/npcs/deer-flea-atlas.png`.
+  - Added follow-up ambient NPC kinds/assets for `peonFlea` and `soldierFlea`, with camp/gate spawn zones in the same hidden layer.
+  - Added `src/render/pixi/scene/mapNpcs.ts`; NPCs live on a dedicated Pixi layer between static map/decor and interactive village objects.
+  - Movement is intentionally cheap: no pathfinding, capped spawn count, deterministic random wandering inside spawn rectangles, and low-priority render cadence (~10 FPS when only NPCs are animating).
+  - NPC spawn zones are camera-gated: offscreen spawn zones do not materialize Pixi sprites, and their entities are destroyed again when the camera leaves the padded viewport.
+  - Verification: `npm run build` passes.
+- 2026-05-14: Sky ambient bird layer added.
+  - Added `src/data/mapBirds.ts`, `src/render/pixi/scene/mapBirds.ts`, and `src/assets/npcs/small-bird-atlas.png`.
+  - Added follow-up white bird variant at `src/assets/npcs/white-bird-atlas.png`; bird flocks randomly choose between black and white variants.
+  - Bird density was increased with larger flocks, shorter spawn delays, and max active count 12.
+  - Birds render on a dedicated `cameraSkyLayer` above map/building objects and below HUD/weather overlays.
+  - Each bird has a ground position plus altitude offset and a subtle ground shadow, giving depth without real 3D.
+  - Flights are lightweight: randomized edge-to-edge paths, small flock sizes, low active cap, the existing low-priority visual loop, and viewport checks that skip flights outside the padded camera view.
+  - Verification: `npm run build` passes.
+- 2026-05-14: Foreground decor depth pass for ambient NPCs.
+  - Added object-layer `renderBand` support from Tiled (`base` default, `foreground` optional).
+  - `src/maps/woodland-camp-01.tmj` marks the high `decor` layer as `renderBand=foreground`.
+  - Removed the empty `water` object layer; water visuals should come from terrain/tile layers, not an unused free object layer.
+  - Pixi render order is now terrain/base decor -> ground NPC -> foreground decor -> buildings/resource sites -> birds/HUD overlays.
+  - This intentionally solves small NPC/tree overlap visually without collision/pathfinding.
+  - Verification: `npm run build` passes.
+- 2026-05-14: Sky ambient clouds were prototyped and then removed by direction.
+  - Keep the current sky ambient system focused on birds for now.
+  - Removed cloud atlas/data/controller wiring; no cloud assets should remain active.

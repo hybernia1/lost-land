@@ -150,6 +150,9 @@ import {
   drawTerrain as drawWorldTerrain,
 } from "./pixi/scene/worldRenderer";
 import { getMapRenderBounds, mapRectToSceneBounds } from "./pixi/scene/mapGeometry";
+import { MapBirdController } from "./pixi/scene/mapBirds";
+import { MapNpcController } from "./pixi/scene/mapNpcs";
+import { SettlementNpcController } from "./pixi/scene/settlementNpcs";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
@@ -234,7 +237,13 @@ export class PixiVillageRenderer {
   private readonly backgroundLayer = new Container();
   private readonly cameraLayer = new Container();
   private readonly cameraStaticLayer = new Container();
+  private readonly cameraNpcLayer = new Container();
+  private readonly cameraMapNpcLayer = new Container();
+  private readonly cameraSettlementNpcLayer = new Container();
+  private readonly cameraForegroundDecorLayer = new Container();
   private readonly cameraDynamicLayer = new Container();
+  private readonly cameraSkyLayer = new Container();
+  private readonly cameraBirdLayer = new Container();
   private readonly environmentOverlayLayer = new Container();
   private readonly daylightOverlayLayer = new Container();
   private readonly environmentOverlayGraphic = new Graphics();
@@ -306,6 +315,9 @@ export class PixiVillageRenderer {
   private readonly terrainTintBindings: TerrainTintBinding[] = [];
   private lastTerrainCondition: EnvironmentConditionId | null = null;
   private readonly ambientEffects: AmbientEffectsController;
+  private readonly mapBirds = new MapBirdController();
+  private readonly mapNpcs = new MapNpcController();
+  private readonly settlementNpcs = new SettlementNpcController();
   private lastFormattedLogSource: ReadonlyArray<GameState["log"][number]> | null = null;
   private lastFormattedLogTranslations: TranslationPack | undefined;
   private lastFormattedLogEntries: FormattedLogEntry[] = [];
@@ -339,9 +351,32 @@ export class PixiVillageRenderer {
     this.daylightOverlayGraphic.eventMode = "none";
     this.environmentOverlayLayer.addChild(this.environmentOverlayGraphic);
     this.daylightOverlayLayer.addChild(this.daylightOverlayGraphic);
-    this.cameraLayer.addChild(this.cameraStaticLayer, this.cameraDynamicLayer);
+    this.cameraLayer.addChild(
+      this.cameraStaticLayer,
+      this.cameraNpcLayer,
+      this.cameraForegroundDecorLayer,
+      this.cameraDynamicLayer,
+      this.cameraSkyLayer,
+    );
     this.cameraStaticLayer.cullable = true;
     this.cameraStaticLayer.cullableChildren = true;
+    this.cameraNpcLayer.cullable = true;
+    this.cameraNpcLayer.cullableChildren = true;
+    this.cameraNpcLayer.sortableChildren = true;
+    this.cameraMapNpcLayer.cullable = true;
+    this.cameraMapNpcLayer.cullableChildren = true;
+    this.cameraMapNpcLayer.sortableChildren = true;
+    this.cameraSettlementNpcLayer.cullable = true;
+    this.cameraSettlementNpcLayer.cullableChildren = true;
+    this.cameraSettlementNpcLayer.sortableChildren = true;
+    this.cameraForegroundDecorLayer.cullable = true;
+    this.cameraForegroundDecorLayer.cullableChildren = true;
+    this.cameraSkyLayer.cullable = true;
+    this.cameraSkyLayer.cullableChildren = true;
+    this.cameraBirdLayer.cullable = true;
+    this.cameraBirdLayer.cullableChildren = true;
+    this.cameraNpcLayer.addChild(this.cameraMapNpcLayer, this.cameraSettlementNpcLayer);
+    this.cameraSkyLayer.addChild(this.cameraBirdLayer);
     this.worldLayer.addChild(
       this.backgroundLayer,
       this.cameraLayer,
@@ -362,6 +397,14 @@ export class PixiVillageRenderer {
       daylightOverlayGraphic: this.daylightOverlayGraphic,
       shouldAnimateCamera: () => this.shouldAnimateCamera(),
       refreshCameraTransform: () => this.refreshCameraTransform(),
+      shouldAnimateMapBirds: () => this.mapBirds.shouldAnimate(),
+      refreshMapBirds: (timestampMs: number) => this.mapBirds.update(timestampMs, this.getCameraVisibleWorldBounds()),
+      shouldAnimateMapNpcs: () => this.mapNpcs.shouldAnimate() || this.settlementNpcs.shouldAnimate(),
+      refreshMapNpcs: (timestampMs: number) => {
+        const visibleBounds = this.getCameraVisibleWorldBounds();
+        this.mapNpcs.update(timestampMs, visibleBounds);
+        this.settlementNpcs.update(timestampMs, visibleBounds);
+      },
     });
     void this.initialize();
   }
@@ -429,9 +472,11 @@ export class PixiVillageRenderer {
     if (staticWorldKey !== this.lastStaticWorldKey) {
       this.disableStaticWorldCache();
       this.clearContainerChildren(this.cameraStaticLayer);
+      this.clearContainerChildren(this.cameraForegroundDecorLayer);
       this.resetTerrainTintBindings();
       drawWorldTerrain(this.worldRendererHost());
-      drawWorldDecorObjects(this.worldRendererHost());
+      drawWorldDecorObjects(this.worldRendererHost(), "base");
+      drawWorldDecorObjects(this.worldRendererHost(), "foreground");
       this.updateStaticWorldCullArea();
       this.lastStaticWorldKey = staticWorldKey;
       this.enableStaticWorldCacheIfEligible();
@@ -440,6 +485,31 @@ export class PixiVillageRenderer {
     if (terrainTintChanged && this.staticWorldCachedAsTexture) {
       this.cameraStaticLayer.updateCacheTexture();
     }
+    this.mapNpcs.sync(
+      this.cameraMapNpcLayer,
+      defaultVillageLayout,
+      this.layout,
+      (kindId) => this.assets.getMapNpcTextures(kindId),
+      state.paused,
+      this.getCameraVisibleWorldBounds(),
+    );
+    this.settlementNpcs.sync(
+      this.cameraSettlementNpcLayer,
+      state,
+      defaultVillageLayout,
+      this.layout,
+      (kindId) => this.assets.getMapNpcTextures(kindId),
+      state.paused,
+      this.getCameraVisibleWorldBounds(),
+    );
+    this.mapBirds.sync(
+      this.cameraBirdLayer,
+      defaultVillageLayout,
+      this.layout,
+      (kindId) => this.assets.getMapBirdTextures(kindId),
+      state.paused,
+      this.getCameraVisibleWorldBounds(),
+    );
     const backgroundKey = `${Math.round(width)}x${Math.round(height)}`;
     if (backgroundKey !== this.lastBackgroundKey) {
       this.clearContainerChildren(this.backgroundLayer);
@@ -509,6 +579,9 @@ export class PixiVillageRenderer {
 
     this.clearContainerChildren(this.cameraDynamicLayer);
     this.clearContainerChildren(this.cameraStaticLayer);
+    this.clearContainerChildren(this.cameraForegroundDecorLayer);
+    this.clearMapNpcs();
+    this.clearMapBirds();
     this.clearContainerChildren(this.backgroundLayer);
     this.clearContainerChildren(this.hudLayer);
     this.resetTerrainTintBindings();
@@ -722,6 +795,8 @@ export class PixiVillageRenderer {
     this.host.removeEventListener("pointercancel", this.handlePointerUp);
     this.disableStaticWorldCache();
     this.ambientEffects.stopAnimation();
+    this.clearMapNpcs();
+    this.clearMapBirds();
     this.app?.destroy(true);
     this.app = null;
   }
@@ -1764,6 +1839,7 @@ export class PixiVillageRenderer {
   private worldRendererHost() {
     return {
       cameraStaticLayer: this.cameraStaticLayer,
+      cameraForegroundDecorLayer: this.cameraForegroundDecorLayer,
       cameraDynamicLayer: this.cameraDynamicLayer,
       backgroundLayer: this.backgroundLayer,
       layout: this.layout,
@@ -3028,6 +3104,22 @@ export class PixiVillageRenderer {
     this.cameraLayer.scale.set(this.cameraZoom);
   }
 
+  private getCameraVisibleWorldBounds(): Bounds | null {
+    const width = this.host.clientWidth;
+    const height = this.host.clientHeight;
+
+    if (width <= 0 || height <= 0 || this.cameraZoom <= 0) {
+      return null;
+    }
+
+    return {
+      x: -this.cameraOffsetX / this.cameraZoom,
+      y: -this.cameraOffsetY / this.cameraZoom,
+      width: width / this.cameraZoom,
+      height: height / this.cameraZoom,
+    };
+  }
+
   private getLayout(width: number, height: number): SceneLayout {
     return getSceneLayout(width, height);
   }
@@ -3091,6 +3183,37 @@ export class PixiVillageRenderer {
       mapBounds.width,
       mapBounds.height,
     );
+    this.cameraNpcLayer.cullArea = new Rectangle(
+      mapBounds.x,
+      mapBounds.y,
+      mapBounds.width,
+      mapBounds.height,
+    );
+    this.cameraForegroundDecorLayer.cullArea = new Rectangle(
+      mapBounds.x,
+      mapBounds.y,
+      mapBounds.width,
+      mapBounds.height,
+    );
+    this.cameraSkyLayer.cullArea = new Rectangle(
+      mapBounds.x - mapBounds.width * 0.2,
+      mapBounds.y - mapBounds.height * 0.3,
+      mapBounds.width * 1.4,
+      mapBounds.height * 1.5,
+    );
+    this.cameraBirdLayer.cullArea = this.cameraSkyLayer.cullArea;
+  }
+
+  private clearMapNpcs(): void {
+    this.mapNpcs.clear();
+    this.settlementNpcs.clear();
+    this.cameraMapNpcLayer.removeChildren();
+    this.cameraSettlementNpcLayer.removeChildren();
+  }
+
+  private clearMapBirds(): void {
+    this.mapBirds.clear();
+    this.cameraBirdLayer.removeChildren();
   }
 
   private trackTerrainSprite(
