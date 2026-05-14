@@ -74,3 +74,12 @@ walls.png is a freeform isometric wall/gate atlas:
 - source images copied from `C:\Users\nikol\Desktop\fence\*.png`
 - source frames were normalized from `256x512` to half-size `128x256` while preserving tile proportions
 
+`floor.png` is an isometric terrain floor atlas:
+- 20 frames (`5x4` grid)
+- frame size `128x128`
+- atlas layout `5 columns x 4 rows`
+- no spacing between frames (`spacing=0`)
+- atlas size `640x512`
+- source image calibrated from `C:\Users\nikol\Desktop\bulindgs\floor.png`
+- source frames were detected from the irregular magenta-background sheet, cleaned to alpha, and normalized into terrain-sized cells
+
