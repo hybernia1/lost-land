@@ -1,218 +1,56 @@
-{ "columns":5,
- "image":"..\/..\/assets\/tiles\/water.png",
- "imageheight":512,
- "imagewidth":640,
- "margin":0,
- "name":"water",
- "objectalignment":"bottom",
- "properties":[
-         {
-         "name":"edgeOverscan",
-         "type":"float",
-         "value":0
-         },
-         {
-          "name":"tintRain",
-          "type":"color",
-          "value":"#ff909fb2"
-         },
-         {
-          "name":"tintSnowFront",
-          "type":"color",
-          "value":"#ffd5e0ef"
-         },
-         {
-          "name":"tintRadiation",
-          "type":"color",
-          "value":"#ffa8c284"
-         }
- ],
- "spacing":0,
- "tilecount":20,
- "tiledversion":"1.12.1",
- "tileheight":128,
- "tiles":[
-        {
-         "id":0,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water01"
-                }]
-        }, 
-        {
-         "id":1,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water02"
-                }]
-        }, 
-        {
-         "id":2,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water03"
-                }]
-        }, 
-        {
-         "id":3,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water04"
-                }]
-        }, 
-        {
-         "id":4,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water05"
-                }]
-        }, 
-        {
-         "id":5,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water06"
-                }]
-        }, 
-        {
-         "id":6,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water07"
-                }]
-        }, 
-        {
-         "id":7,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water08"
-                }]
-        }, 
-        {
-         "id":8,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water09"
-                }]
-        }, 
-        {
-         "id":9,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water10"
-                }]
-        }, 
-        {
-         "id":10,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water11"
-                }]
-        }, 
-        {
-         "id":11,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water12"
-                }]
-        }, 
-        {
-         "id":12,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water13"
-                }]
-        }, 
-        {
-         "id":13,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water14"
-                }]
-        }, 
-        {
-         "id":14,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water15"
-                }]
-        }, 
-        {
-         "id":15,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water16"
-                }]
-        }, 
-        {
-         "id":16,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water17"
-                }]
-        }, 
-        {
-         "id":17,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water18"
-                }]
-        }, 
-        {
-         "id":18,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water19"
-                }]
-        }, 
-        {
-         "id":19,
-         "properties":[
-                {
-                 "name":"tileId",
-                 "type":"string",
-                 "value":"water20"
-                }]
-        }],
- "tilewidth":128,
- "type":"tileset",
- "version":"1.10"
+{
+  "columns": 4,
+  "image": "../../assets/tiles/water.png",
+  "imageheight": 512,
+  "imagewidth": 1024,
+  "margin": 0,
+  "name": "water",
+  "objectalignment": "bottom",
+  "properties": [
+      {
+        "name": "edgeOverscan",
+        "type": "float",
+        "value": 0
+      },
+      {
+        "name": "tintRain",
+        "type": "color",
+        "value": "#ff909fb2"
+      },
+      {
+        "name": "tintSnowFront",
+        "type": "color",
+        "value": "#ffd5e0ef"
+      },
+      {
+        "name": "tintRadiation",
+        "type": "color",
+        "value": "#ffa8c284"
+      }
+  ],
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.12.1",
+  "tileheight": 128,
+  "tiles": [
+    { "id": 0, "properties": [{ "name": "tileId", "type": "string", "value": "water01" }] },
+    { "id": 1, "properties": [{ "name": "tileId", "type": "string", "value": "water02" }] },
+    { "id": 2, "properties": [{ "name": "tileId", "type": "string", "value": "water03" }] },
+    { "id": 3, "properties": [{ "name": "tileId", "type": "string", "value": "water04" }] },
+    { "id": 4, "properties": [{ "name": "tileId", "type": "string", "value": "water05" }] },
+    { "id": 5, "properties": [{ "name": "tileId", "type": "string", "value": "water06" }] },
+    { "id": 6, "properties": [{ "name": "tileId", "type": "string", "value": "water07" }] },
+    { "id": 7, "properties": [{ "name": "tileId", "type": "string", "value": "water08" }] },
+    { "id": 8, "properties": [{ "name": "tileId", "type": "string", "value": "water09" }] },
+    { "id": 9, "properties": [{ "name": "tileId", "type": "string", "value": "water10" }] },
+    { "id": 10, "properties": [{ "name": "tileId", "type": "string", "value": "water11" }] },
+    { "id": 11, "properties": [{ "name": "tileId", "type": "string", "value": "water12" }] },
+    { "id": 12, "properties": [{ "name": "tileId", "type": "string", "value": "water13" }] },
+    { "id": 13, "properties": [{ "name": "tileId", "type": "string", "value": "water14" }] },
+    { "id": 14, "properties": [{ "name": "tileId", "type": "string", "value": "water15" }] },
+    { "id": 15, "properties": [{ "name": "tileId", "type": "string", "value": "water16" }] }
+  ],
+  "tilewidth": 256,
+  "type": "tileset",
+  "version": "1.10"
 }
