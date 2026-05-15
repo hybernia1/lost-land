@@ -293,6 +293,7 @@ export class PixiVillageRenderer {
   private selectedDecisionHistoryIndex: number | null = null;
   private activeModalPlotId: string | null = null;
   private activeBuildCategory: BuildingCategory = "resource";
+  private activeBuildingDetailTab: "overview" | "bonuses" = "overview";
   private barracksTroopCount = 1;
   private readonly resourceSiteTroopCountById = new Map<string, number>();
   private marketFromResource: MarketResourceId = "material";
@@ -1827,6 +1828,10 @@ export class PixiVillageRenderer {
       getActiveBuildCategory: () => this.activeBuildCategory,
       setActiveBuildCategory: (value: BuildingCategory) => {
         this.activeBuildCategory = value;
+      },
+      getActiveBuildingDetailTab: () => this.activeBuildingDetailTab,
+      setActiveBuildingDetailTab: (value: "overview" | "bonuses") => {
+        this.activeBuildingDetailTab = value;
       },
 
       getMarketFromResource: () => this.marketFromResource,

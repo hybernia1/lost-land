@@ -4,7 +4,11 @@ import { buildingVisualDefinitions } from "../../../data/buildingVisuals";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
-import { getAcademyProductionBonus } from "../../../systems/academy";
+import {
+  getAcademyBuildTimeMultiplier,
+  getAcademyExpeditionDeathRiskMultiplier,
+  getAcademyProductionBonus,
+} from "../../../systems/academy";
 import {
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
@@ -90,6 +94,8 @@ type BuildingModalsHost = {
   setBuildChoicesScrollArea: (value: Bounds | null) => void;
   getActiveBuildCategory: () => BuildingCategory;
   setActiveBuildCategory: (value: BuildingCategory) => void;
+  getActiveBuildingDetailTab: () => BuildingDetailTab;
+  setActiveBuildingDetailTab: (value: BuildingDetailTab) => void;
 
   getMarketFromResource: () => MarketResourceId;
   setMarketFromResource: (value: MarketResourceId) => void;
@@ -99,6 +105,15 @@ type BuildingModalsHost = {
   setMarketAmount: (value: number) => void;
   getBarracksTroopCount: () => number;
   setBarracksTroopCount: (value: number) => void;
+};
+
+type BuildingDetailTab = "overview" | "bonuses";
+type AcademyBonusRow = {
+  level: number;
+  iconId: string;
+  label: string;
+  value: string;
+  tooltip: string;
 };
 
 const BUILDING_METRIC_ICON_SIZE = 30;
@@ -445,10 +460,12 @@ export function drawBuildingDetail(
   const sectionHeight = Math.max(176, footerY - sectionY - 22);
   const columnGap = 14;
   const hasControls = hasBuildingControlSection(buildingId);
+  const hasDetailTabs = buildingId === "academy";
   const controlWidth = hasControls ? Math.max(360, Math.floor((bodyWidth - columnGap) * 0.56)) : 0;
   const nextLevelWidth = hasControls ? bodyWidth - controlWidth - columnGap : bodyWidth;
   const controlX = sideMargin;
   const nextLevelX = hasControls ? controlX + controlWidth + columnGap : sideMargin;
+  const activeDetailTab = hasDetailTabs ? host.getActiveBuildingDetailTab() : "overview";
 
   const content = new Container();
   parent.addChild(content);
@@ -476,24 +493,57 @@ export function drawBuildingDetail(
     drawMetricCard(host, content, metric, sideMargin + index * (metricWidth + metricGap), metricY, metricWidth, 74);
   });
 
-  if (hasControls) {
-    drawBuildingControlSection(host, content, buildingId, state, translations, controlX, sectionY, controlWidth, sectionHeight);
+  if (hasDetailTabs) {
+    drawBuildingDetailTabs(host, content, activeDetailTab, translations, sideMargin, sectionY, bodyWidth);
+    if (activeDetailTab === "bonuses") {
+      drawAcademyBonusOverviewSection(
+        host,
+        content,
+        level,
+        maxLevel,
+        translations,
+        sideMargin,
+        sectionY + 52,
+        bodyWidth,
+        Math.max(120, sectionHeight - 52),
+      );
+    } else {
+      drawNextLevelSection(
+        host,
+        content,
+        buildingId,
+        level,
+        locked,
+        cost,
+        requiredWorkers,
+        state,
+        translations,
+        sideMargin,
+        sectionY + 52,
+        bodyWidth,
+        Math.max(120, sectionHeight - 52),
+      );
+    }
+  } else {
+    if (hasControls) {
+      drawBuildingControlSection(host, content, buildingId, state, translations, controlX, sectionY, controlWidth, sectionHeight);
+    }
+    drawNextLevelSection(
+      host,
+      content,
+      buildingId,
+      level,
+      locked,
+      cost,
+      requiredWorkers,
+      state,
+      translations,
+      nextLevelX,
+      sectionY,
+      nextLevelWidth,
+      sectionHeight,
+    );
   }
-  drawNextLevelSection(
-    host,
-    content,
-    buildingId,
-    level,
-    locked,
-    cost,
-    requiredWorkers,
-    state,
-    translations,
-    nextLevelX,
-    sectionY,
-    nextLevelWidth,
-    sectionHeight,
-  );
 
   const buttonLabel = upgrading
     ? `${Math.ceil(upgradingRemaining)}s`
@@ -538,6 +588,195 @@ export function drawBuildingDetail(
 
 function hasBuildingControlSection(buildingId: BuildingId): boolean {
   return buildingId === "coalMine" || buildingId === "workshop" || buildingId === "market" || buildingId === "barracks";
+}
+
+function drawBuildingDetailTabs(
+  host: BuildingModalsHost,
+  parent: Container,
+  activeTab: BuildingDetailTab,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+  width: number,
+): void {
+  const labels = getBuildingDetailTabLabels(translations);
+  host.drawTabs(
+    parent,
+    [
+      { id: "overview", label: labels.overview },
+      { id: "bonuses", label: labels.bonuses },
+    ],
+    {
+      x,
+      y,
+      height: 38,
+      minWidth: 132,
+      maxWidth: width,
+      activeId: activeTab,
+      onSelect: (tab) => {
+        host.setActiveBuildingDetailTab(tab);
+        host.playTabSwitchSound();
+        host.requestRender();
+      },
+    },
+  );
+}
+
+function drawAcademyBonusOverviewSection(
+  host: BuildingModalsHost,
+  parent: Container,
+  level: number,
+  maxLevel: number,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  drawDetailPanel(parent, x, y, width, height);
+  const copy = getAcademyBonusCopy(translations);
+  drawSectionTitle(host, parent, copy.title, x + 22, y + 24);
+
+  const rows = getAcademyBonusRows(maxLevel, translations, copy);
+  const rowGap = 8;
+  const rowHeight = Math.max(34, Math.min(46, (height - 72 - rowGap * Math.max(0, rows.length - 1)) / rows.length));
+  const rowWidth = width - 44;
+  let rowY = y + 64;
+
+  rows.forEach((row) => {
+    drawAcademyBonusRow(host, parent, row, level, x + 22, rowY, rowWidth, rowHeight, copy);
+    rowY += rowHeight + rowGap;
+  });
+}
+
+function drawAcademyBonusRow(
+  host: BuildingModalsHost,
+  parent: Container,
+  row: AcademyBonusRow,
+  currentLevel: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  copy: ReturnType<typeof getAcademyBonusCopy>,
+): void {
+  const unlocked = currentLevel >= row.level;
+  const current = currentLevel === row.level;
+  const fill = current ? uiTheme.rowActive : uiTheme.row;
+  const borderColor = current ? uiTheme.borderStrong : uiTheme.border;
+  const textFill = unlocked ? uiTheme.text : uiTheme.textMuted;
+  const valueFill = unlocked ? uiTheme.accentStrong : uiTheme.textSoft;
+  const status = current ? copy.current : unlocked ? copy.unlocked : copy.locked;
+  const statusFill = current ? uiTheme.accentStrong : unlocked ? uiTheme.positive : uiTheme.textSoft;
+
+  const rowLayer = new Container();
+  rowLayer.x = x;
+  rowLayer.y = y;
+  parent.addChild(rowLayer);
+
+  const background = new Graphics();
+  background.roundRect(0, 0, width, height, UI_PANEL_RADIUS)
+    .fill({ color: fill, alpha: current ? 0.48 : 0.34 })
+    .stroke({ color: borderColor, alpha: current ? 0.72 : 0.36, width: 1 });
+  rowLayer.addChild(background);
+
+  host.drawText(rowLayer, `${copy.level} ${row.level}`, 16, height / 2 - 8, {
+    fill: statusFill,
+    fontSize: uiTextSize.body,
+    fontWeight: "900",
+  });
+  host.drawIcon(rowLayer, row.iconId, 112, height / 2, 20);
+  host.drawText(rowLayer, row.label, 138, height / 2 - 8, {
+    fill: textFill,
+    fontSize: uiTextSize.body,
+    fontWeight: "800",
+    wordWrap: true,
+    wordWrapWidth: Math.max(120, width - 360),
+  });
+  host.drawText(rowLayer, row.value, Math.max(250, width - 250), height / 2 - 8, {
+    fill: valueFill,
+    fontSize: uiTextSize.bodyLarge,
+    fontWeight: "900",
+    align: "right",
+  });
+  host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
+    fill: statusFill,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+    align: "right",
+  });
+  host.bindTooltip(rowLayer, row.tooltip);
+}
+
+function getBuildingDetailTabLabels(translations: TranslationPack): Record<BuildingDetailTab, string> {
+  return {
+    overview: translations.ui.buildingDetailOverview ?? "Overview",
+    bonuses: translations.ui.buildingDetailBonuses ?? "Bonuses",
+  };
+}
+
+function getAcademyBonusCopy(translations: TranslationPack): {
+  title: string;
+  level: string;
+  current: string;
+  unlocked: string;
+  locked: string;
+  noBonus: string;
+  expeditionRisk: string;
+  buildTime: string;
+} {
+  return {
+    title: translations.ui.academyBonusTitle ?? "Bonuses by level",
+    level: translations.ui.level ?? "Lvl",
+    current: translations.ui.academyLevelCurrent ?? "Current",
+    unlocked: translations.ui.academyLevelUnlocked ?? "Unlocked",
+    locked: translations.ui.academyLevelLocked ?? "Locked",
+    noBonus: translations.ui.academyNoNewBonus ?? "No new bonus",
+    expeditionRisk: translations.ui.academyExpeditionRisk ?? "Expedition risk",
+    buildTime: translations.ui.buildTime ?? "Build time",
+  };
+}
+
+function getAcademyBonusRows(
+  maxLevel: number,
+  translations: TranslationPack,
+  copy: ReturnType<typeof getAcademyBonusCopy>,
+): AcademyBonusRow[] {
+  const rows: AcademyBonusRow[] = [
+    {
+      level: 1,
+      iconId: "build",
+      label: translations.ui.production,
+      value: formatPercentBonus(getAcademyProductionBonus(1)),
+      tooltip: `${translations.ui.production}: ${formatPercentBonus(getAcademyProductionBonus(1))}`,
+    },
+    {
+      level: 2,
+      iconId: "shield",
+      label: copy.expeditionRisk,
+      value: `-${formatRate((1 - getAcademyExpeditionDeathRiskMultiplier(2)) * 100)}%`,
+      tooltip: `${copy.expeditionRisk}: -${formatRate((1 - getAcademyExpeditionDeathRiskMultiplier(2)) * 100)}%`,
+    },
+    {
+      level: 3,
+      iconId: "clock",
+      label: copy.buildTime,
+      value: `-${formatRate((1 - getAcademyBuildTimeMultiplier(3)) * 100)}%`,
+      tooltip: `${copy.buildTime}: -${formatRate((1 - getAcademyBuildTimeMultiplier(3)) * 100)}%`,
+    },
+  ];
+
+  for (let level = 4; level <= maxLevel; level += 1) {
+    rows.push({
+      level,
+      iconId: "archive",
+      label: copy.noBonus,
+      value: "-",
+      tooltip: `${copy.level} ${level}: ${copy.noBonus}`,
+    });
+  }
+
+  return rows.slice(0, maxLevel);
 }
 
 function layoutBuildingPreviewSprite(
