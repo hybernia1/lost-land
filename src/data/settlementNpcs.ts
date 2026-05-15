@@ -42,7 +42,7 @@ export const settlementNpcDefinitions: SettlementNpcDefinition[] = [
     wanderRadius: 88,
   },
   {
-    buildingId: "generator",
+    buildingId: "coalMine",
     npcKindId: "peonFlea",
     requirement: "workers",
     maxCount: 2,

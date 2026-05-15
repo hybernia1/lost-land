@@ -33,26 +33,23 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         workers: 2,
         injured: 1,
         profileScores: {
-          philanthropyPrinciple: -2,
-          mercySecurity: -2,
-          opennessCaution: -1,
+          communityMarket: -2,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "refuse",
         profileScores: {
-          philanthropyPrinciple: 1,
-          mercySecurity: 1,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 1,
         },
       },
       {
         id: "execute",
         morale: -5,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 2,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
     ],
@@ -67,22 +64,22 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { food: -6 },
         morale: 4,
         profileScores: {
-          philanthropyPrinciple: -2,
-          mercySecurity: -1,
+          communityMarket: -2,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "guards",
         morale: -4,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 1,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
       {
         id: "ignore",
         profileScores: {
-          opennessCaution: 1,
+          authorityAutonomy: -1,
         },
       },
     ],
@@ -96,7 +93,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         id: "answer",
         resources: { coal: -6, material: 14 },
         profileScores: {
-          opennessCaution: -2,
+          communityMarket: 1,
+          authorityAutonomy: -2,
         },
       },
       {
@@ -104,14 +102,14 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { coal: -2 },
         morale: 2,
         profileScores: {
-          philanthropyPrinciple: -1,
-          opennessCaution: -1,
+          communityMarket: -1,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "silence",
         profileScores: {
-          opennessCaution: 2,
+          authorityAutonomy: 1,
         },
       },
     ],
@@ -127,27 +125,24 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         injured: 1,
         morale: 1,
         profileScores: {
-          philanthropyPrinciple: -1,
-          mercySecurity: -1,
-          opennessCaution: 1,
+          communityMarket: -1,
+          authorityAutonomy: 1,
         },
       },
       {
         id: "turnAway",
         morale: -2,
         profileScores: {
-          philanthropyPrinciple: 1,
-          mercySecurity: 1,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 1,
         },
       },
       {
         id: "execute",
         morale: -6,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 2,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
     ],
@@ -161,22 +156,22 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         id: "tradeFood",
         resources: { food: -8, material: 18 },
         profileScores: {
-          philanthropyPrinciple: 1,
-          opennessCaution: -1,
+          communityMarket: 2,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "tradeWater",
         resources: { water: -8, coal: 6 },
         profileScores: {
-          philanthropyPrinciple: 1,
-          opennessCaution: -1,
+          communityMarket: 2,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "refuse",
         profileScores: {
-          opennessCaution: 2,
+          authorityAutonomy: 1,
         },
       },
     ],
@@ -192,9 +187,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         workers: -3,
         morale: -4,
         profileScores: {
-          philanthropyPrinciple: -2,
-          mercySecurity: -1,
-          opennessCaution: -2,
+          communityMarket: -2,
+          authorityAutonomy: -2,
         },
       },
       {
@@ -202,16 +196,15 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { coal: -4 },
         morale: 2,
         profileScores: {
-          philanthropyPrinciple: -1,
-          opennessCaution: -1,
+          communityMarket: -1,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "stayQuiet",
         morale: -2,
         profileScores: {
-          mercySecurity: 1,
-          opennessCaution: 2,
+          authorityAutonomy: 1,
         },
       },
     ],
@@ -226,31 +219,30 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { water: -5 },
         morale: 3,
         profileScores: {
-          philanthropyPrinciple: -2,
-          mercySecurity: -2,
+          communityMarket: -2,
+          authorityAutonomy: -1,
         },
       },
       {
         id: "punish",
         morale: -3,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 2,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
       {
         id: "rationLock",
         resources: { material: -6 },
         profileScores: {
-          philanthropyPrinciple: 1,
-          mercySecurity: 1,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
     ],
   },
   {
-    id: "generatorSpareParts",
+    id: "coalMineSpareParts",
     minElapsedSeconds: 0,
     weight: 2,
     options: [
@@ -258,22 +250,23 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         id: "install",
         resources: { material: -10, coal: 14 },
         profileScores: {
-          philanthropyPrinciple: 1,
+          communityMarket: 1,
         },
       },
       {
         id: "store",
         resources: { material: 8 },
         profileScores: {
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 1,
         },
       },
       {
         id: "trade",
         resources: { coal: -4, food: 8 },
         profileScores: {
-          philanthropyPrinciple: -1,
-          opennessCaution: -1,
+          communityMarket: 2,
+          authorityAutonomy: -1,
         },
       },
     ],
@@ -288,9 +281,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         workers: -1,
         morale: -2,
         profileScores: {
-          philanthropyPrinciple: 1,
-          mercySecurity: 1,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 1,
         },
       },
       {
@@ -299,8 +291,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         injured: 1,
         morale: -6,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 2,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
       {
@@ -308,8 +300,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { material: -12, food: -4 },
         morale: 3,
         profileScores: {
-          philanthropyPrinciple: -2,
-          mercySecurity: -2,
+          communityMarket: -2,
+          authorityAutonomy: -1,
         },
       },
     ],
@@ -323,8 +315,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         id: "digOut",
         resources: { food: -4, material: 16 },
         profileScores: {
-          philanthropyPrinciple: -2,
-          opennessCaution: -1,
+          communityMarket: -2,
+          authorityAutonomy: -1,
         },
       },
       {
@@ -332,17 +324,16 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { material: -4 },
         morale: 1,
         profileScores: {
-          philanthropyPrinciple: 1,
-          mercySecurity: 1,
-          opennessCaution: 1,
+          communityMarket: -1,
+          authorityAutonomy: 2,
         },
       },
       {
         id: "leaveIt",
         morale: -2,
         profileScores: {
-          philanthropyPrinciple: 2,
-          opennessCaution: 1,
+          communityMarket: 1,
+          authorityAutonomy: 1,
         },
       },
     ],
@@ -356,7 +347,7 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         id: "repair",
         resources: { material: -10, water: 12 },
         profileScores: {
-          philanthropyPrinciple: 1,
+          communityMarket: 1,
         },
       },
       {
@@ -364,8 +355,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         resources: { water: -5 },
         morale: -2,
         profileScores: {
-          philanthropyPrinciple: 2,
-          mercySecurity: 1,
+          communityMarket: 1,
+          authorityAutonomy: 2,
         },
       },
       {
@@ -373,9 +364,8 @@ export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
         injured: 1,
         morale: -1,
         profileScores: {
-          philanthropyPrinciple: -1,
-          mercySecurity: -2,
-          opennessCaution: -1,
+          communityMarket: -1,
+          authorityAutonomy: -2,
         },
       },
     ],

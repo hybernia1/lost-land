@@ -1,13 +1,11 @@
 import {
   Application,
-  CanvasTextMetrics,
   CullerPlugin,
   Container,
   extensions,
   Graphics,
   Rectangle,
   Text,
-  TextStyle,
   Sprite,
   type TextStyleFontWeight,
 } from "pixi.js";
@@ -73,24 +71,18 @@ import {
   getConstructionWorkerCount,
   getPopulation,
 } from "../systems/population";
-import {
-  getAssignedResourceSiteWorkerCount,
-  getResourceSiteAssaultTroopCount,
-} from "../systems/resourceSites";
 import { canAfford } from "../systems/resources";
+import { getDecisionProfileKind } from "../systems/quests";
 import {
-  decisionProfileAxes,
-  getDecisionProfileAxisValue,
-  getDecisionProfileKind,
-} from "../systems/quests";
-import { getTravelTilesToSite } from "../systems/resourceSites";
-import {
-  BUILDING_PREVIEW_RENDER_SCALE,
   CAMERA_MIN_ZOOM,
+  HUD_CHROME_ALPHA,
   HUD_DESIGN_SCALE,
   HUD_FONT_FAMILY,
   HUD_LEFT_PANEL_WIDTH,
+  HUD_SIDE_PANEL_MARGIN,
   HUD_TOP_STRIP_HEIGHT,
+  UI_BADGE_RADIUS,
+  UI_CONTROL_RADIUS,
   MAX_RENDER_RESOLUTION,
   MODAL_BACKDROP_ALPHA,
   TOOLTIP_POSITION_EPSILON,
@@ -103,6 +95,8 @@ import {
   getHudTextLineHeight,
   normalizeHudFontWeight,
   resourceColors,
+  uiTextSize,
+  uiTheme,
 } from "./pixi/core/constants";
 import { drawHudLeftArea, drawHudPanels } from "./pixi/hud/hudPanels";
 import {
@@ -127,6 +121,7 @@ import type {
   EffectLine,
   FormattedLogEntry,
   GameOverPreview,
+  HudSidebarTab,
   PixiActionDetail,
   RectButtonOptions,
   ResourceBreakdownTab,
@@ -154,6 +149,7 @@ import { SettlementNpcController } from "./pixi/scene/settlementNpcs";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
+import { drawModalHeaderPlane } from "./pixi/modals/modalLayout";
 import {
   drawBuildChoices as drawBuildChoicesModal,
   drawBuildingDetail as drawBuildingDetailModal,
@@ -166,6 +162,7 @@ import {
   drawPanelPrimitive,
   drawTextPrimitive,
 } from "./pixi/ui/primitives";
+import { drawBluePanelBackground, loadBluePanelBackground } from "./pixi/ui/panelBackground";
 import {
   getCostLineParts,
   getCurrentBuildingEffects,
@@ -185,6 +182,10 @@ import {
   getDecisionProfileOverallLabel,
 } from "./pixi/helpers/decisionHelpers";
 import { getLogEntryFillColor, getLogEntryIconId } from "./pixi/helpers/logFormatting";
+import {
+  measureHudWrappedTextHeight,
+  wrapHudTextLines,
+} from "./pixi/helpers/textMetrics";
 import { drawPixiIcon } from "./pixiIcons";
 import { VillageAssets } from "./villageAssets";
 
@@ -252,9 +253,9 @@ export class PixiVillageRenderer {
   private readonly canvasTooltipLabel = new Text({
     text: "",
     style: {
-      fill: 0xf4eedf,
+      fill: uiTheme.text,
       fontFamily: HUD_FONT_FAMILY,
-      fontSize: 13,
+      fontSize: uiTextSize.body,
       fontWeight: normalizeHudFontWeight("700"),
       lineHeight: 18,
       wordWrap: true,
@@ -288,6 +289,7 @@ export class PixiVillageRenderer {
   private decisionHistoryScrollMax = 0;
   private decisionHistoryScrollY = 0;
   private activeResourceBreakdownTab: ResourceBreakdownTab = "production";
+  private activeSidebarTab: HudSidebarTab = "tasks";
   private selectedDecisionHistoryIndex: number | null = null;
   private activeModalPlotId: string | null = null;
   private activeBuildCategory: BuildingCategory = "resource";
@@ -822,20 +824,23 @@ export class PixiVillageRenderer {
     app.stage.addChild(this.rootLayer);
     this.app = app;
 
-    await this.assets.load();
+    await Promise.all([
+      this.assets.load(),
+      loadBluePanelBackground(),
+    ]);
     this.canCacheStaticWorldAsTexture = this.computeStaticWorldCacheEligibility();
     this.requestRender();
   }
 
   private drawFrontBackground(width: number, height: number): void {
     const sky = new Graphics();
-    sky.rect(0, 0, width, height).fill({ color: 0x171d22, alpha: 1 });
-    sky.rect(0, height * 0.48, width, height * 0.52).fill({ color: 0x0f1317, alpha: 0.94 });
+    sky.rect(0, 0, width, height).fill({ color: uiTheme.background, alpha: 1 });
+    sky.rect(0, height * 0.48, width, height * 0.52).fill({ color: uiTheme.backgroundLower, alpha: 0.94 });
     this.backgroundLayer.addChild(sky);
 
     const haze = new Graphics();
     haze.rect(width * 0.06, height * 0.07, width * 0.88, height * 0.26)
-      .fill({ color: 0x38484f, alpha: 0.2 });
+      .fill({ color: uiTheme.accentStrong, alpha: 0.18 });
     this.backgroundLayer.addChild(haze);
   }
 
@@ -862,19 +867,13 @@ export class PixiVillageRenderer {
       });
     }
 
-    this.drawText(this.hudLayer, model.translations.ui.menuKicker ?? "Single-player survival strategy", panelX + 22, cursorY + 46, {
-      fill: 0xd1b25d,
-      fontSize: 12,
+    this.drawText(this.hudLayer, model.translations.ui.menuTitle ?? "Lost Land", panelX + 22, cursorY + 56, {
+      fill: uiTheme.text,
+      fontSize: uiTextSize.frontTitle,
       fontWeight: "900",
     });
 
-    this.drawText(this.hudLayer, model.translations.ui.menuTitle ?? "Lost Land", panelX + 22, cursorY + 62, {
-      fill: 0xf5efdf,
-      fontSize: 48,
-      fontWeight: "900",
-    });
-
-    cursorY += 128;
+    cursorY += 118;
 
     if (model.mode === "menu") {
       this.drawFrontMainMenu(model, panelX, cursorY, panelWidth);
@@ -896,17 +895,8 @@ export class PixiVillageRenderer {
 
   private drawFrontMainMenu(model: FrontScreenModel, panelX: number, cursorY: number, panelWidth: number): void {
     const buttonWidth = Math.min(320, panelWidth - 44);
-    this.drawText(this.hudLayer, model.translations.ui.menuText ?? "", panelX + 22, cursorY - 12, {
-      fill: 0xbfc6c5,
-      fontSize: 14,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 44,
-      lineHeight: 20,
-    });
-
     const buttonX = panelX + 22;
-    let buttonY = cursorY + 64;
+    let buttonY = cursorY + 12;
     this.createRectButton(this.hudLayer, {
       label: model.translations.ui.newGame ?? "New Game",
       x: buttonX,
@@ -949,13 +939,13 @@ export class PixiVillageRenderer {
   ): void {
     const t = model.translations;
     this.drawText(this.hudLayer, t.ui.nameCommunity ?? "Name your community", panelX + 22, cursorY - 4, {
-      fill: 0xf1df9a,
-      fontSize: 21,
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.screenTitle,
       fontWeight: "900",
     });
     this.drawText(this.hudLayer, t.ui.nameCommunityText ?? "", panelX + 22, cursorY + 28, {
-      fill: 0xbfc6c5,
-      fontSize: 13,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
       fontWeight: "700",
       wordWrap: true,
       wordWrapWidth: panelWidth - 44,
@@ -966,20 +956,19 @@ export class PixiVillageRenderer {
     const inputY = cursorY + 94;
     const inputWidth = panelWidth - 44;
     const inputBox = new Graphics();
-    inputBox.rect(inputX, inputY, inputWidth, 44).fill({ color: 0x0f1316, alpha: 0.96 });
-    inputBox.rect(inputX, inputY, inputWidth, 44).stroke({ color: 0x475059, width: 1, alpha: 0.9 });
+    inputBox.rect(inputX, inputY, inputWidth, 44).fill({ color: uiTheme.surfaceSunken, alpha: 0.72 });
     this.hudLayer.addChild(inputBox);
 
     const draft = model.communityNameDraft.trim() || t.ui.defaultCommunityName || "New Haven";
     this.drawText(this.hudLayer, draft.slice(0, 32), inputX + 12, inputY + 12, {
-      fill: 0xf5efdf,
-      fontSize: 16,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.control,
       fontWeight: "800",
     });
 
     this.drawText(this.hudLayer, "Enter: start | Backspace: delete", inputX, inputY + 52, {
-      fill: 0x9fa8ae,
-      fontSize: 11,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
       fontWeight: "700",
     });
 
@@ -1016,13 +1005,13 @@ export class PixiVillageRenderer {
   private drawFrontSettings(model: FrontScreenModel, panelX: number, cursorY: number, panelWidth: number): void {
     const t = model.translations;
     this.drawText(this.hudLayer, t.ui.settings ?? "Settings", panelX + 22, cursorY - 4, {
-      fill: 0xf1df9a,
-      fontSize: 21,
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.screenTitle,
       fontWeight: "900",
     });
     this.drawText(this.hudLayer, t.ui.languageText ?? "", panelX + 22, cursorY + 28, {
-      fill: 0xbfc6c5,
-      fontSize: 13,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
       fontWeight: "700",
       wordWrap: true,
       wordWrapWidth: panelWidth - 44,
@@ -1058,8 +1047,8 @@ export class PixiVillageRenderer {
   ): void {
     const t = model.translations;
     this.drawText(this.hudLayer, t.ui.savedCommunities ?? "Saved communities", panelX + 22, cursorY - 4, {
-      fill: 0xf1df9a,
-      fontSize: 21,
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.screenTitle,
       fontWeight: "900",
     });
 
@@ -1073,8 +1062,8 @@ export class PixiVillageRenderer {
 
     if (model.saves.length === 0) {
       this.drawText(this.hudLayer, t.ui.noSavedCommunities ?? "No saved community yet.", listX + 14, listY + 14, {
-        fill: 0xaeb4b8,
-        fontSize: 13,
+        fill: uiTheme.textMuted,
+        fontSize: uiTextSize.body,
         fontWeight: "700",
       });
       this.frontSaveScrollMax = 0;
@@ -1097,20 +1086,20 @@ export class PixiVillageRenderer {
         continue;
       }
 
-      const cardFill = save.loadable ? 0x20262b : 0x1d2227;
+      const cardFill = save.loadable ? uiTheme.surface : uiTheme.surfaceSunken;
       const card = new Graphics();
       card.rect(listX + 8, rowY, listWidth - 16, rowHeight)
         .fill({ color: cardFill, alpha: 0.96 });
       this.hudLayer.addChild(card);
 
       this.drawText(this.hudLayer, save.communityName, listX + 20, rowY + 10, {
-        fill: 0xf5efdf,
-        fontSize: 16,
+        fill: uiTheme.text,
+        fontSize: uiTextSize.control,
         fontWeight: "900",
       });
       this.drawText(this.hudLayer, `${t.ui.day ?? "Day"} ${getGameDay(save.elapsedSeconds)} / ${formatGameClock(save.elapsedSeconds)}`, listX + 20, rowY + 34, {
-        fill: 0xd1b25d,
-        fontSize: 12,
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.small,
         fontWeight: "800",
       });
 
@@ -1122,8 +1111,8 @@ export class PixiVillageRenderer {
           listX + 20,
           rowY + 52,
           {
-            fill: 0xb1b8be,
-            fontSize: 11,
+            fill: uiTheme.textMuted,
+            fontSize: uiTextSize.caption,
             fontWeight: "700",
           },
         );
@@ -1156,14 +1145,14 @@ export class PixiVillageRenderer {
       const trackY = listY + 8;
       const trackHeight = listHeight - 16;
       const track = new Graphics();
-      track.rect(trackX, trackY, 4, trackHeight).fill({ color: 0x1b2024, alpha: 0.96 });
+      track.rect(trackX, trackY, 4, trackHeight).fill({ color: uiTheme.surfaceSunken, alpha: 0.96 });
       this.hudLayer.addChild(track);
 
       const thumbHeight = Math.max(36, (listHeight / contentHeight) * trackHeight);
       const thumbTravel = trackHeight - thumbHeight;
       const thumbY = trackY + (this.frontSaveScrollY / this.frontSaveScrollMax) * thumbTravel;
       const thumb = new Graphics();
-      thumb.rect(trackX, thumbY, 4, thumbHeight).fill({ color: 0x56606a, alpha: 0.98 });
+      thumb.rect(trackX, thumbY, 4, thumbHeight).fill({ color: uiTheme.borderStrong, alpha: 0.98 });
       this.hudLayer.addChild(thumb);
     }
 
@@ -1188,7 +1177,7 @@ export class PixiVillageRenderer {
     }
 
     const backdrop = new Graphics();
-    backdrop.rect(panelX, panelY, panelWidth, panelHeight).fill({ color: 0x020304, alpha: 0.72 });
+    backdrop.rect(panelX, panelY, panelWidth, panelHeight).fill({ color: uiTheme.overlay, alpha: 0.26 });
     backdrop.eventMode = "static";
     backdrop.cursor = "default";
     backdrop.on("pointerdown", (event) => {
@@ -1204,16 +1193,16 @@ export class PixiVillageRenderer {
     this.drawPanel(this.hudLayer, modalX, modalY, modalWidth, modalHeight, 0.94);
 
     this.drawText(this.hudLayer, model.translations.ui.deleteSave ?? "Delete", modalX + 20, modalY + 16, {
-      fill: 0xf1df9a,
-      fontSize: 20,
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.sectionTitle,
       fontWeight: "900",
     });
 
     const question = (model.translations.ui.confirmDeleteSave ?? "Delete save \"{community}\" permanently?")
       .replace("{community}", save.communityName);
     this.drawText(this.hudLayer, question, modalX + 20, modalY + 52, {
-      fill: 0xf5efdf,
-      fontSize: 14,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.bodyLarge,
       fontWeight: "700",
       wordWrap: true,
       wordWrapWidth: modalWidth - 40,
@@ -1271,7 +1260,7 @@ export class PixiVillageRenderer {
       decisionProfileIconByKind[profileKind],
       profileTooltip,
       this.getBrandAlerts(state, t),
-      20,
+      HUD_SIDE_PANEL_MARGIN,
       topRowY - 2,
     );
     this.drawTopPills(
@@ -1309,6 +1298,7 @@ export class PixiVillageRenderer {
   private hudPanelsHost() {
     return {
       hudLayer: this.hudLayer,
+      requestRender: () => this.requestRender(),
       getLogScrollY: () => this.logScrollY,
       setLogScrollY: (value: number) => {
         this.logScrollY = value;
@@ -1318,6 +1308,10 @@ export class PixiVillageRenderer {
       },
       setLogScrollArea: (value: Bounds | null) => {
         this.logScrollArea = value;
+      },
+      getActiveSidebarTab: () => this.activeSidebarTab,
+      setActiveSidebarTab: (value: HudSidebarTab) => {
+        this.activeSidebarTab = value;
       },
       drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
         this.drawIcon(parent, iconId, x, y, size),
@@ -1346,7 +1340,13 @@ export class PixiVillageRenderer {
         fillAlpha?: number,
         cornerRadius?: number,
       ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawTabs: <T extends string>(
+        parent: Container,
+        tabs: Array<TabItem<T>>,
+        options: TabOptions<T>,
+      ) => this.drawTabs(parent, tabs, options),
       bindAction: (target: Container, detail: PixiActionDetail) => this.bindAction(target, detail),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
       registerHudInteractionArea: (x: number, y: number, width: number, height: number, padding = 0) =>
         this.registerHudInteractionArea(x, y, width, height, padding),
       createIconButton: (
@@ -1359,7 +1359,8 @@ export class PixiVillageRenderer {
         detail: PixiActionDetail,
         tooltip?: string,
         active = false,
-      ) => this.createIconButton(parent, iconId, x, y, width, height, detail, tooltip, active),
+        disabled = false,
+      ) => this.createIconButton(parent, iconId, x, y, width, height, detail, tooltip, active, disabled),
       createHudButton: (
         parent: Container,
         label: string,
@@ -1631,6 +1632,9 @@ export class PixiVillageRenderer {
         tooltip?: string,
         active = false,
       ) => this.createIconButton(parent, iconId, x, y, width, height, detail, tooltip, active),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
+      drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
+        this.drawIcon(parent, iconId, x, y, size),
       drawText: (
         parent: Container,
         text: string,
@@ -1669,6 +1673,17 @@ export class PixiVillageRenderer {
         onTap: () => void,
         disabled = false,
       ) => this.createLocalModalButton(parent, label, x, y, width, height, onTap, disabled),
+      createModalButton: (
+        parent: Container,
+        label: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        detail: PixiActionDetail,
+        disabled = false,
+        tooltip?: string,
+      ) => this.createModalButton(parent, label, x, y, width, height, detail, disabled, tooltip),
       createRectButton: (parent: Container, options: RectButtonOptions) => this.createRectButton(parent, options),
       drawBuildChoices: (
         parent: Container,
@@ -1794,7 +1809,6 @@ export class PixiVillageRenderer {
       ) => this.createLocalModalButton(parent, label, x, y, width, height, onTap, disabled),
       createBuildingSprite: (buildingId: BuildingId, level: number, built: boolean) =>
         this.createBuildingSprite(buildingId, level, built),
-      fitSprite: (sprite: Sprite, maxWidth: number, maxHeight: number) => this.fitSprite(sprite, maxWidth, maxHeight),
 
       getBuildChoicesScrollPlotId: () => this.buildChoicesScrollPlotId,
       setBuildChoicesScrollPlotId: (value: string | null) => {
@@ -1897,10 +1911,11 @@ export class PixiVillageRenderer {
   }
 
   private drawTopStrip(width: number): number {
+    drawBluePanelBackground(this.hudLayer, 0, 0, width, HUD_TOP_STRIP_HEIGHT, HUD_CHROME_ALPHA);
     const strip = new Graphics();
     strip
       .rect(0, 0, width, HUD_TOP_STRIP_HEIGHT)
-      .fill({ color: 0x151812, alpha: 1 });
+      .fill({ color: uiTheme.hudChrome, alpha: 0.12 });
     this.hudLayer.addChild(strip);
     return HUD_TOP_STRIP_HEIGHT;
   }
@@ -1920,22 +1935,23 @@ export class PixiVillageRenderer {
 
     const mark = new Graphics();
     mark
-      .rect(0, 0, 44, 44)
-      .fill({ color: 0x141611, alpha: 0.62 });
+      .roundRect(0, 0, 44, 44, UI_CONTROL_RADIUS)
+      .fill({ color: uiTheme.surface, alpha: 0.72 })
+      .stroke({ color: uiTheme.border, alpha: 0.62, width: 1 });
     layer.addChild(mark);
-    this.drawIcon(layer, iconId, 22, 22, 24);
+    this.drawIcon(layer, iconId, 22, 22, 28);
     if (tooltip) {
       mark.hitArea = new Rectangle(0, 0, 44, 44);
       this.bindTooltip(mark, tooltip);
     }
     const titleLabel = this.drawText(layer, title.toUpperCase(), 56, 2, {
-      fill: 0xf5efdf,
-      fontSize: 25,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.brandTitle,
       fontWeight: "900",
     });
     const titleBottom = titleLabel.y + titleLabel.height;
 
-    this.drawBrandAlerts(layer, alerts, 56, titleBottom + 4);
+    this.drawBrandAlerts(layer, alerts, 0, Math.max(46, titleBottom + 4));
   }
 
   private drawBrandAlerts(parent: Container, alerts: BrandAlert[], x: number, y: number): void {
@@ -1952,28 +1968,29 @@ export class PixiVillageRenderer {
 
   private createBrandAlertBadge(alert: BrandAlert): Container {
     const group = new Container();
+    const textFill = this.getBrandAlertTextColor(alert.tone);
     const label = alert.label
       ? new Text({
         text: alert.label,
         style: {
-          fill: 0xf5efdf,
+          fill: textFill,
           fontFamily: HUD_FONT_FAMILY,
-          fontSize: 11,
+          fontSize: uiTextSize.caption,
           fontWeight: normalizeHudFontWeight("900"),
         },
       })
       : null;
-    const width = label ? Math.max(48, label.width + 32) : 28;
-    const height = 22;
-    const colors = this.getBrandAlertColors(alert.tone);
+    const width = label ? Math.max(62, label.width + 38) : 30;
+    const height = 30;
     const background = new Graphics();
-    background.rect(0, 0, width, height)
-      .fill({ color: colors.fill, alpha: 0.82 });
+    background.roundRect(0, 0, width, height, UI_BADGE_RADIUS)
+      .fill({ color: uiTheme.surface, alpha: 0.5 })
+      .stroke({ color: uiTheme.border, alpha: 0.44, width: 1 });
     group.addChild(background);
-    this.drawIcon(group, alert.iconId, 12, height / 2, 13);
+    this.drawIcon(group, alert.iconId, label ? 15 : width / 2, height / 2, 15);
 
     if (label) {
-      label.x = 22;
+      label.x = 28;
       label.y = 6;
       group.addChild(label);
     }
@@ -1990,20 +2007,20 @@ export class PixiVillageRenderer {
     return group;
   }
 
-  private getBrandAlertColors(tone: BrandAlert["tone"]): { fill: number } {
+  private getBrandAlertTextColor(tone: BrandAlert["tone"]): number {
     if (tone === "cold") {
-      return { fill: 0x12232d };
+      return uiTheme.cold;
     }
 
     if (tone === "danger") {
-      return { fill: 0x2c1715 };
+      return uiTheme.negative;
     }
 
     if (tone === "warning") {
-      return { fill: 0x2a2412 };
+      return uiTheme.accentStrong;
     }
 
-    return { fill: 0x141611 };
+    return uiTheme.textMuted;
   }
 
   private getBrandAlerts(state: GameState, translations?: TranslationPack): BrandAlert[] {
@@ -2129,7 +2146,7 @@ export class PixiVillageRenderer {
         item.sublabel,
         item.sublabelFill,
         item.action,
-        0xe9e4d2,
+        uiTheme.text,
         true,
       );
       pill.x = x;
@@ -2170,7 +2187,7 @@ export class PixiVillageRenderer {
         rateLabel,
         getRateColor(rate),
         { action: "open-resource-breakdown", resourceId: resource.id },
-        stockRatio < 0.2 ? 0xff6f7d : undefined,
+        stockRatio < 0.2 ? uiTheme.negative : undefined,
         true,
       );
       pill.x = x;
@@ -2205,7 +2222,7 @@ export class PixiVillageRenderer {
     blockClose = false,
   ): void {
     const backdrop = new Graphics();
-    backdrop.rect(0, 0, width, height).fill({ color: 0x030405, alpha: MODAL_BACKDROP_ALPHA });
+    backdrop.rect(0, 0, width, height).fill({ color: uiTheme.overlay, alpha: MODAL_BACKDROP_ALPHA });
 
     if (blockClose) {
       backdrop.eventMode = "static";
@@ -2232,6 +2249,55 @@ export class PixiVillageRenderer {
       rightText?: string;
     },
   ): number {
+    const headerBackground = new Graphics();
+    parent.addChild(headerBackground);
+
+    const badge = new Container();
+    badge.x = 22;
+    badge.y = 18;
+    parent.addChild(badge);
+    this.drawIcon(badge, options.iconId, 21, 21, 22);
+
+    if (options.kicker) {
+      this.drawText(parent, options.kicker, 72, 18, {
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.small,
+        fontWeight: "900",
+      });
+    }
+
+    const titleY = options.kicker ? 36 : 26;
+    const titleLabel = this.drawText(parent, options.title, 72, titleY, {
+      fill: uiTheme.text,
+      fontSize: uiTextSize.overlayTitle,
+      fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 152,
+    });
+    let contentY = titleLabel.y + titleLabel.height + 8;
+
+    if (options.subtitle) {
+      const subtitleLabel = this.drawText(parent, options.subtitle, 72, contentY, {
+        fill: uiTheme.textMuted,
+        fontSize: uiTextSize.caption,
+        fontWeight: "800",
+        wordWrap: true,
+        wordWrapWidth: panelWidth - 152,
+      });
+      contentY = subtitleLabel.y + subtitleLabel.height + 8;
+    }
+
+    if (options.rightText) {
+      this.drawText(parent, options.rightText, panelWidth - 72, 23, {
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.actionValue,
+        fontWeight: "900",
+      }).anchor.set(1, 0);
+    }
+
+    const headerBottom = Math.max(86, Math.ceil(contentY + 8));
+    drawModalHeaderPlane(headerBackground, panelWidth, headerBottom);
+
     if (options.closeAction) {
       this.createIconButton(
         parent,
@@ -2245,54 +2311,7 @@ export class PixiVillageRenderer {
       );
     }
 
-    const badge = new Container();
-    badge.x = 22;
-    badge.y = 18;
-    parent.addChild(badge);
-    const badgeBox = new Graphics();
-    badgeBox.rect(0, 0, 42, 42)
-      .fill({ color: 0x11140f, alpha: 0.9 });
-    badge.addChild(badgeBox);
-    this.drawIcon(badge, options.iconId, 21, 21, 22);
-
-    if (options.kicker) {
-      this.drawText(parent, options.kicker, 72, 18, {
-        fill: 0xd8c890,
-        fontSize: 12,
-        fontWeight: "900",
-      });
-    }
-
-    const titleY = options.kicker ? 36 : 26;
-    const titleLabel = this.drawText(parent, options.title, 72, titleY, {
-      fill: 0xf5efdf,
-      fontSize: 22,
-      fontWeight: "900",
-      wordWrap: true,
-      wordWrapWidth: panelWidth - 152,
-    });
-    let contentY = titleLabel.y + titleLabel.height + 8;
-
-    if (options.subtitle) {
-      const subtitleLabel = this.drawText(parent, options.subtitle, 72, contentY, {
-        fill: 0xaeb6ad,
-        fontSize: 11,
-        fontWeight: "800",
-        wordWrap: true,
-        wordWrapWidth: panelWidth - 152,
-      });
-      contentY = subtitleLabel.y + subtitleLabel.height + 8;
-    }
-
-    if (options.rightText) {
-      this.drawText(parent, options.rightText, panelWidth - 72, 23, {
-        fill: 0xf1df9a,
-        fontSize: 18,
-        fontWeight: "900",
-      }).anchor.set(1, 0);
-    }
-
-    return Math.max(72, contentY);
+    return headerBottom;
   }
 
   private getResourceSiteTroopCount(
@@ -2332,17 +2351,45 @@ export class PixiVillageRenderer {
     disabled = false,
     tooltip?: string,
   ): Container {
-    return this.createRectButton(parent, {
-      label,
-      x,
-      y,
-      width,
-      height,
+    return this.createModalRectButton(parent, label, x, y, width, height, {
       detail,
       disabled,
       tooltip,
       tone: "primary",
-      fontSize: 12,
+      fontSize: uiTextSize.small,
+    });
+  }
+
+  private createModalRectButton(
+    parent: Container,
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    options: {
+      detail?: PixiActionDetail;
+      onTap?: () => void;
+      disabled?: boolean;
+      tooltip?: string;
+      tone: RectButtonOptions["tone"];
+      fontSize: number;
+    },
+  ): Container {
+    const symbolIconId = this.getSymbolButtonIconId(label);
+    return this.createRectButton(parent, {
+      label: symbolIconId ? undefined : label,
+      iconId: symbolIconId,
+      x,
+      y,
+      width,
+      height,
+      detail: options.detail,
+      onTap: options.onTap,
+      disabled: options.disabled,
+      tooltip: options.tooltip,
+      tone: symbolIconId ? "secondary" : options.tone,
+      fontSize: options.fontSize,
       fontWeight: "900",
     });
   }
@@ -2370,8 +2417,8 @@ export class PixiVillageRenderer {
 
       this.drawIcon(token, typedResourceId, 8, 8, 14);
       const label = this.drawText(token, `+${roundedAmount}`, 20, 0, {
-        fill: 0xf1df9a,
-        fontSize: 12,
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.small,
         fontWeight: "900",
       });
       this.bindTooltip(
@@ -2396,18 +2443,24 @@ export class PixiVillageRenderer {
     onTap: () => void,
     disabled = false,
   ): Container {
-    return this.createRectButton(parent, {
-      label,
-      x,
-      y,
-      width,
-      height,
+    return this.createModalRectButton(parent, label, x, y, width, height, {
       onTap,
       disabled,
       tone: "secondary",
-      fontSize: 14,
-      fontWeight: "900",
+      fontSize: uiTextSize.bodyLarge,
     });
+  }
+
+  private getSymbolButtonIconId(label: string): string | undefined {
+    if (label === "+") {
+      return "plus";
+    }
+
+    if (label === "-") {
+      return "minus";
+    }
+
+    return undefined;
   }
 
   private createPill(
@@ -2415,9 +2468,9 @@ export class PixiVillageRenderer {
     iconId: string,
     tooltip?: string,
     sublabel?: string,
-    sublabelFill = 0xaeb4b8,
+    sublabelFill = uiTheme.textMuted,
     action?: PixiActionDetail,
-    labelFill = 0xe9e4d2,
+    labelFill = uiTheme.text,
     compact = false,
   ): Container {
     return createPillPrimitive(
@@ -2461,7 +2514,7 @@ export class PixiVillageRenderer {
       detail,
       active,
       tone: "toolbar",
-      fontSize: 13,
+      fontSize: uiTextSize.body,
       fontWeight: "700",
     });
   }
@@ -2476,6 +2529,7 @@ export class PixiVillageRenderer {
     detail: PixiActionDetail,
     tooltip?: string,
     active = false,
+    disabled = false,
   ): Container {
     return this.createRectButton(parent, {
       iconId,
@@ -2486,6 +2540,7 @@ export class PixiVillageRenderer {
       detail,
       tooltip,
       active,
+      disabled,
       tone: "toolbar",
     });
   }
@@ -2553,14 +2608,15 @@ export class PixiVillageRenderer {
     for (const impact of [...impacts].reverse()) {
       const chip = new Container();
       const value = this.drawText(chip, impact.value, 24, 4, {
-        fill: impact.negative ? 0xff9c8f : 0x9ed99b,
-        fontSize: 11,
+        fill: impact.negative ? uiTheme.negative : uiTheme.positive,
+        fontSize: uiTextSize.caption,
         fontWeight: "900",
       });
       const chipWidth = Math.max(42, 32 + value.width);
       const background = new Graphics();
+      const chipFill = impact.negative ? uiTheme.negativeSurface : uiTheme.positiveSurface;
       background.rect(0, 0, chipWidth, 22)
-        .fill({ color: impact.negative ? 0x291513 : 0x122117, alpha: 0.84 });
+        .fill({ color: chipFill, alpha: 0.5 });
       chip.addChildAt(background, 0);
       this.drawIcon(chip, impact.iconId, 13, 11, 13);
       chip.x = cursorX - chipWidth;
@@ -2591,12 +2647,13 @@ export class PixiVillageRenderer {
       parent.addChild(tabLayer);
 
       const box = new Graphics();
-      box.rect(0, 0, tabWidth, options.height)
-        .fill({ color: active ? 0xe0c46f : 0x151813, alpha: active ? 1 : 0.78 });
+      box.roundRect(0, 0, tabWidth, options.height, UI_CONTROL_RADIUS)
+        .fill({ color: active ? uiTheme.accentSurface : uiTheme.surfaceMuted, alpha: active ? 0.72 : 0.42 })
+        .stroke({ color: uiTheme.border, alpha: active ? 0.78 : 0.42, width: 1 });
       tabLayer.addChild(box);
       this.drawCenteredText(tabLayer, tab.label, tabWidth / 2, options.height / 2, {
-        fill: active ? 0x11140f : 0xd8d2bd,
-        fontSize: 12,
+        fill: active ? uiTheme.text : uiTheme.textMuted,
+        fontSize: uiTextSize.small,
         fontWeight: "900",
       });
 
@@ -2687,7 +2744,7 @@ export class PixiVillageRenderer {
       this.canvasTooltipHeight = Math.max(36, this.canvasTooltipLabel.height + 18);
       this.canvasTooltipPanel.clear();
       this.canvasTooltipPanel.rect(0, 0, this.canvasTooltipWidth, this.canvasTooltipHeight)
-        .fill({ color: 0x111519, alpha: 0.96 });
+        .fill({ color: uiTheme.tooltip, alpha: 0.96 });
       shouldRender = true;
     }
 
@@ -2758,21 +2815,93 @@ export class PixiVillageRenderer {
   }
 
   private drawPowerWarning(parent: Container, bounds: Bounds): void {
+    this.drawBuildingStatusBadge(parent, bounds, {
+      iconId: "power-warning",
+      slot: "right",
+      tone: "danger",
+      iconSize: 19,
+    });
+  }
+
+  private drawBuildingStatusBadge(
+    parent: Container,
+    bounds: Bounds,
+    options: {
+      iconId: string;
+      slot: "left" | "center" | "right";
+      tone: "danger" | "neutral" | "active";
+      iconSize: number;
+      label?: string;
+      tooltip?: string;
+    },
+  ): Container {
+    const slotX = options.slot === "left"
+      ? -bounds.width * 0.28
+      : options.slot === "right"
+        ? bounds.width * 0.28
+        : 0;
+    return this.drawStatusBadgeAt(parent, slotX, -bounds.height * 0.44, options);
+  }
+
+  private drawStatusBadgeAt(
+    parent: Container,
+    x: number,
+    y: number,
+    options: {
+      iconId: string;
+      tone: "danger" | "neutral" | "active";
+      iconSize: number;
+      label?: string;
+      tooltip?: string;
+    },
+  ): Container {
+    const hasLabel = Boolean(options.label);
+    const width = hasLabel ? Math.max(58, 38 + (options.label?.length ?? 0) * 8) : 32;
+    const height = hasLabel ? 28 : 32;
     const badge = new Container();
-    badge.x = bounds.width * 0.28;
-    badge.y = -bounds.height * 0.44;
+    badge.x = x;
+    badge.y = y;
+    badge.hitArea = new Rectangle(-width / 2, -height / 2, width, height);
     parent.addChild(badge);
 
+    const fill = uiTheme.surfaceSunken;
+    const alpha = 0.86;
+
     const shadow = new Graphics();
-    shadow.circle(2, 3, 16).fill({ color: 0x000000, alpha: 0.42 });
+    if (hasLabel) {
+      shadow.roundRect(-width / 2 + 2, -height / 2 + 3, width, height, 3)
+        .fill({ color: uiTheme.shadow, alpha: 0.18 });
+    } else {
+      shadow.circle(2, 3, 16).fill({ color: uiTheme.shadow, alpha: 0.18 });
+    }
     badge.addChild(shadow);
 
-    const ring = new Graphics();
-    ring.circle(0, 0, 16)
-      .fill({ color: 0x2a090b, alpha: 0.94 });
-    badge.addChild(ring);
+    const background = new Graphics();
+    if (hasLabel) {
+      background.roundRect(-width / 2, -height / 2, width, height, 3)
+        .fill({ color: fill, alpha });
+    } else {
+      background.circle(0, 0, 16).fill({ color: fill, alpha });
+    }
+    badge.addChild(background);
 
-    this.drawIcon(badge, "power-warning", 0, 1, 19);
+    const iconX = hasLabel ? -width / 2 + 15 : 0;
+    const iconY = options.iconId === "power-warning" ? 1 : 0;
+    this.drawIcon(badge, options.iconId, iconX, iconY, options.iconSize);
+
+    if (options.label) {
+      this.drawText(badge, options.label, -width / 2 + 29, -7, {
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.caption,
+        fontWeight: "900",
+      });
+    }
+
+    if (options.tooltip) {
+      this.bindTooltip(badge, options.tooltip);
+    }
+
+    return badge;
   }
 
   private drawBuildingWorkerBadge(
@@ -2788,40 +2917,32 @@ export class PixiVillageRenderer {
     }
 
     const asleep = workers <= 0;
-    const label = asleep
-      ? translations?.ui.sleeping ?? "Idle"
-      : `${workers}/${workerLimit}`;
-    const width = asleep ? 68 : 58;
-    const height = 24;
-    const badge = new Container();
-    badge.x = -bounds.width * 0.42;
-    badge.y = bounds.height * 0.16;
-    parent.addChild(badge);
-
-    const shadow = new Graphics();
-    shadow.rect(2, 3, width, height)
-      .fill({ color: 0x000000, alpha: 0.32 });
-    badge.addChild(shadow);
-
-    const box = new Graphics();
-    box.rect(0, 0, width, height)
-      .fill({ color: asleep ? 0x1a1d18 : 0x10120e, alpha: 0.94 });
-    badge.addChild(box);
-
-    this.drawIcon(badge, asleep ? "clock" : "people", 14, height / 2, 13);
-    this.drawText(badge, label, 28, 5, {
-      fill: asleep ? 0xaeb4b8 : 0xf1df9a,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-
     const buildingName = translations?.buildings[buildingId].name ?? buildingById[buildingId].name;
     const workerLabel = translations?.ui.workers ?? "Workers";
     const sleepLabel = translations?.ui.sleeping ?? "Idle";
     const tooltip = asleep
       ? `${buildingName}: ${sleepLabel} (${workerLabel} 0/${workerLimit})`
       : `${buildingName}: ${workerLabel} ${workers}/${workerLimit}`;
-    this.bindTooltip(badge, tooltip);
+
+    if (asleep) {
+      this.drawBuildingStatusBadge(parent, bounds, {
+        iconId: "sleep",
+        slot: "left",
+        tone: "neutral",
+        iconSize: 20,
+        tooltip,
+      });
+      return;
+    }
+
+    this.drawBuildingStatusBadge(parent, bounds, {
+      iconId: "people",
+      slot: "left",
+      tone: "active",
+      iconSize: 13,
+      label: `${workers}/${workerLimit}`,
+      tooltip,
+    });
   }
 
   private drawConstructionCountdown(
@@ -2829,36 +2950,17 @@ export class PixiVillageRenderer {
     remainingSeconds: number,
     x: number,
     y: number,
-    width: number,
+    _width: number,
     translations?: TranslationPack,
   ): void {
     const label = `${Math.ceil(remainingSeconds)}s`;
-    const badge = new Container();
-    badge.x = x;
-    badge.y = y;
-    parent.addChild(badge);
-
-    const height = 26;
-    const shadow = new Graphics();
-    shadow.rect(-width / 2 + 2, 3, width, height)
-      .fill({ color: 0x000000, alpha: 0.34 });
-    badge.addChild(shadow);
-
-    const box = new Graphics();
-    box.rect(-width / 2, 0, width, height)
-      .fill({ color: 0x10120e, alpha: 0.94 });
-    badge.addChild(box);
-
-    this.drawIcon(badge, "clock", -width / 2 + 15, height / 2, 13);
-    this.drawText(badge, label, -width / 2 + 29, 5, {
-      fill: 0xf1df9a,
-      fontSize: 12,
-      fontWeight: "900",
+    this.drawStatusBadgeAt(parent, x, y, {
+      iconId: "clock",
+      tone: "active",
+      iconSize: 13,
+      label,
+      tooltip: `${translations?.ui.buildingQueue ?? "Building queue"}: ${label}`,
     });
-    this.bindTooltip(
-      badge,
-      `${translations?.ui.buildingQueue ?? "Building queue"}: ${label}`,
-    );
   }
 
   private createBuildingSprite(buildingId: BuildingId, level: number, built: boolean): Sprite {
@@ -2924,19 +3026,7 @@ export class PixiVillageRenderer {
     fontWeight: TextStyleFontWeight,
     maxWidth: number,
   ): number {
-    const lineHeight = getHudTextLineHeight(fontSize);
-    const style = new TextStyle({
-      fill: 0xffffff,
-      fontFamily: HUD_FONT_FAMILY,
-      fontSize,
-      fontWeight: normalizeHudFontWeight(fontWeight),
-      lineHeight,
-      wordWrap: true,
-      wordWrapWidth: Math.max(1, maxWidth),
-    });
-    const sample = text && text.trim().length > 0 ? text : " ";
-    const metrics = CanvasTextMetrics.measureText(sample, style);
-    return Math.max(lineHeight, Math.ceil(metrics.height));
+    return measureHudWrappedTextHeight(text, fontSize, fontWeight, maxWidth);
   }
 
   private applyHudPixelScale(container: Container, scale: number): void {
@@ -3284,60 +3374,10 @@ export class PixiVillageRenderer {
     fontWeight: TextStyleFontWeight,
     maxWidth: number,
   ): string[] {
-    const style = new TextStyle({
-      fill: 0xffffff,
-      fontFamily: HUD_FONT_FAMILY,
-      fontSize: 11,
-      fontWeight: normalizeHudFontWeight(fontWeight),
-      wordWrap: false,
+    return wrapHudTextLines(text, {
+      fontSize: uiTextSize.caption,
+      fontWeight,
+      maxWidth,
     });
-    const lines: string[] = [];
-    const baseWords = text.split(/\s+/).filter((word) => word.length > 0);
-
-    if (baseWords.length === 0) {
-      return [text];
-    }
-
-    let currentLine = "";
-
-    for (const word of baseWords) {
-      const candidate = currentLine ? `${currentLine} ${word}` : word;
-      const candidateWidth = CanvasTextMetrics.measureText(candidate, style).width;
-
-      if (candidateWidth <= maxWidth) {
-        currentLine = candidate;
-        continue;
-      }
-
-      if (currentLine) {
-        lines.push(currentLine);
-        currentLine = "";
-      }
-
-      if (CanvasTextMetrics.measureText(word, style).width <= maxWidth) {
-        currentLine = word;
-        continue;
-      }
-
-      let chunk = "";
-      for (const char of word) {
-        const charCandidate = chunk + char;
-        if (CanvasTextMetrics.measureText(charCandidate, style).width <= maxWidth || chunk.length === 0) {
-          chunk = charCandidate;
-          continue;
-        }
-
-        lines.push(chunk);
-        chunk = char;
-      }
-
-      currentLine = chunk;
-    }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    return lines;
   }
 }

@@ -35,15 +35,14 @@ function getIconSvg(iconId: string): string {
   const symbol = iconsDocument.getElementById(`icon-${iconId}`);
 
   if (!symbol) {
-    return getFallbackSvg();
+    throw new Error(`Missing icon symbol "icon-${iconId}" in icons.svg`);
   }
 
   const viewBox = symbol.getAttribute("viewBox") ?? "0 0 24 24";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="24" height="24">${symbol.innerHTML}</svg>`;
+  const iconMarkup = symbol.innerHTML
+    .replace(/#d9d2b7/gi, "#f0d7a1")
+    .replace(/#f3edda/gi, "#f0d7a1");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="24" height="24">${iconMarkup}</svg>`;
   iconSvgCache.set(iconId, svg);
   return svg;
-}
-
-function getFallbackSvg(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><circle fill="#d9d2b7" cx="12" cy="12" r="7"/></svg>`;
 }

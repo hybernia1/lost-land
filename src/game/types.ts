@@ -12,7 +12,7 @@ export type BuildingId =
   | "hydroponics"
   | "waterStill"
   | "workshop"
-  | "generator"
+  | "coalMine"
   | "market"
   | "watchtower"
   | "barracks"
@@ -142,7 +142,7 @@ export type ResourceSiteState = {
 
 export type ObjectiveQuestId =
   | "buildStorage"
-  | "buildGenerator"
+  | "buildCoalMine"
   | "buildDormitory"
   | "buildWaterStill"
   | "buildHydroponics";
@@ -155,7 +155,7 @@ export type DecisionQuestId =
   | "traderAtDusk"
   | "nightScreams"
   | "waterTheft"
-  | "generatorSpareParts"
+  | "coalMineSpareParts"
   | "provenTheft"
   | "collapsedUnderpass"
   | "brokenWaterFilter";
@@ -164,9 +164,8 @@ export type SuddenQuestId =
   | "cropSpoilage";
 
 export type DecisionProfileAxisId =
-  | "philanthropyPrinciple"
-  | "mercySecurity"
-  | "opennessCaution";
+  | "communityMarket"
+  | "authorityAutonomy";
 
 export type DecisionOptionId = string;
 

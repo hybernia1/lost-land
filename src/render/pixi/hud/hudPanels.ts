@@ -5,28 +5,46 @@ import type {
   ResourceBag,
 } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
-import { getActiveObjectiveQuests, getObjectiveQuestProgress } from "../../../systems/quests";
-import { HUD_LEFT_PANEL_WIDTH, HUD_SIDE_PANEL_MARGIN, HUD_TOP_STRIP_HEIGHT } from "../core/constants";
+import { canClaimObjectiveReward, getActiveObjectiveQuests, getObjectiveQuestProgress } from "../../../systems/quests";
+import {
+  HUD_CHROME_ALPHA,
+  HUD_LEFT_PANEL_WIDTH,
+  HUD_SIDE_PANEL_CONTENT_WIDTH,
+  HUD_SIDE_PANEL_MARGIN,
+  HUD_TOP_STRIP_HEIGHT,
+  UI_CONTROL_RADIUS,
+  uiTextSize,
+  uiTheme,
+} from "../core/constants";
 import { formatScoutingRemaining } from "../helpers/formatters";
+import { drawBluePanelBackground } from "../ui/panelBackground";
 import type {
   Bounds,
   DrawIconFn,
   DrawPanelFn,
   DrawTextFn,
   FormattedLogEntry,
+  HudSidebarTab,
   PixiActionDetail,
+  TabItem,
+  TabOptions,
 } from "../core/types";
 
 type HudPanelsHost = {
   hudLayer: Container;
+  requestRender: () => void;
   getLogScrollY: () => number;
   setLogScrollY: (value: number) => void;
   setLogScrollMax: (value: number) => void;
   setLogScrollArea: (value: Bounds | null) => void;
+  getActiveSidebarTab: () => HudSidebarTab;
+  setActiveSidebarTab: (value: HudSidebarTab) => void;
   drawIcon: DrawIconFn;
   drawText: DrawTextFn;
   drawPanel: DrawPanelFn;
+  drawTabs: <T extends string>(parent: Container, tabs: Array<TabItem<T>>, options: TabOptions<T>) => void;
   bindAction: (target: Container, detail: PixiActionDetail) => void;
+  bindTooltip: (target: Container, text: string) => void;
   registerHudInteractionArea: (x: number, y: number, width: number, height: number, padding?: number) => void;
   createIconButton: (
     parent: Container,
@@ -38,6 +56,7 @@ type HudPanelsHost = {
     detail: PixiActionDetail,
     tooltip?: string,
     active?: boolean,
+    disabled?: boolean,
   ) => Container;
   createHudButton: (
     parent: Container,
@@ -80,20 +99,19 @@ export function drawHudPanels(
   height: number,
   topPanelsY: number,
 ): void {
-  const conquestPanelHeight = drawActiveConquests(host, state, translations, topPanelsY);
-  drawQuestPanel(host, state, translations, topPanelsY + conquestPanelHeight + 10);
+  drawSidebarTabsPanel(host, state, translations, topPanelsY);
   drawEventLog(host, state, translations, height);
   drawActionPanel(host, state, translations, width, height);
   drawToolbar(host, state, translations, width, height);
 }
-
-function drawActiveConquests(
+function drawSidebarTabsPanel(
   host: HudPanelsHost,
   state: GameState,
   translations: TranslationPack | undefined,
   y: number,
-): number {
-  const panelWidth = HUD_LEFT_PANEL_WIDTH;
+): void {
+  const panelWidth = HUD_SIDE_PANEL_CONTENT_WIDTH;
+  const panelHeight = 170;
   const layer = new Container();
   layer.x = HUD_SIDE_PANEL_MARGIN;
   layer.y = y;
@@ -102,91 +120,105 @@ function drawActiveConquests(
   const activeAssaults = state.resourceSites
     .filter((site) => site.assault)
     .slice(0, 4);
-  const panelHeight = activeAssaults.length > 0 ? 52 + activeAssaults.length * 24 : 82;
+  const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
+  const activeTab = host.getActiveSidebarTab();
+  const tabs: Array<TabItem<HudSidebarTab>> = [
+    {
+      id: "tasks",
+      label: `${translations?.ui.sidebarTasksTab ?? "Tasks"} ${activeObjectives.length}`,
+    },
+    {
+      id: "expeditions",
+      label: `${translations?.ui.sidebarExpeditionsTab ?? "Expeditions"} ${activeAssaults.length}`,
+    },
+  ];
 
-  host.drawIcon(layer, "scout", 18, 22, 15);
-  host.drawText(layer, translations?.ui.activeConquests ?? "Active conquests", 34, 14, {
-    fill: 0xf3edda,
-    fontSize: 12,
-    fontWeight: "800",
+  host.drawTabs(layer, tabs, {
+    activeId: activeTab,
+    x: 0,
+    y: 8,
+    height: 32,
+    gap: 6,
+    minWidth: 132,
+    maxTabWidth: 156,
+    maxWidth: panelWidth,
+    onSelect: (tab) => {
+      host.setActiveSidebarTab(tab);
+      host.requestRender();
+    },
   });
-  host.drawText(layer, `${activeAssaults.length}`, panelWidth - 28, 14, {
-    fill: 0xf1df9a,
-    fontSize: 13,
-    fontWeight: "900",
-  }).anchor.set(1, 0);
+
+  if (activeTab === "tasks") {
+    drawQuestPanelContent(host, state, translations, layer, activeObjectives);
+  } else {
+    drawActiveConquestsContent(host, translations, layer, activeAssaults);
+  }
+
+  host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
+}
+function drawActiveConquestsContent(
+  host: HudPanelsHost,
+  translations: TranslationPack | undefined,
+  layer: Container,
+  activeAssaults: GameState["resourceSites"],
+): void {
+  const panelWidth = HUD_SIDE_PANEL_CONTENT_WIDTH;
+  const contentY = 54;
 
   if (activeAssaults.length === 0) {
-    host.drawText(layer, translations?.ui.noActiveConquests ?? "No active conquest teams.", 14, 48, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
+    host.drawIcon(layer, "scout", 8, contentY + 8, 15);
+    host.drawText(layer, translations?.ui.noActiveConquests ?? "No active conquest teams.", 28, contentY, {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
       fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 42,
     });
-    host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-    return panelHeight;
+    return;
   }
 
   activeAssaults.forEach((site, index) => {
     const remaining = formatScoutingRemaining(site.assault?.remainingSeconds ?? 0);
-    const rowY = 44 + index * 24;
-    host.drawIcon(layer, "people", 18, rowY + 10, 13);
-    host.drawText(layer, `${translations?.resources[site.resourceId] ?? site.resourceId}: ${site.assault?.troops ?? 0}`, 34, rowY + 2, {
-      fill: 0xf5efdf,
-      fontSize: 11,
+    const rowY = contentY + index * 24;
+    host.drawIcon(layer, "people", 8, rowY + 10, 13);
+    host.drawText(layer, `${translations?.resources[site.resourceId] ?? site.resourceId}: ${site.assault?.troops ?? 0}`, 24, rowY + 2, {
+      fill: uiTheme.text,
+      fontSize: uiTextSize.caption,
       fontWeight: "900",
     });
-    const timer = host.drawText(layer, `${translations?.ui.returnsIn ?? "returns in"} ${remaining}`, panelWidth - 14, rowY + 2, {
-      fill: 0xd8c890,
-      fontSize: 11,
+    const timer = host.drawText(layer, `${translations?.ui.returnsIn ?? "returns in"} ${remaining}`, panelWidth, rowY + 2, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.caption,
       fontWeight: "800",
     });
     timer.anchor.set(1, 0);
   });
-
-  host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
-  return panelHeight;
 }
 
-function drawQuestPanel(
+function drawQuestPanelContent(
   host: HudPanelsHost,
   state: GameState,
   translations: TranslationPack | undefined,
-  y: number,
+  layer: Container,
+  activeObjectives: ReturnType<typeof getActiveObjectiveQuests>,
 ): void {
   if (!translations) {
     return;
   }
 
-  const panelWidth = HUD_LEFT_PANEL_WIDTH;
-  const activeObjectives = getActiveObjectiveQuests(state).slice(0, 3);
+  const panelWidth = HUD_SIDE_PANEL_CONTENT_WIDTH;
   const rowHeight = 34;
-  const panelHeight = activeObjectives.length > 0
-    ? 52 + activeObjectives.length * rowHeight
-    : 82;
-  const layer = new Container();
-  layer.x = HUD_SIDE_PANEL_MARGIN;
-  layer.y = y;
-  host.hudLayer.addChild(layer);
-
-  host.drawIcon(layer, "build", 18, 22, 15);
-  host.drawText(layer, translations.quests.ui.activeObjectives, 34, 14, {
-    fill: 0xf3edda,
-    fontSize: 12,
-    fontWeight: "800",
-  });
-  host.drawText(layer, `${activeObjectives.length}`, panelWidth - 28, 14, {
-    fill: 0xf1df9a,
-    fontSize: 13,
-    fontWeight: "900",
-  }).anchor.set(1, 0);
+  const contentY = 54;
 
   if (activeObjectives.length === 0) {
-    host.drawText(layer, translations.quests.ui.objectivesEmpty, 14, 48, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
+    host.drawIcon(layer, "build", 8, contentY + 8, 15);
+    host.drawText(layer, translations.quests.ui.objectivesEmpty, 28, contentY, {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
       fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 42,
     });
-    host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
     return;
   }
 
@@ -195,33 +227,51 @@ function drawQuestPanel(
     const copy = translations.quests.objectives[quest.definitionId];
     const progress = getObjectiveQuestProgress(state, definition);
     const isCompletedPendingClaim = quest.completedAt !== null && quest.rewardClaimedAt === null;
-    const rowY = 44 + index * rowHeight;
+    const canClaimReward = isCompletedPendingClaim && canClaimObjectiveReward(state, quest.definitionId);
+    const rowY = contentY + index * rowHeight;
     const row = new Graphics();
-    row.rect(10, rowY - 3, panelWidth - 20, rowHeight - 4)
-      .fill({ color: isCompletedPendingClaim ? 0x202316 : 0x1a1d17, alpha: isCompletedPendingClaim ? 0.9 : 0.78 });
+    row.roundRect(0, rowY - 3, panelWidth, rowHeight - 4, UI_CONTROL_RADIUS)
+      .fill({ color: isCompletedPendingClaim ? uiTheme.rewardSurface : uiTheme.surface, alpha: isCompletedPendingClaim ? 0.58 : 0.34 })
+      .stroke({ color: uiTheme.border, alpha: 0.42, width: 1 });
     layer.addChild(row);
     host.bindAction(row, {
       action: "open-objective-quest",
       objectiveQuestId: quest.definitionId,
     } satisfies PixiActionDetail);
 
-    host.drawText(layer, copy?.title ?? quest.definitionId, 18, rowY + 5, {
-      fill: 0xf5efdf,
-      fontSize: 12,
+    host.drawText(layer, copy?.title ?? quest.definitionId, 8, rowY + 5, {
+      fill: uiTheme.text,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: isCompletedPendingClaim ? panelWidth - 60 : panelWidth - 110,
     });
-    const progressLabelText = isCompletedPendingClaim
-      ? (translations.ui.questRewardClaim ?? "Claim reward")
-      : `${progress.current}/${progress.required}`;
-    const progressLabel = host.drawText(layer, progressLabelText, panelWidth - 18, rowY + 5, {
-      fill: isCompletedPendingClaim ? 0x9ed99b : 0xf1df9a,
-      fontSize: 12,
+    if (isCompletedPendingClaim) {
+      const claimIcon = host.drawIcon(layer, "done", panelWidth - 18, rowY + 11, 15);
+      claimIcon.hitArea = new Rectangle(-8, -8, 30, 30);
+      claimIcon.alpha = canClaimReward ? 1 : 0.48;
+      host.bindTooltip(
+        claimIcon,
+        canClaimReward
+          ? (translations.ui.questRewardClaim ?? "Claim reward")
+          : (translations.ui.questRewardClaimBlocked ?? "No free capacity for reward resources."),
+      );
+      if (canClaimReward) {
+        host.bindAction(claimIcon, {
+          action: "claim-objective-reward",
+          objectiveQuestId: quest.definitionId,
+        });
+      }
+      return;
+    }
+
+    const progressLabel = host.drawText(layer, `${progress.current}/${progress.required}`, panelWidth - 8, rowY + 5, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
     });
     progressLabel.anchor.set(1, 0);
   });
-
-  host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
 }
 
 export function drawHudLeftArea(
@@ -234,10 +284,11 @@ export function drawHudLeftArea(
     return;
   }
 
+  drawBluePanelBackground(host.hudLayer, 0, HUD_TOP_STRIP_HEIGHT, HUD_LEFT_PANEL_WIDTH, areaHeight, HUD_CHROME_ALPHA);
   const area = new Graphics();
   area
     .rect(0, HUD_TOP_STRIP_HEIGHT, HUD_LEFT_PANEL_WIDTH, areaHeight)
-    .fill({ color: 0x151812, alpha: 1 });
+    .fill({ color: uiTheme.hudChrome, alpha: 0.12 });
   host.hudLayer.addChild(area);
 }
 
@@ -252,24 +303,24 @@ function drawEventLog(
   layer.y = Math.max(242, height - 390);
   host.hudLayer.addChild(layer);
 
-  const width = HUD_LEFT_PANEL_WIDTH;
+  const width = HUD_SIDE_PANEL_CONTENT_WIDTH;
   const panelHeight = Math.max(168, Math.min(326, height - layer.y - 48));
   const viewportY = 42;
   const viewportHeight = panelHeight - 54;
-  host.drawIcon(layer, "clock", 18, 22, 14);
-  host.drawText(layer, translations?.ui.log ?? "Log", 34, 14, {
-    fill: 0xf5efdf,
-    fontSize: 12,
+  host.drawIcon(layer, "clock", 8, 22, 14);
+  host.drawText(layer, translations?.ui.log ?? "Log", 24, 14, {
+    fill: uiTheme.text,
+    fontSize: uiTextSize.small,
     fontWeight: "800",
   });
 
   const entries = host.getFormattedLogEntries(state, translations);
-  const textWrapWidth = width - 58;
+  const textWrapWidth = width - 48;
 
   if (entries.length === 0) {
-    host.drawText(layer, "-", 14, viewportY, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
+    host.drawText(layer, "-", 0, viewportY, {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
       fontWeight: "700",
     });
     host.registerHudInteractionArea(layer.x, layer.y, width, panelHeight, 6);
@@ -292,9 +343,9 @@ function drawEventLog(
   const nextScrollY = Math.max(0, Math.min(host.getLogScrollY(), scrollMax));
   host.setLogScrollY(nextScrollY);
   host.setLogScrollArea({
-    x: layer.x + 10,
+    x: layer.x,
     y: layer.y + viewportY - 4,
-    width: width - 20,
+    width,
     height: viewportHeight + 8,
   });
 
@@ -304,7 +355,7 @@ function drawEventLog(
 
   const logMask = new Graphics();
   logMask.eventMode = "none";
-  logMask.rect(10, viewportY, width - 30, viewportHeight)
+  logMask.rect(0, viewportY, width - 20, viewportHeight)
     .fill({ color: 0xffffff, alpha: 1 });
   layer.addChild(logMask);
   logContent.mask = logMask;
@@ -317,11 +368,11 @@ function drawEventLog(
       return;
     }
 
-    host.drawIcon(logContent, row.entry.iconId, 20, rowY + 9, 14);
+    host.drawIcon(logContent, row.entry.iconId, 8, rowY + 9, 14);
     row.lines.forEach((line, lineIndex) => {
-      host.drawText(logContent, line, 30, rowY + lineIndex * lineHeight, {
+      host.drawText(logContent, line, 22, rowY + lineIndex * lineHeight, {
         fill: row.entry.fill,
-        fontSize: 11,
+        fontSize: uiTextSize.caption,
         fontWeight: row.index === 0 ? "800" : "700",
       });
     });
@@ -333,9 +384,9 @@ function drawEventLog(
     const thumbY = viewportY + (trackHeight - thumbHeight) * (nextScrollY / scrollMax);
     const track = new Graphics();
     track.rect(width - 18, viewportY, 5, trackHeight)
-      .fill({ color: 0x0b0d0a, alpha: 0.72 });
+      .fill({ color: uiTheme.surfaceSunken, alpha: 0.38 });
     track.rect(width - 18, thumbY, 5, thumbHeight)
-      .fill({ color: 0xe0c46f, alpha: 0.6 });
+      .fill({ color: uiTheme.accentStrong, alpha: 0.5 });
     layer.addChild(track);
   }
 
@@ -396,7 +447,7 @@ function drawActionPanel(
   height: number,
 ): void {
   const group = new Container();
-  group.x = HUD_SIDE_PANEL_MARGIN + HUD_LEFT_PANEL_WIDTH / 2;
+  group.x = HUD_SIDE_PANEL_MARGIN + HUD_SIDE_PANEL_CONTENT_WIDTH / 2;
   group.y = height - 40;
   host.hudLayer.addChild(group);
 

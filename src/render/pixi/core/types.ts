@@ -199,6 +199,7 @@ export type FormattedLogEntry = {
 };
 
 export type ResourceBreakdownTab = "production" | "consumption";
+export type HudSidebarTab = "expeditions" | "tasks";
 export type RectButtonTone = "primary" | "secondary" | "toolbar";
 
 export type RectButtonOptions = {

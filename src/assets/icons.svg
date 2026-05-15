@@ -99,8 +99,19 @@
   <symbol id="icon-plus" viewBox="0 0 24 24">
     <path fill="#eadca0" d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z"/>
   </symbol>
+  <symbol id="icon-minus" viewBox="0 0 24 24">
+    <path fill="#eadca0" d="M4 11h16v2H4v-2Z"/>
+  </symbol>
+  <symbol id="icon-done" viewBox="0 0 24 24">
+    <path fill="#eadca0" d="M9.4 17.6 3.8 12l1.7-1.7 3.9 3.9 9.1-9.1 1.7 1.7-10.8 10.8Z"/>
+  </symbol>
   <symbol id="icon-power-warning" viewBox="0 0 24 24">
     <path fill="#ff4f62" d="M10.2 2h8.4l-4.2 7.3h5L8.8 22l3.3-8.8H5.8L10.2 2Z"/>
+  </symbol>
+  <symbol id="icon-sleep" viewBox="0 0 24 24">
+    <path fill="#f3dfb8" d="M13 3.5h7v1.8l-4 3.6h4v2h-7V9.1l4-3.6h-4v-2Z"/>
+    <path fill="#eadca0" d="M8 9h6.5v1.7l-3.7 3.4h3.7V16H8v-1.7l3.7-3.4H8V9Z"/>
+    <path fill="#d8b66a" d="M4 15h5.8v1.6l-3.2 3h3.2v1.8H4v-1.6l3.2-3H4V15Z"/>
   </symbol>
   <symbol id="icon-people" viewBox="0 0 24 24">
     <path fill="#d7bb72" d="M8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm8.5 1a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7ZM2 21v-2.5C2 15.5 4.7 13 8 13s6 2.5 6 5.5V21H2Zm13.4 0v-2.5c0-1.7-.6-3.2-1.7-4.4.8-.4 1.7-.6 2.8-.6 3 0 5.5 2.2 5.5 5V21h-6.6Z"/>

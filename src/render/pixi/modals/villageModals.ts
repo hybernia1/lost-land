@@ -1,12 +1,15 @@
-import { Container, Graphics } from "pixi.js";
+import { Container } from "pixi.js";
 import { buildingById } from "../../../data/buildings";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingId, GameState } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
-import { getAvailableBuildingsForPlot } from "../../../systems/buildings";
+import { getAvailableBuildingsForPlot, getGlobalProductionMultiplier } from "../../../systems/buildings";
 import { getTravelTilesToSite } from "../../../systems/resourceSites";
-import type { DrawCenteredTextFn, DrawOverlayHeaderFn, DrawPanelFn, DrawTextFn, PixiActionDetail, RectButtonOptions } from "../core/types";
+import type { DrawCenteredTextFn, DrawIconFn, DrawOverlayHeaderFn, DrawPanelFn, DrawTextFn, PixiActionDetail, RectButtonOptions } from "../core/types";
+import { uiTextSize, uiTheme } from "../core/constants";
 import { formatRate, formatScoutingRemaining, formatTemplate } from "../helpers/formatters";
+import { drawActionStepper, drawLocalStepper } from "./modalControls";
+import { createModalPanel, drawModalContentPlane, modalLayout, resolveModalFrame } from "./modalLayout";
 
 type VillageModalsHost = {
   hudLayer: Container;
@@ -30,6 +33,8 @@ type VillageModalsHost = {
     tooltip?: string,
     active?: boolean,
   ) => Container;
+  bindTooltip: (target: Container, text: string) => void;
+  drawIcon: DrawIconFn;
   drawText: DrawTextFn;
   drawCenteredText: DrawCenteredTextFn;
   createLocalModalButton: (
@@ -41,6 +46,17 @@ type VillageModalsHost = {
     height: number,
     onTap: () => void,
     disabled?: boolean,
+  ) => Container;
+  createModalButton: (
+    parent: Container,
+    label: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    detail: PixiActionDetail,
+    disabled?: boolean,
+    tooltip?: string,
   ) => Container;
   createRectButton: (parent: Container, options: RectButtonOptions) => Container;
   drawBuildChoices: (
@@ -92,32 +108,36 @@ export function drawVillageModal(
 
   const isResourceSiteModal = Boolean(selectedResourceSite);
   const isBuildChoice = selectedPlot?.buildingId === null;
-  const detailBuildingId = selectedPlot?.buildingId;
-  const modalWidth = isResourceSiteModal
-    ? Math.min(720, width - 40)
+  const preferredHeight = isResourceSiteModal
+    ? 560
     : isBuildChoice
-      ? Math.min(900, width - 56)
-      : Math.min(860, width - 40);
-  const modalHeight = isResourceSiteModal
-    ? Math.min(500, height - 40)
-    : isBuildChoice
-      ? Math.min(690, height - 56)
-      : Math.min(detailBuildingId === "barracks" ? 590 : 510, height - 40);
-  const panel = new Container();
-  panel.x = (width - modalWidth) / 2;
-  panel.y = (height - modalHeight) / 2;
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-  host.drawPanel(panel, 0, 0, modalWidth, modalHeight, 1, 0);
+      ? 690
+      : 650;
+  const frame = resolveModalFrame(width, height, {
+    maxWidth: isResourceSiteModal ? 820 : isBuildChoice ? 900 : 980,
+    preferredHeight,
+    maxHeight: preferredHeight,
+    marginX: isBuildChoice ? modalLayout.buildViewportMargin : modalLayout.tightViewportMargin,
+    marginY: isBuildChoice ? modalLayout.buildViewportMargin : modalLayout.tightViewportMargin,
+    topMin: 0,
+  });
+  const panel = createModalPanel(overlay, host.drawPanel, frame);
+  const modalWidth = frame.width;
+  const modalHeight = frame.height;
+  if (isResourceSiteModal || isBuildChoice) {
+    drawModalContentPlane(panel, modalWidth, modalHeight, 86, 0.86, !isBuildChoice);
+  }
 
   if (isResourceSiteModal && selectedResourceSite) {
+    const statusLabel = getResourceSiteStatusLabel(selectedResourceSite, translations);
     drawModalHeader(
       host,
       panel,
       translations.ui.resourceSiteTitle ?? "Oasis",
-      `${translations.resources[selectedResourceSite.resourceId]} / ${translations.ui.resourceSiteStatus ?? "Status"}`,
       modalWidth,
       translations,
+      `${translations.resources[selectedResourceSite.resourceId]} / ${statusLabel}`,
+      selectedResourceSite.resourceId,
     );
     drawResourceSiteModal(
       host,
@@ -137,8 +157,7 @@ export function drawVillageModal(
 
   if (selectedPlot.buildingId === null) {
     const title = translations.ui.availableBuilds;
-    const subtitle = `${selectedPlot.id} / ${translations.ui.emptyPlot}`;
-    drawModalHeader(host, panel, title, subtitle, modalWidth, translations);
+    drawModalHeader(host, panel, title, modalWidth, translations);
     host.drawBuildChoices(
       panel,
       selectedPlot.id,
@@ -151,7 +170,6 @@ export function drawVillageModal(
     return;
   }
 
-  drawModalClose(host, panel, modalWidth, translations);
   const buildingId = selectedPlot.buildingId;
   const building = state.buildings[buildingId];
   const definition = buildingById[buildingId];
@@ -166,18 +184,20 @@ export function drawVillageModal(
     modalWidth,
     modalHeight,
   );
+  drawModalClose(host, panel, modalWidth, translations);
 }
 
 function drawModalHeader(
   host: VillageModalsHost,
   parent: Container,
   title: string,
-  subtitle: string,
   modalWidth: number,
   translations: TranslationPack,
+  subtitle?: string,
+  iconId = "build",
 ): void {
   host.drawOverlayHeader(parent, modalWidth, translations, {
-    iconId: "build",
+    iconId,
     title,
     subtitle,
     closeAction: { action: "close-village-modal" },
@@ -211,86 +231,102 @@ function drawResourceSiteModal(
   modalWidth: number,
   modalHeight: number,
 ): void {
-  const panelX = 26;
-  const panelY = 86;
-  const panelWidth = modalWidth - 52;
-  const panelHeight = modalHeight - 112;
-  const card = new Graphics();
-  card.rect(panelX, panelY, panelWidth, panelHeight).fill({ color: 0x0f120f, alpha: 0.78 }).stroke({
-    color: 0x2b352f,
-    alpha: 0.9,
-    width: 1.5,
-  });
-  parent.addChild(card);
-
   const resourceName = translations.resources[siteState.resourceId];
-  const yieldPerWorkerPerHour = siteState.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
+  const productionMultiplier = getGlobalProductionMultiplier(state);
+  const yieldPerWorkerPerHour = siteState.yieldPerWorker * productionMultiplier * GAME_HOUR_REAL_SECONDS;
+  const currentProductionPerHour = siteState.captured
+    ? yieldPerWorkerPerHour * siteState.assignedWorkers
+    : 0;
   const travelHours = getTravelTilesToSite(siteState.id);
-  const contentX = panelX + 16;
-  const contentWidth = panelWidth - 32;
-  let cursorY = panelY + 14;
-  const statusLabel = siteState.assault
-    ? translations.ui.resourceSiteStatusAssault ?? "Assault in progress"
-    : siteState.captured
-      ? translations.ui.resourceSiteStatusCaptured ?? "Secured"
-      : translations.ui.resourceSiteStatusLocked ?? "Unsecured";
-  const commodityLabel = host.drawText(parent, `${translations.ui.resourceSiteCommodity ?? "Commodity"}: ${resourceName}`, contentX, cursorY, {
-    fill: 0xf5efdf,
-    fontSize: 16,
-    fontWeight: "900",
-  });
-  cursorY = commodityLabel.y + commodityLabel.height + 6;
-  const statusText = host.drawText(parent, `${translations.ui.resourceSiteStatus ?? "Status"}: ${statusLabel}`, contentX, cursorY, {
-    fill: siteState.captured ? 0x9ed99b : siteState.assault ? 0xf1c17f : 0xd38a8a,
-    fontSize: 13,
-    fontWeight: "900",
-  });
-  cursorY = statusText.y + statusText.height + 6;
-  const requirementText = host.drawText(
+  const statusLabel = getResourceSiteStatusLabel(siteState, translations);
+  const contentX = 34;
+  const contentY = 112;
+  const contentWidth = modalWidth - 68;
+  const cardGap = 10;
+  const metricCardWidth = (contentWidth - cardGap * 3) / 4;
+  const metricCardHeight = 78;
+  const statusColor = siteState.captured ? uiTheme.positive : siteState.assault ? uiTheme.warning : uiTheme.negative;
+
+  drawResourceSiteMetricCard(
+    host,
     parent,
-    `${translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength"}: ${siteState.captureMinTroops} ${translations.ui.availableTroops?.toLowerCase() ?? "troops"}`,
+    siteState.resourceId,
+    translations.ui.resourceSiteCommodity ?? "Commodity",
+    resourceName,
     contentX,
-    cursorY,
-    {
-      fill: 0xaeb4b8,
-      fontSize: 12,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: contentWidth,
-    },
+    contentY,
+    metricCardWidth,
+    metricCardHeight,
+    uiTheme.text,
+    `${translations.ui.resourceSiteCommodity ?? "Commodity"}: ${resourceName}`,
   );
-  cursorY = requirementText.y + requirementText.height + 6;
-  const travelText = host.drawText(
+  drawResourceSiteMetricCard(
+    host,
     parent,
-    `${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h (${travelHours} tiles)`,
-    contentX,
-    cursorY,
-    {
-      fill: 0xaeb4b8,
-      fontSize: 12,
-      fontWeight: "800",
-      wordWrap: true,
-      wordWrapWidth: contentWidth,
-    },
+    "shield",
+    translations.ui.resourceSiteStatus ?? "Status",
+    statusLabel,
+    contentX + (metricCardWidth + cardGap),
+    contentY,
+    metricCardWidth,
+    metricCardHeight,
+    statusColor,
+    `${translations.ui.resourceSiteStatus ?? "Status"}: ${statusLabel}`,
   );
-  cursorY = travelText.y + travelText.height + 14;
+  drawResourceSiteMetricCard(
+    host,
+    parent,
+    siteState.captured ? siteState.resourceId : "clock",
+    siteState.captured ? translations.ui.production : translations.ui.resourceSiteTravelTime ?? "Travel time",
+    siteState.captured ? `+${formatRate(currentProductionPerHour)}/h` : `${travelHours}h`,
+    contentX + (metricCardWidth + cardGap) * 2,
+    contentY,
+    metricCardWidth,
+    metricCardHeight,
+    siteState.captured ? uiTheme.positive : uiTheme.text,
+    siteState.captured
+      ? `${translations.ui.production}: +${formatRate(currentProductionPerHour)}/h`
+      : `${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h`,
+  );
+  drawResourceSiteMetricCard(
+    host,
+    parent,
+    siteState.captured ? "people" : "scout",
+    siteState.captured
+      ? translations.ui.resourceSiteSettlement ?? "Oasis settlement crew"
+      : translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength",
+    siteState.captured ? `${siteState.assignedWorkers}/${siteState.maxWorkers}` : `${siteState.captureMinTroops}`,
+    contentX + (metricCardWidth + cardGap) * 3,
+    contentY,
+    metricCardWidth,
+    metricCardHeight,
+    siteState.captured ? uiTheme.text : uiTheme.accentStrong,
+    siteState.captured
+      ? `${translations.ui.resourceSiteSettlement ?? "Oasis settlement crew"}: ${siteState.assignedWorkers}/${siteState.maxWorkers}`
+      : `${translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength"}: ${siteState.captureMinTroops}`,
+  );
+
+  const sectionY = contentY + metricCardHeight + 24;
+  const sectionHeight = Math.max(1, modalHeight - sectionY - 36);
 
   if (siteState.assault) {
-    const runningLabel = host.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", contentX, cursorY, {
-      fill: 0xf1df9a,
-      fontSize: 13,
+    host.drawPanel(parent, contentX, sectionY, contentWidth, sectionHeight, 0.55);
+    host.drawIcon(parent, "scout", contentX + 34, sectionY + 48, 26);
+    const runningLabel = host.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", contentX + 68, sectionY + 28, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.control,
       fontWeight: "900",
       wordWrap: true,
-      wordWrapWidth: contentWidth,
+      wordWrapWidth: contentWidth - 108,
     });
     host.drawText(
       parent,
       `${translations.ui.returnsIn ?? "returns in"} ${formatScoutingRemaining(siteState.assault.remainingSeconds)}`,
-      contentX,
-      runningLabel.y + runningLabel.height + 12,
+      contentX + 68,
+      runningLabel.y + runningLabel.height + 14,
       {
-        fill: 0xf5efdf,
-        fontSize: 16,
+        fill: uiTheme.text,
+        fontSize: uiTextSize.sectionTitle,
         fontWeight: "900",
       },
     );
@@ -299,127 +335,102 @@ function drawResourceSiteModal(
 
   if (!siteState.captured) {
     const selectedTroops = host.getResourceSiteTroopCount(siteState.id, state.survivors.troops, siteState.captureMinTroops);
-    host.drawText(parent, translations.ui.resourceSiteSendTroops ?? "Send troops", contentX, cursorY, {
-      fill: 0xd7ddd8,
-      fontSize: 14,
-      fontWeight: "900",
-    });
-    const controlsY = cursorY + 24;
-    host.createLocalModalButton(parent, "-", contentX, controlsY, 42, 34, () => {
-      host.setResourceSiteTroopCount(siteState.id, selectedTroops - 1, state.survivors.troops, siteState.captureMinTroops);
-    }, selectedTroops <= 1);
-    host.drawCenteredText(parent, `${selectedTroops}`, contentX + 74, controlsY + 17, {
-      fill: 0xf5efdf,
-      fontSize: 16,
-      fontWeight: "900",
-    });
-    host.createLocalModalButton(parent, "+", contentX + 106, controlsY, 42, 34, () => {
-      host.setResourceSiteTroopCount(siteState.id, selectedTroops + 1, state.survivors.troops, siteState.captureMinTroops);
-    }, selectedTroops >= Math.max(1, state.survivors.troops));
-    const canSend = selectedTroops > 0 && selectedTroops <= state.survivors.troops;
-    const sendDisabledTooltip = canSend
-      ? undefined
-      : translations.ui.notEnoughTroops ?? "Not enough available troops.";
-    const sendButtonWidth = Math.max(
-      120,
-      Math.min(194, panelX + panelWidth - (contentX + 170) - 16),
+    const selectedMeetsRequirement = selectedTroops >= siteState.captureMinTroops;
+    const enoughTroopsAvailable = selectedTroops <= state.survivors.troops;
+    const canSend = selectedMeetsRequirement && enoughTroopsAvailable;
+    const disabledTooltip = getResourceSiteAssaultDisabledTooltip(
+      translations,
+      selectedTroops,
+      siteState.captureMinTroops,
+      enoughTroopsAvailable,
     );
-    const sendButtonX = panelX + panelWidth - sendButtonWidth - 16;
-    host.createRectButton(parent, {
-      label: translations.ui.resourceSiteSendAssault ?? "Capture oasis",
-      x: sendButtonX,
-      y: controlsY,
-      width: sendButtonWidth,
-      height: 34,
-      detail: {
+    host.drawPanel(parent, contentX, sectionY, contentWidth, sectionHeight, 0.56);
+    const actionX = contentX + 28;
+    const actionWidth = contentWidth - 56;
+    host.drawText(parent, translations.ui.resourceSiteSendTroops ?? "Send troops", actionX, sectionY + 22, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.emphasis,
+      fontWeight: "900",
+    });
+    drawLocalStepper(
+      host,
+      parent,
+      `${selectedTroops}`,
+      actionX,
+      sectionY + 68,
+      () => {
+        host.setResourceSiteTroopCount(siteState.id, selectedTroops - 1, state.survivors.troops, siteState.captureMinTroops);
+      },
+      () => {
+        host.setResourceSiteTroopCount(siteState.id, selectedTroops + 1, state.survivors.troops, siteState.captureMinTroops);
+      },
+      selectedTroops <= 1,
+      selectedTroops >= Math.max(1, state.survivors.troops),
+    );
+    const requirementColor = selectedMeetsRequirement ? uiTheme.positive : uiTheme.warning;
+    host.createModalButton(
+      parent,
+      translations.ui.resourceSiteSendAssault ?? "Capture oasis",
+      actionX,
+      sectionY + 144,
+      Math.min(320, actionWidth),
+      40,
+      {
         action: "resource-site-assault",
         resourceSiteId: siteState.id,
         resourceSiteTroops: selectedTroops,
       },
-      disabled: !canSend,
-      tooltip: sendDisabledTooltip,
-      tone: "primary",
-    });
-
-    host.drawText(
-      parent,
-      formatTemplate(
-        translations.ui.resourceSiteTroopAvailability ?? "Available troops: {available} / selected: {selected}",
-        {
-          available: state.survivors.troops,
-          selected: selectedTroops,
-        },
-      ),
-      contentX,
-      controlsY + 68,
-      {
-        fill: canSend ? 0xaeb4b8 : 0xd38a8a,
-        fontSize: 12,
-        fontWeight: "800",
-        wordWrap: true,
-        wordWrapWidth: contentWidth,
-      },
+      !canSend,
+      disabledTooltip,
     );
-
-    const requirementColor = selectedTroops >= siteState.captureMinTroops ? 0x9ed99b : 0xf1c17f;
     host.drawText(
       parent,
-      selectedTroops >= siteState.captureMinTroops
+      selectedMeetsRequirement
         ? translations.ui.resourceSiteReadyThreshold ?? "Troop minimum met."
         : formatTemplate(
             translations.ui.resourceSiteBelowThreshold ?? "Below requirement: need at least {required} troops.",
             { required: siteState.captureMinTroops },
           ),
-      contentX,
-      controlsY + 44,
+      actionX,
+      sectionY + 198,
       {
         fill: requirementColor,
-        fontSize: 12,
+        fontSize: uiTextSize.small,
         fontWeight: "900",
         wordWrap: true,
-        wordWrapWidth: contentWidth,
+        wordWrapWidth: actionWidth,
       },
     );
     return;
   }
 
-  host.drawText(parent, translations.ui.resourceSiteSettlement ?? "Oasis settlement crew", contentX, cursorY, {
-    fill: 0xd7ddd8,
-    fontSize: 14,
+  host.drawPanel(parent, contentX, sectionY, contentWidth, sectionHeight, 0.52);
+  host.drawText(parent, translations.ui.resourceSiteSettlement ?? "Oasis settlement crew", contentX + 20, sectionY + 22, {
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.emphasis,
     fontWeight: "900",
   });
-  const workerControlsY = cursorY + 24;
-  host.createRectButton(parent, {
-    label: "-",
-    x: contentX,
-    y: workerControlsY,
-    width: 42,
-    height: 34,
-    detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: -1 },
-    disabled: siteState.assignedWorkers <= 0,
-  });
-  host.drawCenteredText(
+  drawActionStepper(
+    host,
     parent,
-    `${siteState.assignedWorkers}/${siteState.maxWorkers}`,
-    contentX + 80,
-    workerControlsY + 17,
-    {
-      fill: 0xf5efdf,
-      fontSize: 16,
-      fontWeight: "900",
-    },
+    `${siteState.assignedWorkers}`,
+    contentX + 20,
+    sectionY + 76,
+    { action: "resource-site-workers", resourceSiteId: siteState.id, delta: -1 },
+    { action: "resource-site-workers", resourceSiteId: siteState.id, delta: 1 },
+    siteState.assignedWorkers <= 0,
+    siteState.assignedWorkers >= siteState.maxWorkers || state.survivors.workers <= 0,
+    siteState.assignedWorkers <= 0 ? `${translations.ui.workers}: 0/${siteState.maxWorkers}` : undefined,
+    siteState.assignedWorkers >= siteState.maxWorkers
+      ? `${translations.ui.workers}: ${siteState.assignedWorkers}/${siteState.maxWorkers}`
+      : state.survivors.workers <= 0
+        ? translations.ui.notEnoughWorkers
+        : undefined,
   );
-  host.createRectButton(parent, {
-    label: "+",
-    x: contentX + 120,
-    y: workerControlsY,
-    width: 42,
-    height: 34,
-    detail: { action: "resource-site-workers", resourceSiteId: siteState.id, delta: 1 },
-    disabled: siteState.assignedWorkers >= siteState.maxWorkers || state.survivors.workers <= 0,
-    tooltip: state.survivors.workers <= 0
-      ? translations.ui.notEnoughWorkers
-      : undefined,
+  host.drawText(parent, `${siteState.assignedWorkers}/${siteState.maxWorkers}`, contentX + 198, sectionY + 96, {
+    fill: uiTheme.text,
+    fontSize: uiTextSize.sectionTitle,
+    fontWeight: "900",
   });
 
   host.drawText(
@@ -431,14 +442,79 @@ function drawResourceSiteModal(
         resource: resourceName,
       },
     ),
-    contentX,
-    workerControlsY + 46,
+    contentX + 20,
+    sectionY + 142,
     {
-      fill: 0x9ed99b,
-      fontSize: 12,
+      fill: uiTheme.positive,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
       wordWrap: true,
-      wordWrapWidth: contentWidth,
+      wordWrapWidth: contentWidth - 40,
     },
   );
+}
+
+function getResourceSiteStatusLabel(
+  siteState: GameState["resourceSites"][number],
+  translations: TranslationPack,
+): string {
+  if (siteState.assault) {
+    return translations.ui.resourceSiteStatusAssault ?? "Assault in progress";
+  }
+
+  if (siteState.captured) {
+    return translations.ui.resourceSiteStatusCaptured ?? "Secured";
+  }
+
+  return translations.ui.resourceSiteStatusLocked ?? "Unsecured";
+}
+
+function getResourceSiteAssaultDisabledTooltip(
+  translations: TranslationPack,
+  selectedTroops: number,
+  minimumTroops: number,
+  enoughTroopsAvailable: boolean,
+): string | undefined {
+  if (!enoughTroopsAvailable) {
+    return translations.ui.notEnoughTroops ?? "Not enough available troops.";
+  }
+
+  if (selectedTroops < minimumTroops) {
+    return formatTemplate(
+      translations.ui.resourceSiteBelowThreshold ?? "Below requirement: need at least {required} troops.",
+      { required: minimumTroops },
+    );
+  }
+
+  return undefined;
+}
+
+function drawResourceSiteMetricCard(
+  host: VillageModalsHost,
+  parent: Container,
+  iconId: string,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  valueFill = uiTheme.text,
+  tooltip?: string,
+): void {
+  const card = new Container();
+  card.x = x;
+  card.y = y;
+  parent.addChild(card);
+
+  host.drawPanel(card, 0, 0, width, height, 0.48);
+  host.drawIcon(card, iconId, 26, height / 2, 30);
+  host.drawText(card, value, 56, 27, {
+    fill: valueFill,
+    fontSize: uiTextSize.actionValue,
+    fontWeight: "900",
+    wordWrap: true,
+    wordWrapWidth: width - 68,
+  });
+  host.bindTooltip(card, tooltip ?? `${label}: ${value}`);
 }

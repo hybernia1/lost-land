@@ -43,12 +43,10 @@ const SCARCITY_THEFT_PRESSURE_CHANCE = 0.42;
 export type DecisionProfileKind =
   | "noData"
   | "balanced"
-  | "philanthropist"
-  | "principled"
-  | "merciful"
-  | "security"
-  | "open"
-  | "cautious";
+  | "communalAuthority"
+  | "marketAuthority"
+  | "communalAutonomy"
+  | "marketAutonomy";
 
 export const decisionProfileAxes: {
   id: DecisionProfileAxisId;
@@ -58,25 +56,18 @@ export const decisionProfileAxes: {
   rightLabelKey: string;
 }[] = [
   {
-    id: "philanthropyPrinciple",
-    leftKind: "philanthropist",
-    leftLabelKey: "profilePhilanthropist",
-    rightKind: "principled",
-    rightLabelKey: "profilePrincipled",
+    id: "communityMarket",
+    leftKind: "communalAuthority",
+    leftLabelKey: "profileCommunity",
+    rightKind: "marketAuthority",
+    rightLabelKey: "profileMarket",
   },
   {
-    id: "mercySecurity",
-    leftKind: "merciful",
-    leftLabelKey: "profileMerciful",
-    rightKind: "security",
-    rightLabelKey: "profileSecurity",
-  },
-  {
-    id: "opennessCaution",
-    leftKind: "open",
-    leftLabelKey: "profileOpen",
-    rightKind: "cautious",
-    rightLabelKey: "profileCautious",
+    id: "authorityAutonomy",
+    leftKind: "communalAutonomy",
+    leftLabelKey: "profileAutonomy",
+    rightKind: "marketAuthority",
+    rightLabelKey: "profileAuthority",
   },
 ];
 
@@ -289,20 +280,27 @@ export function getDecisionProfileKind(state: GameState): DecisionProfileKind {
     return "noData";
   }
 
-  const strongest = decisionProfileAxes
-    .map((axis) => ({
-      axis,
-      value: getDecisionProfileAxisValue(state, axis.id),
-    }))
-    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))[0];
+  const marketValue = getDecisionProfileAxisValue(state, "communityMarket");
+  const authorityValue = getDecisionProfileAxisValue(state, "authorityAutonomy");
+  const profileMagnitude = Math.hypot(marketValue, authorityValue);
 
-  if (!strongest || Math.abs(strongest.value) < DECISION_PROFILE_DECISIVE_THRESHOLD) {
+  if (profileMagnitude < DECISION_PROFILE_DECISIVE_THRESHOLD) {
     return "balanced";
   }
 
-  return strongest.value < 0
-    ? strongest.axis.leftKind
-    : strongest.axis.rightKind;
+  if (marketValue < 0 && authorityValue >= 0) {
+    return "communalAuthority";
+  }
+
+  if (marketValue >= 0 && authorityValue >= 0) {
+    return "marketAuthority";
+  }
+
+  if (marketValue < 0 && authorityValue < 0) {
+    return "communalAutonomy";
+  }
+
+  return "marketAutonomy";
 }
 
 export function getDecisionOptionCost(option: DecisionQuestOptionDefinition): ResourceBag {
@@ -338,9 +336,8 @@ function normalizeDecisionHistory(history: DecisionHistoryEntry[]): DecisionHist
 
 function createEmptyDecisionProfileScores(): Record<DecisionProfileAxisId, number> {
   return {
-    philanthropyPrinciple: 0,
-    mercySecurity: 0,
-    opennessCaution: 0,
+    communityMarket: 0,
+    authorityAutonomy: 0,
   };
 }
 

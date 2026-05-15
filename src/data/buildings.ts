@@ -31,6 +31,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
       food: 90,
       water: 90,
       material: 130,
+      coal: 90,
     },
     consumes: { coal: 0.005 },
   },
@@ -79,16 +80,13 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     consumes: { coal: 0.025 },
   },
   {
-    id: "generator",
+    id: "coalMine",
     category: "resource",
     name: "Coal Mine",
     description: "Sends assigned workers into old seams to extract coal for the camp.",
     buildSeconds: 36,
     baseConstructionWorkers: 3,
     baseCost: { material: 90 },
-    storageBonus: {
-      coal: 60,
-    },
   },
   {
     id: "market",

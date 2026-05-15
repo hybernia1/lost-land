@@ -19,7 +19,7 @@ export const quests: QuestTranslationPack = {
         description: "Zajisti místo pro zásoby, než začne tlak na produkci.",
         reward: "+45 materiál, +10 jídlo",
       },
-      buildGenerator: {
+      buildCoalMine: {
         title: "Postav uhelný důl",
         description: "Zajisti palivo dřív, než ho spolknou vytápěné a technické budovy.",
         reward: "+50 materiál, +20 uhlí",
@@ -146,7 +146,7 @@ export const quests: QuestTranslationPack = {
           rationLock: "Nové zámky a značení spotřebovaly materiál, ale další výdej půjde lépe hlídat.",
         },
       },
-      generatorSpareParts: {
+      coalMineSpareParts: {
         title: "Díly pro důl",
         body:
           "Mechanik našel krabici součástek z rozebrané čerpací stanice. Mohou okamžitě pomoct důlní technice, nebo skončit ve skladu.",

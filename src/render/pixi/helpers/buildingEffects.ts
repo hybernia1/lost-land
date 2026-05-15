@@ -159,7 +159,7 @@ export function getNextLevelEffects(
     }
   }
 
-  if (buildingId === "generator") {
+  if (buildingId === "coalMine") {
     const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
     const nextLimit = Math.min(4, currentLevel + 2);
     const currentMaxRate = getCoalMineCoalRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
