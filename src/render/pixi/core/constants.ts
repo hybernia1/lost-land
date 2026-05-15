@@ -1,5 +1,4 @@
 import type { TextStyleFontWeight } from "pixi.js";
-import { defaultVillageLayout } from "../../../data/villageLayouts";
 import type { BuildingCategory, ResourceId } from "../../../game/types";
 import type { DecisionProfileKind } from "../../../systems/quests";
 import type { ActiveEnvironmentConditionId, BrandAlertTone } from "./types";
@@ -50,8 +49,6 @@ export const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
   1,
   VILLAGE_BUILDING_RENDER_SCALE / BUILDING_PREVIEW_BASE_RENDER_SCALE,
 );
-export const villagePlotDefinitions = defaultVillageLayout.plots;
-export const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
 export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
 
 export const HUD_DESIGN_SCALE = 1.2;

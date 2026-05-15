@@ -48,20 +48,73 @@ function singleTexture(
 }
 
 export const buildingVisualDefinitions: Partial<Record<BuildingId, BuildingVisualDefinition>> = {
-  mainBuilding: singleTexture(mainBuildingTextureUrl),
-  storage: singleTexture(storageTextureUrl),
-  dormitory: singleTexture(dormitoryTextureUrl),
-  hydroponics: singleTexture(hydroponicsTextureUrl),
-  waterStill: singleTexture(waterStillTextureUrl),
-  workshop: singleTexture(workshopTextureUrl),
-  generator: singleTexture(generatorTextureUrl),
-  market: singleTexture(marketTextureUrl),
+  mainBuilding: singleTexture(mainBuildingTextureUrl, {
+    placement: {
+      anchor: { x: 0.5, y: 0.82 },
+      offset: { x: 0, y: 30 },
+    },
+    fit: {
+      footprintWidthScale: 2.55,
+      visualHeightScale: 6.4,
+    },
+  }),
+  storage: singleTexture(storageTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.18,
+    },
+  }),
+  dormitory: singleTexture(dormitoryTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.22,
+    },
+  }),
+  hydroponics: singleTexture(hydroponicsTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.08,
+    },
+  }),
+  waterStill: singleTexture(waterStillTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.02,
+    },
+  }),
+  workshop: singleTexture(workshopTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.12,
+    },
+  }),
+  generator: singleTexture(generatorTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.08,
+    },
+  }),
+  market: singleTexture(marketTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.2,
+    },
+  }),
   watchtower: singleTexture(watchtowerTextureUrl, {
     placement: {
       anchor: { x: 0.476, y: 0.802 },
     },
+    fit: {
+      footprintWidthScale: 1.58,
+      visualHeightScale: 5.9,
+    },
   }),
-  barracks: singleTexture(barracksTextureUrl),
-  academy: singleTexture(academyTextureUrl),
-  clinic: singleTexture(clinicTextureUrl),
+  barracks: singleTexture(barracksTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.18,
+    },
+  }),
+  academy: singleTexture(academyTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.16,
+    },
+  }),
+  clinic: singleTexture(clinicTextureUrl, {
+    fit: {
+      footprintWidthScale: 2.04,
+    },
+  }),
 };
