@@ -10,7 +10,7 @@
       {
         "name": "edgeOverscan",
         "type": "float",
-        "value": 0
+        "value": 0.5
       },
       {
         "name": "tintRain",

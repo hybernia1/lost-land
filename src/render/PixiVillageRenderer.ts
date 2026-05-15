@@ -103,8 +103,6 @@ import {
   getHudTextLineHeight,
   normalizeHudFontWeight,
   resourceColors,
-  resourceSiteDefinitions,
-  villagePlotDefinitions,
 } from "./pixi/core/constants";
 import { drawHudLeftArea, drawHudPanels } from "./pixi/hud/hudPanels";
 import {
@@ -518,7 +516,7 @@ export class PixiVillageRenderer {
     }
     drawWorldResourceSites(this.worldRendererHost(), state, translations);
 
-    for (const plot of villagePlotDefinitions) {
+    for (const plot of defaultVillageLayout.plots) {
       drawWorldPlot(this.worldRendererHost(), plot, state, translations);
     }
 
@@ -615,7 +613,7 @@ export class PixiVillageRenderer {
     const x = (clientX - rect.left - this.cameraOffsetX) / this.cameraZoom;
     const y = (clientY - rect.top - this.cameraOffsetY) / this.cameraZoom;
 
-    const siteHit = resourceSiteDefinitions.find((site) => {
+    const siteHit = defaultVillageLayout.resourceSites.find((site) => {
       const bounds = this.getPlotBounds(site);
       return (
         x >= bounds.x &&
@@ -629,7 +627,7 @@ export class PixiVillageRenderer {
       return siteHit.id;
     }
 
-    const plotHit = villagePlotDefinitions.find((plot) => {
+    const plotHit = defaultVillageLayout.plots.find((plot) => {
       const bounds = this.getPlotBounds(plot);
       return (
         x >= bounds.x &&
@@ -1842,6 +1840,7 @@ export class PixiVillageRenderer {
       cameraForegroundDecorLayer: this.cameraForegroundDecorLayer,
       cameraDynamicLayer: this.cameraDynamicLayer,
       backgroundLayer: this.backgroundLayer,
+      mapLayout: defaultVillageLayout,
       layout: this.layout,
       activeModalPlotId: this.activeModalPlotId,
       drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) =>
@@ -3057,7 +3056,7 @@ export class PixiVillageRenderer {
   }
 
   private refreshCameraTransform(): void {
-    const next = refreshCameraStateTransform(this.host, this.cameraLayer, this.layout, {
+    const next = refreshCameraStateTransform(this.host, this.cameraLayer, defaultVillageLayout, this.layout, {
       zoom: this.cameraZoom,
       targetZoom: this.cameraTargetZoom,
       offsetX: this.cameraOffsetX,
@@ -3075,6 +3074,7 @@ export class PixiVillageRenderer {
       this.cameraZoom,
       this.cameraOffsetX,
       this.cameraOffsetY,
+      defaultVillageLayout,
       this.layout,
       viewportWidth,
       viewportHeight,
@@ -3089,6 +3089,7 @@ export class PixiVillageRenderer {
       this.cameraTargetZoom,
       this.cameraTargetOffsetX,
       this.cameraTargetOffsetY,
+      defaultVillageLayout,
       this.layout,
       viewportWidth,
       viewportHeight,

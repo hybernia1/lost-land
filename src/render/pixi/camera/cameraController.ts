@@ -1,5 +1,5 @@
 import type { Container } from "pixi.js";
-import { defaultVillageLayout } from "../../../data/villageLayouts";
+import type { VillageLayoutDefinition } from "../../../data/villageLayouts";
 import { CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM, CAMERA_OFFSET_SNAP_EPSILON, CAMERA_SMOOTH_FACTOR, CAMERA_ZOOM_SNAP_EPSILON, CAMERA_ZOOM_STEP, HUD_DESIGN_SCALE, HUD_LEFT_PANEL_WIDTH, HUD_TOP_STRIP_HEIGHT } from "../core/constants";
 import type { Bounds, SceneLayout } from "../core/types";
 import { getMapRenderBounds } from "../scene/mapGeometry";
@@ -283,11 +283,12 @@ export function clampCamera(
   zoom: number,
   offsetX: number,
   offsetY: number,
+  mapLayout: VillageLayoutDefinition,
   layout: SceneLayout,
   viewportWidth: number,
   viewportHeight: number,
 ): { zoom: number; offsetX: number; offsetY: number } {
-  const mapBounds = getMapRenderBounds(defaultVillageLayout, layout);
+  const mapBounds = getMapRenderBounds(mapLayout, layout);
   const terrainWidth = mapBounds.width;
   const terrainHeight = mapBounds.height;
   const originX = mapBounds.x;
@@ -299,7 +300,7 @@ export function clampCamera(
   const safeBottom = viewportHeight - insets.bottom;
   const safeWidth = Math.max(1, safeRight - safeLeft);
   const safeHeight = Math.max(1, safeBottom - safeTop);
-  const minZoomForCoverage = defaultVillageLayout.orientation === "isometric"
+  const minZoomForCoverage = mapLayout.orientation === "isometric"
     ? safeWidth / Math.max(1, terrainWidth) + safeHeight / Math.max(1, terrainHeight)
     : Math.max(
       safeWidth / Math.max(1, terrainWidth),
@@ -310,7 +311,7 @@ export function clampCamera(
   let clampedOffsetX = offsetX;
   let clampedOffsetY = offsetY;
 
-  if (defaultVillageLayout.orientation === "isometric") {
+  if (mapLayout.orientation === "isometric") {
     const halfTerrainWidth = Math.max(1, terrainWidth / 2);
     const halfTerrainHeight = Math.max(1, terrainHeight / 2);
     const centerX = originX + halfTerrainWidth;
@@ -420,6 +421,7 @@ export function getLayout(width: number, height: number): SceneLayout {
 export function refreshCameraTransform(
   host: HTMLElement,
   cameraLayer: Container,
+  mapLayout: VillageLayoutDefinition,
   layout: SceneLayout,
   state: {
     zoom: number;
@@ -448,7 +450,7 @@ export function refreshCameraTransform(
   let nextOffsetX = state.offsetX + (state.targetOffsetX - state.offsetX) * CAMERA_SMOOTH_FACTOR;
   let nextOffsetY = state.offsetY + (state.targetOffsetY - state.offsetY) * CAMERA_SMOOTH_FACTOR;
 
-  const clampedCurrent = clampCamera(nextZoom, nextOffsetX, nextOffsetY, layout, viewportWidth, viewportHeight);
+  const clampedCurrent = clampCamera(nextZoom, nextOffsetX, nextOffsetY, mapLayout, layout, viewportWidth, viewportHeight);
   nextZoom = clampedCurrent.zoom;
   nextOffsetX = clampedCurrent.offsetX;
   nextOffsetY = clampedCurrent.offsetY;
@@ -462,6 +464,7 @@ export function refreshCameraTransform(
       state.targetZoom,
       state.targetOffsetX,
       state.targetOffsetY,
+      mapLayout,
       layout,
       viewportWidth,
       viewportHeight,
