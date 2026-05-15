@@ -4,11 +4,7 @@ import { buildingVisualDefinitions } from "../../../data/buildingVisuals";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
-import {
-  getAcademyBuildTimeMultiplier,
-  getAcademyExpeditionDeathRiskMultiplier,
-  getAcademyProductionBonus,
-} from "../../../systems/academy";
+import { getAcademyProductionBonus } from "../../../systems/academy";
 import {
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
@@ -108,14 +104,6 @@ type BuildingModalsHost = {
 };
 
 type BuildingDetailTab = "overview" | "bonuses";
-type AcademyBonusRow = {
-  level: number;
-  iconId: string;
-  label: string;
-  value: string;
-  tooltip: string;
-};
-
 const BUILDING_METRIC_ICON_SIZE = 30;
 const BUILDING_INFO_TOKEN_ICON_SIZE = 22;
 const BUILDING_INFO_TOKEN_HEIGHT = 28;
@@ -460,7 +448,7 @@ export function drawBuildingDetail(
   const sectionHeight = Math.max(176, footerY - sectionY - 22);
   const columnGap = 14;
   const hasControls = hasBuildingControlSection(buildingId);
-  const hasDetailTabs = buildingId === "academy";
+  const hasDetailTabs = true;
   const controlWidth = hasControls ? Math.max(360, Math.floor((bodyWidth - columnGap) * 0.56)) : 0;
   const nextLevelWidth = hasControls ? bodyWidth - controlWidth - columnGap : bodyWidth;
   const controlX = sideMargin;
@@ -496,9 +484,10 @@ export function drawBuildingDetail(
   if (hasDetailTabs) {
     drawBuildingDetailTabs(host, content, activeDetailTab, translations, sideMargin, sectionY, bodyWidth);
     if (activeDetailTab === "bonuses") {
-      drawAcademyBonusOverviewSection(
+      drawBuildingBonusOverviewSection(
         host,
         content,
+        buildingId,
         level,
         maxLevel,
         translations,
@@ -622,9 +611,10 @@ function drawBuildingDetailTabs(
   );
 }
 
-function drawAcademyBonusOverviewSection(
+function drawBuildingBonusOverviewSection(
   host: BuildingModalsHost,
   parent: Container,
+  buildingId: BuildingId,
   level: number,
   maxLevel: number,
   translations: TranslationPack,
@@ -634,38 +624,39 @@ function drawAcademyBonusOverviewSection(
   height: number,
 ): void {
   drawDetailPanel(parent, x, y, width, height);
-  const copy = getAcademyBonusCopy(translations);
+  const copy = getBuildingBonusCopy(translations);
   drawSectionTitle(host, parent, copy.title, x + 22, y + 24);
 
-  const rows = getAcademyBonusRows(maxLevel, translations, copy);
+  const rows = Array.from({ length: maxLevel }, (_, index) => index + 1);
   const rowGap = 8;
   const rowHeight = Math.max(34, Math.min(46, (height - 72 - rowGap * Math.max(0, rows.length - 1)) / rows.length));
   const rowWidth = width - 44;
   let rowY = y + 64;
 
-  rows.forEach((row) => {
-    drawAcademyBonusRow(host, parent, row, level, x + 22, rowY, rowWidth, rowHeight, copy);
+  rows.forEach((rowLevel) => {
+    drawBuildingBonusRow(host, parent, buildingId, rowLevel, level, translations, x + 22, rowY, rowWidth, rowHeight, copy);
     rowY += rowHeight + rowGap;
   });
 }
 
-function drawAcademyBonusRow(
+function drawBuildingBonusRow(
   host: BuildingModalsHost,
   parent: Container,
-  row: AcademyBonusRow,
+  buildingId: BuildingId,
+  rowLevel: number,
   currentLevel: number,
+  translations: TranslationPack,
   x: number,
   y: number,
   width: number,
   height: number,
-  copy: ReturnType<typeof getAcademyBonusCopy>,
+  copy: ReturnType<typeof getBuildingBonusCopy>,
 ): void {
-  const unlocked = currentLevel >= row.level;
-  const current = currentLevel === row.level;
+  const unlocked = currentLevel >= rowLevel;
+  const current = currentLevel === rowLevel;
   const fill = current ? uiTheme.rowActive : uiTheme.row;
   const borderColor = current ? uiTheme.borderStrong : uiTheme.border;
-  const textFill = unlocked ? uiTheme.text : uiTheme.textMuted;
-  const valueFill = unlocked ? uiTheme.accentStrong : uiTheme.textSoft;
+  const effects = getCurrentBuildingEffects(buildingId, rowLevel, translations);
   const status = current ? copy.current : unlocked ? copy.unlocked : copy.locked;
   const statusFill = current ? uiTheme.accentStrong : unlocked ? uiTheme.positive : uiTheme.textSoft;
 
@@ -680,32 +671,35 @@ function drawAcademyBonusRow(
     .stroke({ color: borderColor, alpha: current ? 0.72 : 0.36, width: 1 });
   rowLayer.addChild(background);
 
-  host.drawText(rowLayer, `${copy.level} ${row.level}`, 16, height / 2 - 8, {
+  host.drawText(rowLayer, `${copy.level} ${rowLevel}`, 16, height / 2 - 8, {
     fill: statusFill,
     fontSize: uiTextSize.body,
     fontWeight: "900",
   });
-  host.drawIcon(rowLayer, row.iconId, 112, height / 2, 20);
-  host.drawText(rowLayer, row.label, 138, height / 2 - 8, {
-    fill: textFill,
-    fontSize: uiTextSize.body,
-    fontWeight: "800",
-    wordWrap: true,
-    wordWrapWidth: Math.max(120, width - 360),
-  });
-  host.drawText(rowLayer, row.value, Math.max(250, width - 250), height / 2 - 8, {
-    fill: valueFill,
-    fontSize: uiTextSize.bodyLarge,
-    fontWeight: "900",
-    align: "right",
-  });
+
+  if (effects.length > 0) {
+    drawEffects(host, rowLayer, effects, 102, Math.max(5, height / 2 - BUILDING_INFO_TOKEN_HEIGHT / 2), width - 210);
+  } else {
+    host.drawText(rowLayer, copy.noBonus, 104, height / 2 - 8, {
+      fill: unlocked ? uiTheme.textMuted : uiTheme.textSoft,
+      fontSize: uiTextSize.body,
+      fontWeight: "800",
+      wordWrap: true,
+      wordWrapWidth: Math.max(120, width - 220),
+    });
+  }
+
   host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
     fill: statusFill,
     fontSize: uiTextSize.caption,
     fontWeight: "900",
     align: "right",
   });
-  host.bindTooltip(rowLayer, row.tooltip);
+  if (effects.length > 0) {
+    host.bindTooltip(rowLayer, effects.map((effect) => effect.tooltip).join("\n"));
+  } else {
+    host.bindTooltip(rowLayer, `${copy.level} ${rowLevel}: ${copy.noBonus}`);
+  }
 }
 
 function getBuildingDetailTabLabels(translations: TranslationPack): Record<BuildingDetailTab, string> {
@@ -715,68 +709,22 @@ function getBuildingDetailTabLabels(translations: TranslationPack): Record<Build
   };
 }
 
-function getAcademyBonusCopy(translations: TranslationPack): {
+function getBuildingBonusCopy(translations: TranslationPack): {
   title: string;
   level: string;
   current: string;
   unlocked: string;
   locked: string;
   noBonus: string;
-  expeditionRisk: string;
-  buildTime: string;
 } {
   return {
-    title: translations.ui.academyBonusTitle ?? "Bonuses by level",
+    title: translations.ui.buildingBonusTitle ?? "Bonuses by level",
     level: translations.ui.level ?? "Lvl",
-    current: translations.ui.academyLevelCurrent ?? "Current",
-    unlocked: translations.ui.academyLevelUnlocked ?? "Unlocked",
-    locked: translations.ui.academyLevelLocked ?? "Locked",
-    noBonus: translations.ui.academyNoNewBonus ?? "No new bonus",
-    expeditionRisk: translations.ui.academyExpeditionRisk ?? "Expedition risk",
-    buildTime: translations.ui.buildTime ?? "Build time",
+    current: translations.ui.buildingLevelCurrent ?? "Current",
+    unlocked: translations.ui.buildingLevelUnlocked ?? "Unlocked",
+    locked: translations.ui.buildingLevelLocked ?? "Locked",
+    noBonus: translations.ui.buildingNoLevelBonus ?? "No listed bonus",
   };
-}
-
-function getAcademyBonusRows(
-  maxLevel: number,
-  translations: TranslationPack,
-  copy: ReturnType<typeof getAcademyBonusCopy>,
-): AcademyBonusRow[] {
-  const rows: AcademyBonusRow[] = [
-    {
-      level: 1,
-      iconId: "build",
-      label: translations.ui.production,
-      value: formatPercentBonus(getAcademyProductionBonus(1)),
-      tooltip: `${translations.ui.production}: ${formatPercentBonus(getAcademyProductionBonus(1))}`,
-    },
-    {
-      level: 2,
-      iconId: "shield",
-      label: copy.expeditionRisk,
-      value: `-${formatRate((1 - getAcademyExpeditionDeathRiskMultiplier(2)) * 100)}%`,
-      tooltip: `${copy.expeditionRisk}: -${formatRate((1 - getAcademyExpeditionDeathRiskMultiplier(2)) * 100)}%`,
-    },
-    {
-      level: 3,
-      iconId: "clock",
-      label: copy.buildTime,
-      value: `-${formatRate((1 - getAcademyBuildTimeMultiplier(3)) * 100)}%`,
-      tooltip: `${copy.buildTime}: -${formatRate((1 - getAcademyBuildTimeMultiplier(3)) * 100)}%`,
-    },
-  ];
-
-  for (let level = 4; level <= maxLevel; level += 1) {
-    rows.push({
-      level,
-      iconId: "archive",
-      label: copy.noBonus,
-      value: "-",
-      tooltip: `${copy.level} ${level}: ${copy.noBonus}`,
-    });
-  }
-
-  return rows.slice(0, maxLevel);
 }
 
 function layoutBuildingPreviewSprite(
