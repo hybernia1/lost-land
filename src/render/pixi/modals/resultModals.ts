@@ -311,7 +311,7 @@ export function drawConquestResultModal(
   const resolvedPanelWidth = shell.panelWidth;
 
   const headerBottom = host.drawOverlayHeader(panel, resolvedPanelWidth, translations, {
-    iconId: "shield",
+    iconId: "expedition",
     kicker: isVictory
       ? translations.ui.conquestVictoryTitle ?? "Oasis secured"
       : translations.ui.conquestDefeatTitle ?? "Oasis assault failed",

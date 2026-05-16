@@ -1360,7 +1360,7 @@ function drawBarracksControlsContent(
   const statWidth = Math.max(118, Math.floor((availableWidth - 14) / 2));
 
   drawModalStatLine(host, parent, "people", translations.ui.availableWorkers, `${state.survivors.workers}`, contentX, y, statWidth);
-  drawModalStatLine(host, parent, "scout", translations.ui.availableTroops, `${state.survivors.troops}`, contentX + statWidth + 14, y, statWidth);
+  drawModalStatLine(host, parent, "troop", translations.ui.availableTroops, `${state.survivors.troops}`, contentX + statWidth + 14, y, statWidth);
   drawLocalStepper(
     host,
     parent,

@@ -483,8 +483,8 @@ function drawSurvivorOverviewPanel(
     { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
     { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
     { iconId: "people", value: `${resourceSiteWorkers}`, label: translations.ui.resourceSiteWorkers ?? "Site workers", tooltip: translations.ui.resourceSiteWorkers ?? "Site workers" },
-    { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
-    { iconId: "shield", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
+    { iconId: "troop", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
+    { iconId: "expedition", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
     { iconId: "crisis-injured", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
     {
       iconId: "crisis-shelter",

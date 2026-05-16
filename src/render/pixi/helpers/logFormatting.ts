@@ -55,7 +55,7 @@ export function getLogEntryIconId(entry: GameState["log"][number]): string {
     key === "logResourceSiteAssaultOverrun" ||
     key === "logResourceSiteCaptured"
   ) {
-    return "shield";
+    return "expedition";
   }
 
   if (key === "logMarketTrade") {

@@ -166,7 +166,7 @@ function drawActiveConquestsContent(
   const contentY = 54;
 
   if (activeAssaults.length === 0) {
-    host.drawIcon(layer, "scout", 8, contentY + 8, 15);
+    host.drawIcon(layer, "expedition", 8, contentY + 8, 15);
     host.drawText(layer, translations?.ui.noActiveConquests ?? "No active conquest teams.", 28, contentY, {
       fill: uiTheme.textMuted,
       fontSize: uiTextSize.caption,
@@ -180,7 +180,7 @@ function drawActiveConquestsContent(
   activeAssaults.forEach((site, index) => {
     const remaining = formatScoutingRemaining(site.assault?.remainingSeconds ?? 0);
     const rowY = contentY + index * 24;
-    host.drawIcon(layer, "people", 8, rowY + 10, 13);
+    host.drawIcon(layer, "expedition", 8, rowY + 10, 13);
     host.drawText(layer, `${translations?.resources[site.resourceId] ?? site.resourceId}: ${site.assault?.troops ?? 0}`, 24, rowY + 2, {
       fill: uiTheme.text,
       fontSize: uiTextSize.caption,

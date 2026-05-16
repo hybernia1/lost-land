@@ -120,7 +120,7 @@ export function getNextLevelEffects(
 
     if (rateDelta > 0) {
       effects.push({
-        iconId: "scout",
+        iconId: "troop",
         value: `+${formatRate(rateDelta)}/h`,
         tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(rateDelta)}/h`,
       });
@@ -142,7 +142,7 @@ export function getNextLevelEffects(
     const nextRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel + 1);
     if (nextRiskMultiplier < currentRiskMultiplier) {
       effects.push({
-        iconId: "shield",
+        iconId: "expedition",
         value: `-${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}%`,
         tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}% risk`,
       });
@@ -326,7 +326,7 @@ export function getCurrentBuildingEffects(
   if (buildingId === "barracks") {
     const trainingRate = getBarracksTrainingRatePerGameHour(level);
     effects.push({
-      iconId: "scout",
+      iconId: "troop",
       value: `+${formatRate(trainingRate)}/h`,
       tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(trainingRate)}/h`,
     });
@@ -345,7 +345,7 @@ export function getCurrentBuildingEffects(
     const expeditionRiskReduction = (1 - getAcademyExpeditionDeathRiskMultiplier(level)) * 100;
     if (expeditionRiskReduction > 0) {
       effects.push({
-        iconId: "shield",
+        iconId: "expedition",
         value: `-${formatRate(expeditionRiskReduction)}%`,
         tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate(expeditionRiskReduction)}% risk`,
       });

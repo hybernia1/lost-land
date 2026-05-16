@@ -293,7 +293,7 @@ function drawResourceSiteModal(
   drawResourceSiteMetricCard(
     host,
     parent,
-    siteState.captured ? "people" : "scout",
+    siteState.captured ? "people" : "troop",
     siteState.captured
       ? translations.ui.resourceSiteSettlement ?? "Oasis settlement crew"
       : translations.ui.resourceSiteCaptureRequirement ?? "Minimum assault strength",
@@ -313,7 +313,7 @@ function drawResourceSiteModal(
 
   if (siteState.assault) {
     host.drawPanel(parent, contentX, sectionY, contentWidth, sectionHeight, 0.55);
-    host.drawIcon(parent, "scout", contentX + 34, sectionY + 48, 26);
+    host.drawIcon(parent, "expedition", contentX + 34, sectionY + 48, 26);
     const runningLabel = host.drawText(parent, translations.ui.resourceSiteAssaultRunning ?? "Assault team is marching to the oasis.", contentX + 68, sectionY + 28, {
       fill: uiTheme.accentStrong,
       fontSize: uiTextSize.control,
