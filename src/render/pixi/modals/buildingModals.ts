@@ -818,6 +818,9 @@ function drawBuildingBonusRow(
   if (unlocked && !current) {
     const doneIcon = host.drawIcon(rowLayer, "done", width - 42, height / 2, 18);
     host.bindTooltip(doneIcon, copy.unlocked);
+  } else if (!unlocked) {
+    const lockIcon = host.drawIcon(rowLayer, "lock", width - 42, height / 2, 18);
+    host.bindTooltip(lockIcon, copy.locked);
   } else {
     host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
       fill: statusFill,
