@@ -10,7 +10,11 @@ import {
   type VillageObjectLayerDefinition,
   type VillageLayoutDefinition,
 } from "../../../data/villageLayouts";
-import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../../../data/villagePlots";
+import type {
+  VillagePlotDefinition,
+  VillageResourceSiteDefinition,
+  VillageResourceSitePalisadeType,
+} from "../../../data/villagePlots";
 import type { BuildingId, EnvironmentConditionId, GameState } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import { getBuildingWorkerLimit, isBuildingInactiveDueToCoal } from "../../../systems/buildings";
@@ -40,34 +44,6 @@ type BuildingLotSpec = {
   groundYOffset: number;
 };
 
-type ResourceSiteTone = {
-  fill: number;
-  stroke: number;
-  iconBack: number;
-  accent: number;
-};
-
-const RESOURCE_SITE_TONES: Record<"locked" | "assault" | "captured", ResourceSiteTone> = {
-  locked: {
-    fill: 0x211714,
-    stroke: 0xb77763,
-    iconBack: 0x2f1e1a,
-    accent: uiTheme.negative,
-  },
-  assault: {
-    fill: 0x2e2415,
-    stroke: 0xe6b36c,
-    iconBack: 0x3c2a15,
-    accent: uiTheme.warning,
-  },
-  captured: {
-    fill: 0x13241d,
-    stroke: 0x8fc58b,
-    iconBack: 0x1b3329,
-    accent: uiTheme.positive,
-  },
-};
-
 export type WorldRenderHost = {
   cameraStaticLayer: Container;
   cameraForegroundDecorLayer: Container;
@@ -80,6 +56,7 @@ export type WorldRenderHost = {
   drawText: DrawTextFn;
   bindTooltip: (target: Container, text: string) => void;
   createTerrainSprite: (textureKey: string) => Sprite | null;
+  createResourceSiteSettlementSprite: (type: VillageResourceSitePalisadeType) => Sprite | null;
   trackTerrainSprite: (
     sprite: Sprite,
     tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
@@ -311,126 +288,90 @@ function drawResourceSite(
 
   const bounds = host.getPlotBounds(siteDefinition);
   const selected = host.activeModalPlotId === siteDefinition.id;
+  const settlementVisual = getResourceSiteSettlementVisual(bounds);
   const layer = new Container();
   layer.x = bounds.x + bounds.width / 2;
-  layer.y = bounds.y + bounds.height / 2;
+  layer.y = bounds.y + bounds.height / 2 + settlementVisual.offsetY;
   layer.hitArea = {
     contains: (x: number, y: number) =>
-      x >= -bounds.width / 2 &&
-      x <= bounds.width / 2 &&
-      y >= -bounds.height / 2 &&
-      y <= bounds.height / 2,
+      x >= -settlementVisual.width / 2 &&
+      x <= settlementVisual.width / 2 &&
+      y >= -settlementVisual.height / 2 &&
+      y <= settlementVisual.height / 2,
   };
   host.cameraDynamicLayer.addChild(layer);
 
-  const isCaptured = siteState.captured;
+  const isLooted = siteState.looted;
   const isAssault = Boolean(siteState.assault);
-  const tone = getResourceSiteTone(isCaptured, isAssault);
-  const markerSize = Math.max(30, Math.min(bounds.width, bounds.height) * 0.64);
-  const markerHeight = Math.max(18, markerSize * 0.44);
-  const iconRadius = Math.max(13, markerHeight * 0.72);
-
-  drawResourceSiteMarker(layer, markerSize, markerHeight, iconRadius, tone, selected, isCaptured, isAssault);
-
-  const resourceIcon = getResourceSiteIcon(siteState.resourceId);
-  host.drawIcon(layer, resourceIcon, 0, -markerHeight * 0.18, Math.max(17, iconRadius * 1.12));
+  drawResourceSiteSettlement(
+    host,
+    layer,
+    settlementVisual.width,
+    settlementVisual.height,
+    siteDefinition.palisadeType,
+    selected,
+    isLooted,
+    isAssault,
+  );
 
   if (siteState.assault) {
     host.drawConstructionCountdown(
       layer,
       siteState.assault.remainingSeconds,
       0,
-      -markerHeight - iconRadius - 18,
-      Math.max(64, markerSize * 1.25),
+      -settlementVisual.height * 0.65 - 24,
+      Math.max(96, settlementVisual.width * 0.7),
       undefined,
     );
   }
 
-  if (siteState.captured) {
-    const workerBadge = new Graphics();
-    const badgeWidth = Math.max(34, markerSize * 0.52);
-    const badgeHeight = 18;
-    workerBadge
-      .roundRect(-badgeWidth / 2, markerHeight * 0.28, badgeWidth, badgeHeight, 6)
-      .fill({ color: 0x0f1714, alpha: selected ? 0.88 : 0.78 })
-      .stroke({ color: tone.accent, alpha: selected ? 0.82 : 0.58, width: 1 });
-    layer.addChild(workerBadge);
-
-    host.drawText(layer, `${siteState.assignedWorkers}/${siteState.maxWorkers}`, -badgeWidth * 0.25, markerHeight * 0.31, {
-      fill: uiTheme.text,
-      fontSize: uiTextSize.micro,
-      fontWeight: "900",
-    });
-    host.drawIcon(layer, "people", badgeWidth * 0.28, markerHeight * 0.48, 12);
-  }
-
-  const resourceName = translations?.resources[siteState.resourceId] ?? siteState.resourceId;
+  const siteName = translations?.ui.resourceSiteTitle ?? "Settlement";
   const tooltip = siteState.assault
-    ? `${resourceName} / ${translations?.ui.resourceSiteStatusAssault ?? "Assault in progress"}`
-    : siteState.captured
-      ? `${resourceName} / ${translations?.ui.resourceSiteStatusCaptured ?? "Captured"}`
-      : `${resourceName} / ${translations?.ui.resourceSiteStatusLocked ?? "Locked"}`;
+    ? `${siteName} / ${translations?.ui.resourceSiteStatusAssault ?? "Assault in progress"}`
+    : siteState.looted
+      ? `${siteName} / ${translations?.ui.resourceSiteStatusLooted ?? "Looted"}`
+      : `${siteName} / ${translations?.ui.resourceSiteStatusLocked ?? "Locked"}`;
   host.bindTooltip(layer, tooltip);
 }
 
-function getResourceSiteTone(isCaptured: boolean, isAssault: boolean): ResourceSiteTone {
-  if (isCaptured) {
-    return RESOURCE_SITE_TONES.captured;
-  }
-
-  if (isAssault) {
-    return RESOURCE_SITE_TONES.assault;
-  }
-
-  return RESOURCE_SITE_TONES.locked;
+function getResourceSiteSettlementVisual(bounds: Bounds): { width: number; height: number; offsetY: number } {
+  return {
+    width: Math.max(1, bounds.width),
+    height: Math.max(1, bounds.height),
+    offsetY: 0,
+  };
 }
 
-function getResourceSiteIcon(resourceId: GameState["resourceSites"][number]["resourceId"]): string {
-  return resourceId === "food"
-    ? "food"
-    : resourceId === "water"
-      ? "water"
-      : resourceId === "coal"
-        ? "coal"
-        : "material";
-}
-
-function drawResourceSiteMarker(
+function drawResourceSiteSettlement(
+  host: WorldRenderHost,
   parent: Container,
   width: number,
   height: number,
-  iconRadius: number,
-  tone: ResourceSiteTone,
+  palisadeType: VillageResourceSitePalisadeType,
   selected: boolean,
-  isCaptured: boolean,
+  isLooted: boolean,
   isAssault: boolean,
 ): void {
-  const shadow = new Graphics();
-  shadow.ellipse(0, height * 0.18, width * 0.58, height * 0.45)
-    .fill({ color: FOOTPRINT_SHADOW_COLOR, alpha: selected ? 0.34 : 0.25 });
-  parent.addChild(shadow);
-
-  const pad = new Graphics();
-  drawDiamond(pad, width, height)
-    .fill({ color: tone.fill, alpha: selected ? 0.68 : 0.48 })
-    .stroke({ color: tone.stroke, alpha: selected ? 1 : 0.78, width: selected ? 2.4 : 1.6 });
-  parent.addChild(pad);
-
-  const iconBack = new Graphics();
-  iconBack.circle(0, -height * 0.18, iconRadius)
-    .fill({ color: tone.iconBack, alpha: selected ? 0.92 : 0.82 })
-    .stroke({ color: tone.accent, alpha: selected ? 0.95 : 0.64, width: selected ? 2 : 1.4 });
-  parent.addChild(iconBack);
-
-  const brackets = new Graphics();
-  drawPlotCornerMarks(brackets, width * 0.94, height * 1.08, selected || isAssault, tone.accent);
-  brackets.alpha = isCaptured ? 0.58 : 0.78;
-  parent.addChild(brackets);
+  const sprite = host.createResourceSiteSettlementSprite(palisadeType);
+  if (sprite) {
+    sprite.anchor.set(0.5);
+    sprite.width = width;
+    sprite.height = height;
+    sprite.alpha = isLooted ? 0.72 : 1;
+    sprite.tint = isLooted
+      ? 0x91a08a
+      : isAssault
+        ? 0xffd69a
+        : selected
+          ? 0xfff0c7
+          : 0xffffff;
+    parent.addChild(sprite);
+  }
 
   if (isAssault) {
     const alert = new Graphics();
-    alert.circle(width * 0.34, -height * 0.48, Math.max(4, iconRadius * 0.22))
-      .fill({ color: tone.accent, alpha: 0.9 });
+    alert.circle(width * 0.34, -height * 0.5, Math.max(4, width * 0.05))
+      .fill({ color: uiTheme.warning, alpha: 0.9 });
     parent.addChild(alert);
   }
 }

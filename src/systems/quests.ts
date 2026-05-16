@@ -25,7 +25,7 @@ import type {
   SuddenQuestId,
 } from "../game/types";
 import { pushLogEntry } from "./log";
-import { addResources, canAfford } from "./resources";
+import { addResources, addRewardResources, canAfford } from "./resources";
 
 const FIRST_DECISION_DELAY_SECONDS = GAME_HOUR_REAL_SECONDS * 4;
 const NEXT_DECISION_BASE_SECONDS = GAME_HOUR_REAL_SECONDS * 7;
@@ -166,7 +166,7 @@ export function resolveDecisionQuest(
   }
 
   if (option.resources) {
-    addResources(state.resources, option.resources, state.capacities);
+    addRewardResources(state, option.resources);
   }
 
   if (option.morale) {
@@ -388,16 +388,7 @@ export function canClaimObjectiveReward(
     return false;
   }
 
-  return Object.entries(definition.reward).some(([resourceId, amount]) => {
-    if ((amount ?? 0) <= 0) {
-      return false;
-    }
-
-    const typedResourceId = resourceId as ResourceId;
-    const current = state.resources[typedResourceId];
-    const capacity = typedResourceId === "morale" ? 100 : state.capacities[typedResourceId];
-    return current < capacity;
-  });
+  return true;
 }
 
 export function claimObjectiveQuestReward(
@@ -420,7 +411,7 @@ export function claimObjectiveQuestReward(
     return false;
   }
 
-  addResources(state.resources, definition.reward, state.capacities);
+  addRewardResources(state, definition.reward);
   objectiveState.rewardClaimedAt = state.elapsedSeconds;
   pushLogEntry(state, {
     source: "questUi",

@@ -1,5 +1,6 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
 import { objectiveQuestById } from "../../../data/quests";
+import { resourceIds } from "../../../data/resources";
 import {
   ENVIRONMENT_MAX_INTENSITY,
   getEnvironmentDefinition,
@@ -15,7 +16,6 @@ import type {
 } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import {
-  getGlobalProductionMultiplier,
   getHousingStatus,
   getResourceBreakdown,
   type ResourceBreakdownLine,
@@ -25,11 +25,8 @@ import {
   getConstructionWorkerCount,
   getPopulation,
 } from "../../../systems/population";
-import {
-  getAssignedResourceSiteWorkerCount,
-  getResourceSiteAssaultTroopCount,
-  getTravelTilesToSite,
-} from "../../../systems/resourceSites";
+import { getResourceSiteAssaultTroopCount } from "../../../systems/resourceSites";
+import { getTotalTroopCount, unitIds } from "../../../systems/survivors";
 import {
   canClaimObjectiveReward,
   getActiveObjectiveQuests,
@@ -64,6 +61,7 @@ import {
   getHourlyRateLabel,
   getRateColor,
 } from "../helpers/formatters";
+import { getUnitIconId } from "../helpers/unitIcons";
 import { createModalPanel, resolveModalFrame, type ModalFrameOptions } from "./modalLayout";
 
 type InfoPanelsHost = {
@@ -113,6 +111,8 @@ type InfoPanelsHost = {
   setSelectedDecisionHistoryIndex: (value: number | null) => void;
   getActiveResourceBreakdownTab: () => ResourceBreakdownTab;
   setActiveResourceBreakdownTab: (value: ResourceBreakdownTab) => void;
+  getActiveSurvivorOverviewTab: () => SurvivorOverviewTab;
+  setActiveSurvivorOverviewTab: (value: SurvivorOverviewTab) => void;
   getResourceBreakdownScrollY: () => number;
   setResourceBreakdownScrollY: (value: number) => void;
   setResourceBreakdownScrollMax: (value: number) => void;
@@ -122,6 +122,8 @@ type InfoPanelsHost = {
   getResourceBreakdownScrollTab: () => ResourceBreakdownTab;
   setResourceBreakdownScrollTab: (value: ResourceBreakdownTab) => void;
 };
+
+type SurvivorOverviewTab = "civilians" | "army";
 
 const INFO_SECTION_TOP_GAP = 18;
 const INFO_SECTION_TITLE_GAP = 30;
@@ -178,8 +180,8 @@ export function drawInfoPanel(
     return;
   }
 
-  if (infoPanel === "oasisOverview") {
-    drawOasisOverviewPanel(host, state, translations, width, height);
+  if (infoPanel === "heroInventory") {
+    drawHeroInventoryPanel(host, state, translations, width, height);
     return;
   }
 
@@ -459,17 +461,17 @@ function drawSurvivorOverviewPanel(
 ): void {
   const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
     maxWidth: 420,
-    minHeight: 378,
-    preferredHeight: 378,
-    maxHeight: 420,
+    minHeight: 430,
+    preferredHeight: 430,
+    maxHeight: 480,
   });
 
   const housing = getHousingStatus(state);
   const buildingWorkers = getAssignedBuildingWorkerCount(state);
   const constructionWorkers = getConstructionWorkerCount(state);
-  const resourceSiteWorkers = getAssignedResourceSiteWorkerCount(state);
   const conqueringTroops = getResourceSiteAssaultTroopCount(state);
   const totalPopulation = getPopulation(state);
+  const activeTab = host.getActiveSurvivorOverviewTab();
 
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: "people",
@@ -478,13 +480,30 @@ function drawSurvivorOverviewPanel(
     closeAction: { action: "close-village-modal" },
   });
 
-  const rows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
+  host.drawTabs(
+    panel,
+    [
+      { id: "civilians", label: translations.ui.survivorTabCivilians ?? "Population" },
+      { id: "army", label: translations.ui.survivorTabArmy ?? "Army" },
+    ],
+    {
+      activeId: activeTab,
+      x: 28,
+      y: headerBottom + 12,
+      height: 34,
+      minWidth: 142,
+      maxWidth: panelWidth - 56,
+      onSelect: (tab) => {
+        host.setActiveSurvivorOverviewTab(tab);
+        host.requestRender();
+      },
+    },
+  );
+
+  const civilianRows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
     { iconId: "people", value: `${state.survivors.workers}`, label: translations.ui.availableWorkers, tooltip: translations.ui.availableWorkers },
     { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
     { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
-    { iconId: "people", value: `${resourceSiteWorkers}`, label: translations.ui.resourceSiteWorkers ?? "Site workers", tooltip: translations.ui.resourceSiteWorkers ?? "Site workers" },
-    { iconId: "troop", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
-    { iconId: "expedition", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
     { iconId: "crisis-injured", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
     {
       iconId: "crisis-shelter",
@@ -500,12 +519,23 @@ function drawSurvivorOverviewPanel(
       missing: housing.homeless > 0,
     },
   ];
+  const armyRows: Array<{ iconId: string; value: string; label: string; tooltip: string; missing?: boolean }> = [
+    { iconId: "troop", value: `${getTotalTroopCount(state)}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
+    ...unitIds.map((unitId) => ({
+      iconId: getUnitIconId(unitId),
+      value: `${state.survivors.units[unitId]}`,
+      label: translations.roles[unitId] ?? unitId,
+      tooltip: translations.roles[unitId] ?? unitId,
+    })),
+    { iconId: "expedition", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On raids", tooltip: translations.ui.conqueringTroops ?? "On raids" },
+  ];
+  const rows = activeTab === "army" ? armyRows : civilianRows;
 
   rows.forEach((row, index) => {
     drawWorkforceRow(host, panel, {
       ...row,
       x: 28,
-      y: headerBottom + 12 + index * 29,
+      y: headerBottom + 62 + index * 29,
       width: panelWidth - 56,
     });
   });
@@ -970,7 +1000,7 @@ function getEnvironmentDescription(state: GameState, translations: TranslationPa
     "No active weather front is present. The camp is in a relatively stable state.";
 }
 
-function drawOasisOverviewPanel(
+function drawHeroInventoryPanel(
   host: InfoPanelsHost,
   state: GameState,
   translations: TranslationPack,
@@ -983,17 +1013,20 @@ function drawOasisOverviewPanel(
     maxHeight: 560,
   });
 
-  const capturedSites = state.resourceSites.filter((site) => site.captured);
+  const inventoryResources = resourceIds.filter((resourceId) =>
+    resourceId !== "morale" && (state.heroInventory[resourceId] ?? 0) > 0,
+  );
+  const totalItems = inventoryResources.reduce((total, resourceId) => total + Math.floor(state.heroInventory[resourceId] ?? 0), 0);
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
-    iconId: "oasis",
-    title: translations.ui.oasisOverview ?? "Captured oases",
-    rightText: `${capturedSites.length}`,
+    iconId: "expedition",
+    title: translations.ui.heroInventory ?? "Hero inventory",
+    rightText: `${totalItems}`,
     closeAction: { action: "close-village-modal" },
   });
   const bodyY = headerBottom + 8;
 
-  if (capturedSites.length === 0) {
-    host.drawText(panel, translations.ui.quickNoCapturedOases ?? "No captured oasis yet.", 24, bodyY + 8, {
+  if (inventoryResources.length === 0) {
+    host.drawText(panel, translations.ui.heroInventoryEmpty ?? "No loot is waiting in the hero inventory.", 24, bodyY + 8, {
       fill: uiTheme.textMuted,
       fontSize: uiTextSize.body,
       fontWeight: "800",
@@ -1002,25 +1035,26 @@ function drawOasisOverviewPanel(
   }
 
   const rowHeight = 70;
-  capturedSites.forEach((site, index) => {
+  inventoryResources.forEach((resourceId, index) => {
     const rowY = bodyY + index * rowHeight;
+    const amount = Math.floor(state.heroInventory[resourceId] ?? 0);
+    const freeSpace = Math.max(0, Math.floor(state.capacities[resourceId] - state.resources[resourceId]));
+    const transferAmount = Math.min(amount, freeSpace);
     const row = new Graphics();
     row.rect(18, rowY, panelWidth - 36, rowHeight - 8)
       .fill({ color: uiTheme.surfaceMuted, alpha: 0.44 });
     panel.addChild(row);
 
-    const resourceName = translations.resources[site.resourceId] ?? site.resourceId;
-    const travelHours = getTravelTilesToSite(site.id);
-    const yieldPerHour = site.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
-    host.drawIcon(panel, site.resourceId, 34, rowY + 31, 18);
-    host.drawText(panel, `${resourceName} ${translations.ui.resourceSiteTitle ?? "Oasis"}`, 52, rowY + 10, {
+    const resourceName = translations.resources[resourceId] ?? resourceId;
+    host.drawIcon(panel, resourceId, 34, rowY + 31, 18);
+    host.drawText(panel, resourceName, 52, rowY + 10, {
       fill: uiTheme.text,
       fontSize: uiTextSize.bodyLarge,
       fontWeight: "900",
     });
     host.drawText(
       panel,
-      `${translations.ui.resourceSiteSettlement ?? "Oasis settlement crew"}: ${site.assignedWorkers}/${site.maxWorkers} · +${formatRate(yieldPerHour)}/h · ${translations.ui.resourceSiteTravelTime ?? "Travel time"}: ${travelHours}h`,
+      `${translations.ui.heroInventoryStored ?? "Stored here"}: ${amount} / ${translations.ui.storageFreeSpace ?? "free storage"}: ${freeSpace}`,
       52,
       rowY + 30,
       {
@@ -1032,17 +1066,20 @@ function drawOasisOverviewPanel(
 
     host.createModalButton(
       panel,
-      translations.ui.openOasis ?? "Open oasis",
+      translations.ui.heroInventoryMoveToStorage ?? "Move to storage",
       panelWidth - 156,
       rowY + 16,
       122,
       34,
       {
-        action: "open-resource-site-modal",
-        resourceSiteId: site.id,
+        action: "hero-inventory-transfer",
+        resourceId,
+        inventoryAmount: transferAmount,
       },
-      false,
-      `${translations.ui.openOasis ?? "Open oasis"}\n${resourceName}`,
+      transferAmount <= 0,
+      transferAmount > 0
+        ? `${translations.ui.heroInventoryMoveToStorage ?? "Move to storage"}: ${transferAmount}`
+        : translations.ui.heroInventoryStorageFull ?? "Storage is full.",
     );
   });
 }
@@ -1062,7 +1099,6 @@ function drawResourceBreakdownPanel(
   });
 
   const breakdown = getResourceBreakdown(state, resourceId);
-  appendResourceSiteBreakdownLines(state, resourceId, breakdown);
   const totalRate = breakdown.reduce((total, line) => total + line.ratePerSecond, 0);
   const stockLabel = resourceId === "morale"
     ? `${Math.floor(state.resources.morale)}%`
@@ -1252,39 +1288,6 @@ function getResourceBreakdownLabel(line: ResourceBreakdownLine, translations: Tr
     return translations.ui.environment;
   }
 
-  if (line.source === "resourceSite") {
-    return translations.ui.resourceSiteProduction ?? "Secured oasis production";
-  }
-
   return translations.ui.moraleWaterShortage;
 }
 
-function appendResourceSiteBreakdownLines(
-  state: GameState,
-  resourceId: ResourceId,
-  breakdown: ResourceBreakdownLine[],
-): void {
-  const multiplier = getGlobalProductionMultiplier(state);
-  let totalRate = 0;
-  let totalWorkers = 0;
-
-  for (const site of state.resourceSites) {
-    if (!site.captured || site.assignedWorkers <= 0 || site.resourceId !== resourceId) {
-      continue;
-    }
-
-    totalWorkers += site.assignedWorkers;
-    totalRate += site.yieldPerWorker * site.assignedWorkers * multiplier;
-  }
-
-  if (totalRate <= 0) {
-    return;
-  }
-
-  breakdown.push({
-    source: "resourceSite",
-    resourceId,
-    ratePerSecond: totalRate,
-    count: totalWorkers,
-  });
-}

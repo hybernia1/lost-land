@@ -64,8 +64,7 @@ export type ResourceBreakdownLine = {
     | "continuousShifts"
     | "environment"
     | "mainBuildingBonus"
-    | "moraleProductionPenalty"
-    | "resourceSite";
+    | "moraleProductionPenalty";
   resourceId: ResourceId;
   ratePerSecond: number;
   buildingId?: BuildingId;
@@ -304,8 +303,9 @@ export function getHousingStatus(state: GameState): {
   civilianCapacity: number;
 } {
   const population = getPopulation(state);
-  const troopHousing = state.buildings.barracks.level > 0 ? state.survivors.troops : 0;
-  const civilians = Math.max(0, population - state.survivors.troops);
+  const troops = Object.values(state.survivors.units).reduce((total, count) => total + count, 0);
+  const troopHousing = state.buildings.barracks.level > 0 ? troops : 0;
+  const civilians = Math.max(0, population - troops);
   const civilianCapacity = getDormitoryHousingCapacity(state);
   const housedCivilians = Math.min(civilians, civilianCapacity);
   const housed = Math.min(population, troopHousing + housedCivilians);

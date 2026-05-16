@@ -151,12 +151,12 @@ function drawSidebarTabsPanel(
   if (activeTab === "tasks") {
     drawQuestPanelContent(host, state, translations, layer, activeObjectives);
   } else {
-    drawActiveConquestsContent(host, translations, layer, activeAssaults);
+    drawActiveRaidsContent(host, translations, layer, activeAssaults);
   }
 
   host.registerHudInteractionArea(layer.x, layer.y, panelWidth, panelHeight, 6);
 }
-function drawActiveConquestsContent(
+function drawActiveRaidsContent(
   host: HudPanelsHost,
   translations: TranslationPack | undefined,
   layer: Container,
@@ -167,7 +167,7 @@ function drawActiveConquestsContent(
 
   if (activeAssaults.length === 0) {
     host.drawIcon(layer, "expedition", 8, contentY + 8, 15);
-    host.drawText(layer, translations?.ui.noActiveConquests ?? "No active conquest teams.", 28, contentY, {
+    host.drawText(layer, translations?.ui.noActiveSettlementRaids ?? "No active settlement raids.", 28, contentY, {
       fill: uiTheme.textMuted,
       fontSize: uiTextSize.caption,
       fontWeight: "800",
@@ -181,7 +181,7 @@ function drawActiveConquestsContent(
     const remaining = formatScoutingRemaining(site.assault?.remainingSeconds ?? 0);
     const rowY = contentY + index * 24;
     host.drawIcon(layer, "expedition", 8, rowY + 10, 13);
-    host.drawText(layer, `${translations?.resources[site.resourceId] ?? site.resourceId}: ${site.assault?.troops ?? 0}`, 24, rowY + 2, {
+    host.drawText(layer, `${translations?.ui.resourceSiteTitle ?? "Settlement"}: ${site.assault?.troops ?? 0}`, 24, rowY + 2, {
       fill: uiTheme.text,
       fontSize: uiTextSize.caption,
       fontWeight: "900",
@@ -466,10 +466,12 @@ function drawActionPanel(
   const marketTooltip = marketBuilt
     ? `${translations?.buildings.market.name ?? "Market"}\n${translations?.ui.quickOpenMarket ?? "Open market exchange."}`
     : `${translations?.buildings.market.name ?? "Market"}\n${translations?.ui.quickMarketUnavailable ?? "Build the market first."}`;
-  const capturedOases = state.resourceSites.filter((site) => site.captured).length;
-  const oasisTooltip = capturedOases > 0
-    ? `${translations?.ui.oasisOverview ?? "Captured oases"}\n${translations?.ui.quickOpenOasisOverview ?? "Open captured oasis overview."}`
-    : `${translations?.ui.oasisOverview ?? "Captured oases"}\n${translations?.ui.quickNoCapturedOases ?? "No captured oasis yet."}`;
+  const inventoryItems = Object.entries(state.heroInventory)
+    .filter(([resourceId]) => resourceId !== "morale")
+    .reduce((total, [, amount]) => total + Math.max(0, Math.floor(amount)), 0);
+  const inventoryTooltip = inventoryItems > 0
+    ? `${translations?.ui.heroInventory ?? "Hero inventory"}\n${translations?.ui.quickOpenHeroInventory ?? "Open hero inventory."}`
+    : `${translations?.ui.heroInventory ?? "Hero inventory"}\n${translations?.ui.heroInventoryEmpty ?? "No loot is waiting."}`;
   const questLogTooltip = `${translations?.ui.questLog ?? "Quest log"}\n${translations?.ui.questLogTooltip ?? "Review active and completed tasks."}`;
   const radius = 20;
   const spacing = 52;
@@ -512,14 +514,14 @@ function drawActionPanel(
 
   host.createCircularActionButton(
     group,
-    "oasis",
+    "expedition",
     startX + spacing * 4,
     0,
     radius,
-    { action: "open-oasis-overview" } satisfies PixiActionDetail,
-    oasisTooltip,
+    { action: "open-hero-inventory" } satisfies PixiActionDetail,
+    inventoryTooltip,
     false,
-    capturedOases <= 0,
+    false,
   );
 
   host.createCircularActionButton(

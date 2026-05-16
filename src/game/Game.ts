@@ -6,6 +6,14 @@ import {
   startBuildingUpgrade,
   tickBuildings,
 } from "../systems/buildings";
+import {
+  attackBattleUnit,
+  createBattleState,
+  endPlayerBattleTurn,
+  moveSelectedBattleUnit,
+  resolveOpeningEnemyTurn,
+  selectBattleUnit,
+} from "../systems/combat";
 import { normalizeEnvironmentState, tickEnvironment } from "../systems/environment";
 import { tickHealth } from "../systems/health";
 import { normalizeLogEntries } from "../systems/log";
@@ -17,19 +25,19 @@ import {
   tickQuests,
 } from "../systems/quests";
 import {
-  getResourceSiteProductionDelta,
   normalizeResourceSites,
-  setResourceSiteWorkers as setWorkersAtResourceSite,
   startResourceSiteAssault as startSiteAssault,
   tickResourceSites,
 } from "../systems/resourceSites";
-import { addResources } from "../systems/resources";
+import { transferHeroInventoryToStorage } from "../systems/resources";
 import { loadGame, saveGame, SAVE_VERSION } from "../systems/save";
-import { convertTroopToWorker, convertWorkerToTroop, tickBarracksTraining } from "../systems/survivors";
+import { startBarracksTraining, tickBarracksTraining, unitIds } from "../systems/survivors";
+import { isCombatUnitId, isPlayerUnitId } from "../data/combatUnits";
 import { gameConfig } from "./config";
 import { createInitialState } from "./createInitialState";
 import { GAME_HOUR_REAL_SECONDS, isDaylightHour } from "./time";
 import type {
+  BarracksTrainingJobState,
   BuildingId,
   DecisionOptionId,
   EnvironmentConditionId,
@@ -38,6 +46,9 @@ import type {
   GameState,
   ObjectiveQuestId,
   ResourceId,
+  UnitCounts,
+  UnitId,
+  BattleState,
 } from "./types";
 
 export class Game {
@@ -112,20 +123,14 @@ export class Game {
     }
   }
 
-  convertWorkerToTroop(): void {
-    if (convertWorkerToTroop(this.state)) {
+  startBarracksTraining(unitId: UnitId, count: number): void {
+    if (startBarracksTraining(this.state, unitId, count)) {
       this.commit();
     }
   }
 
-  convertTroopToWorker(): void {
-    if (convertTroopToWorker(this.state)) {
-      this.commit();
-    }
-  }
-
-  startResourceSiteAssault(siteId: string, troopCount: number): boolean {
-    const started = startSiteAssault(this.state, siteId, troopCount);
+  startResourceSiteAssault(siteId: string, units: UnitCounts): boolean {
+    const started = startSiteAssault(this.state, siteId, units);
     if (started) {
       this.commit();
       return true;
@@ -135,8 +140,26 @@ export class Game {
     return false;
   }
 
-  setResourceSiteWorkers(siteId: string, targetWorkers: number): void {
-    if (setWorkersAtResourceSite(this.state, siteId, targetWorkers)) {
+  selectBattleUnit(unitInstanceId: string): void {
+    if (selectBattleUnit(this.state, unitInstanceId)) {
+      this.commit();
+    }
+  }
+
+  moveBattleUnit(q: number, r: number): void {
+    if (moveSelectedBattleUnit(this.state, q, r)) {
+      this.commit();
+    }
+  }
+
+  attackBattleUnit(targetInstanceId: string): void {
+    if (attackBattleUnit(this.state, targetInstanceId)) {
+      this.commit();
+    }
+  }
+
+  endBattleTurn(): void {
+    if (endPlayerBattleTurn(this.state)) {
       this.commit();
     }
   }
@@ -160,6 +183,14 @@ export class Game {
     }
 
     this.emit();
+  }
+
+  transferHeroInventory(resourceId: ResourceId, amount: number): void {
+    if (transferHeroInventoryToStorage(this.state, resourceId, amount) > 0) {
+      this.commit();
+    } else {
+      this.emit();
+    }
   }
 
   setPaused(paused: boolean): void {
@@ -241,6 +272,21 @@ export class Game {
     this.commit();
   }
 
+  devStartDemoBattle(): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    this.state.activeBattle = createBattleState(
+      "dev-demo-settlement",
+      { food: 80, water: 70, material: 45, coal: 55 },
+      { footman: 5, archer: 4, bulwark: 2 },
+      { rat: 4, spider: 2, snake: 2, wolf: 1, zombie: 1, bandit: 1, berserkerZombie: 1 },
+    );
+    resolveOpeningEnemyTurn(this.state);
+    this.commit();
+  }
+
   load(saveId?: string): boolean {
     const loadedState = loadGame(saveId);
 
@@ -268,6 +314,11 @@ export class Game {
       return;
     }
 
+    if (this.state.activeBattle) {
+      this.emit();
+      return;
+    }
+
     const previousElapsedSeconds = this.state.elapsedSeconds;
     const scaledDelta = deltaSeconds * this.state.speed;
     this.state.elapsedSeconds += scaledDelta;
@@ -279,11 +330,6 @@ export class Game {
     tickBarracksTraining(this.state, scaledDelta);
     tickEnvironment(this.state, scaledDelta);
     applyProduction(this.state, scaledDelta);
-    addResources(
-      this.state.resources,
-      getResourceSiteProductionDelta(this.state, scaledDelta),
-      this.state.capacities,
-    );
     tickHealth(this.state, scaledDelta);
     this.autosaveIfDue();
     this.emit();
@@ -338,10 +384,12 @@ function normalizeGameState(state: GameState): void {
   state.saveVersion = SAVE_VERSION;
   state.workMode = state.workMode === "continuous" ? "continuous" : "day";
   state.log = normalizeLogEntries(state.log ?? []);
+  state.heroInventory = normalizeResourceRecord(state.heroInventory);
   normalizeQuestState(state);
   normalizeMarketState(state);
   normalizeEnvironmentState(state);
   normalizeResourceSites(state);
+  state.activeBattle = normalizeBattleState(state.activeBattle);
 
   if (state.speed !== 24) {
     state.speed = 1;
@@ -352,8 +400,141 @@ function normalizeGameState(state: GameState): void {
     building.constructionWorkers = Math.max(0, building.constructionWorkers);
   }
 
-  state.survivors.barracksTrainingProgress = Math.max(
-    0,
-    state.survivors.barracksTrainingProgress ?? 0,
+  state.survivors.units = normalizeUnitCounts(state.survivors.units);
+  state.survivors.barracksTrainingQueue = normalizeBarracksTrainingQueue(
+    state.survivors.barracksTrainingQueue,
   );
+}
+
+function normalizeBattleState(battle: BattleState | null | undefined): BattleState | null {
+  if (!battle || !Array.isArray(battle.units)) {
+    return null;
+  }
+
+  return {
+    id: String(battle.id ?? `battle-${Date.now().toString(36)}`),
+    siteId: String(battle.siteId ?? ""),
+    loot: normalizeResourceSiteLoot(battle.loot),
+    turn: battle.turn === "enemy" ? "enemy" : "player",
+    round: Math.max(1, Math.floor(battle.round ?? 1)),
+    selectedUnitId: typeof battle.selectedUnitId === "string" ? battle.selectedUnitId : null,
+    units: battle.units
+      .map((unit): BattleState["units"][number] => {
+        const count = Math.max(0, Math.floor(unit.count ?? 1));
+        return {
+          id: String(unit.id),
+          unitId: normalizeCombatUnitId(unit.unitId, unit.side === "enemy" ? "rat" : "footman"),
+          side: unit.side === "enemy" ? "enemy" : "player",
+          count,
+          q: Math.floor(unit.q ?? 0),
+          r: Math.floor(unit.r ?? 0),
+          hp: Math.max(0, Math.floor(unit.hp ?? 1)),
+          maxHp: Math.max(1, Math.floor(unit.maxHp ?? unit.hp ?? 1)),
+          moved: Boolean(unit.moved),
+          acted: Boolean(unit.acted),
+        };
+      })
+      .filter((unit) =>
+        isCombatUnitId(unit.unitId) &&
+        unit.hp > 0 &&
+        unit.count > 0,
+      ),
+    log: normalizeBattleLogEntries(battle.log),
+  };
+}
+
+function normalizeBattleLogEntries(log: BattleState["log"] | string[] | undefined): BattleState["log"] {
+  if (!Array.isArray(log)) {
+    return [];
+  }
+
+  return log.slice(0, 8).map((entry) => {
+    if (typeof entry === "string") {
+      return { key: "text", text: entry };
+    }
+
+    if (entry.key === "initiative") {
+      return {
+        key: "initiative",
+        side: entry.side === "enemy" ? "enemy" : "player",
+      };
+    }
+
+    if (entry.key === "hit") {
+      return {
+        key: "hit",
+        attackerUnitId: normalizeCombatUnitId(entry.attackerUnitId, "footman"),
+        attackerCount: Math.max(1, Math.floor(entry.attackerCount ?? 1)),
+        targetUnitId: normalizeCombatUnitId(entry.targetUnitId, "rat"),
+        targetCount: Math.max(1, Math.floor(entry.targetCount ?? 1)),
+        damage: Math.max(0, Math.floor(entry.damage ?? 0)),
+        losses: Math.max(0, Math.floor(entry.losses ?? 0)),
+      };
+    }
+
+    return { key: "text", text: entry.text ?? "" };
+  });
+}
+
+function normalizeCombatUnitId(
+  unitId: BattleState["units"][number]["unitId"] | undefined,
+  fallback: BattleState["units"][number]["unitId"],
+): BattleState["units"][number]["unitId"] {
+  return isCombatUnitId(unitId) ? unitId : fallback;
+}
+
+function normalizeUnitCounts(units: UnitCounts | undefined): UnitCounts {
+  return Object.fromEntries(
+    unitIds.map((unitId) => [unitId, Math.max(0, Math.floor(units?.[unitId] ?? 0))]),
+  ) as UnitCounts;
+}
+
+function normalizeResourceRecord(resources: Partial<Record<ResourceId, number>> | undefined): Record<ResourceId, number> {
+  return {
+    food: Math.max(0, Math.floor(resources?.food ?? 0)),
+    water: Math.max(0, Math.floor(resources?.water ?? 0)),
+    material: Math.max(0, Math.floor(resources?.material ?? 0)),
+    coal: Math.max(0, Math.floor(resources?.coal ?? 0)),
+    morale: Math.max(0, Math.floor(resources?.morale ?? 0)),
+  };
+}
+
+function normalizeResourceSiteLoot(loot: BattleState["loot"] | undefined): BattleState["loot"] {
+  const normalized: BattleState["loot"] = {};
+
+  for (const resourceId of ["food", "water", "material", "coal"] as const) {
+    const amount = Math.max(0, Math.floor(loot?.[resourceId] ?? 0));
+    if (amount > 0) {
+      normalized[resourceId] = amount;
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeBarracksTrainingQueue(
+  queue: BarracksTrainingJobState[] | undefined,
+): BarracksTrainingJobState[] {
+  if (!Array.isArray(queue)) {
+    return [];
+  }
+
+  return queue
+    .map((job) => {
+      const unitId: UnitId = isPlayerUnitId(job.unitId) ? job.unitId : "footman";
+      const durationSeconds = Math.max(
+        1,
+        Math.floor(job.durationSeconds ?? gameConfig.barracks.troopTraining[unitId].seconds),
+      );
+
+      return {
+        unitId,
+        durationSeconds,
+        remainingSeconds: Math.min(
+          durationSeconds,
+          Math.max(0, Math.floor(job.remainingSeconds ?? durationSeconds)),
+        ),
+      };
+    })
+    .filter((job) => job.remainingSeconds > 0);
 }

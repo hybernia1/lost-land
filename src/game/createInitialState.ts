@@ -51,13 +51,19 @@ export function createInitialState(
       morale: 100,
     },
     capacities: emptyResourceRecord(),
+    heroInventory: emptyResourceRecord(),
     survivors: {
       workers: 3,
-      troops: 0,
-      barracksTrainingProgress: 0,
+      units: {
+        footman: 0,
+        archer: 0,
+        bulwark: 0,
+      },
+      barracksTrainingQueue: [],
     },
     quests: createInitialQuestState(),
     resourceSites: createInitialResourceSites(),
+    activeBattle: null,
     market: {
       cooldownRemainingSeconds: 0,
       tradesUsed: 0,

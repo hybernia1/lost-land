@@ -123,7 +123,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     id: "academy",
     category: "support",
     name: "Academy",
-    description: "Unlocks strategic research that boosts production, expeditions, and build speed.",
+    description: "Unlocks strategic research that boosts production and build speed.",
     maxLevel: 5,
     buildSeconds: 56,
     baseConstructionWorkers: 3,

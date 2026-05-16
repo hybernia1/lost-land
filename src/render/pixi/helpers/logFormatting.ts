@@ -48,8 +48,7 @@ export function getLogEntryIconId(entry: GameState["log"][number]): string {
   if (
     key === "logResourceSiteAssaultStarted" ||
     key === "logResourceSiteAssaultFailed" ||
-    key === "logResourceSiteAssaultOverrun" ||
-    key === "logResourceSiteCaptured"
+    key === "logResourceSiteLooted"
   ) {
     return "expedition";
   }

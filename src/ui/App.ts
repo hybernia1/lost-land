@@ -1,12 +1,12 @@
 import type { Game } from "../game/Game";
 import { gameConfig } from "../game/config";
 import { getDaylightState } from "../game/time";
-import type { DecisionHistoryEntry, GameState } from "../game/types";
+import type { DecisionHistoryEntry, GameState, ResourceId } from "../game/types";
 import { packs, loadLocale, saveLocale } from "../i18n";
 import type { Locale, TranslationPack } from "../i18n/types";
 import { PixiVillageRenderer } from "../render/PixiVillageRenderer";
 import type {
-  ConquestResultPreview,
+  RaidResultPreview,
   FrontScreenModel,
   FrontScreenSaveEntry,
   GameOverPreview,
@@ -44,7 +44,7 @@ export class App {
   private villageModalPlotId: string | null = null;
   private villageInfoPanel: VillageInfoPanel | null = null;
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
-  private conquestResultPreview: ConquestResultPreview | null = null;
+  private raidResultPreview: RaidResultPreview | null = null;
   private gameOverPreview: GameOverPreview | null = null;
   private gameMenuView: GameMenuView | null = null;
   private topLogSignature = "";
@@ -113,7 +113,7 @@ export class App {
         this.resolvedDecisionPreview = null;
       }
       this.maybeShowGameOverModal(state);
-      this.maybeShowConquestResultModal(state, previousSignature, nextSignature);
+      this.maybeShowRaidResultModal(state, previousSignature, nextSignature);
       this.updateAmbientLoop();
       if (hasNewDecisionQuest) {
         this.playUiSound(this.decisionQuestAlertAudio);
@@ -197,7 +197,7 @@ export class App {
       this.villageModalPlotId,
       this.villageInfoPanel,
       this.resolvedDecisionPreview,
-      this.conquestResultPreview,
+      this.raidResultPreview,
       this.gameOverPreview,
       this.gameMenuView
         ? {
@@ -311,20 +311,25 @@ export class App {
     const wasModalOpen = this.isAnyModalOpen();
     const {
       action,
+      battleQ,
+      battleR,
+      battleUnitId,
       building,
       continuousShifts,
       delta,
       marketAmount,
       marketFromResource,
       marketToResource,
+      inventoryAmount,
       objectiveQuestId,
       plot,
       questOption,
       resourceId,
       resourceSiteId,
-      resourceSiteTroops,
+      resourceSiteUnits,
       speed,
       troopCount,
+      unitId,
     } = detail;
 
     if (this.isTabSwitchAction(action)) {
@@ -410,9 +415,9 @@ export class App {
       return;
     }
 
-    if (action === "open-oasis-overview") {
+    if (action === "open-hero-inventory") {
       this.villageModalPlotId = null;
-      this.villageInfoPanel = "oasisOverview";
+      this.villageInfoPanel = "heroInventory";
       this.requestRender();
       this.playModalTransitionSound(wasModalOpen);
       return;
@@ -479,8 +484,8 @@ export class App {
       return;
     }
 
-    if (action === "close-conquest-result") {
-      this.conquestResultPreview = null;
+    if (action === "close-raid-result") {
+      this.raidResultPreview = null;
       this.requestRender();
       this.playModalTransitionSound(wasModalOpen);
       return;
@@ -541,32 +546,49 @@ export class App {
       return;
     }
 
-    if (action === "barracks-worker-to-troop") {
-      this.repeatAction(troopCount, () => this.game.convertWorkerToTroop());
+    if (action === "hero-inventory-transfer" && resourceId) {
+      this.game.transferHeroInventory(resourceId, inventoryAmount ?? 1);
       return;
     }
 
-    if (action === "barracks-troop-to-worker") {
-      this.repeatAction(troopCount, () => this.game.convertTroopToWorker());
+    if (action === "battle-select-unit" && battleUnitId) {
+      this.game.selectBattleUnit(battleUnitId);
+      return;
+    }
+
+    if (
+      action === "battle-move" &&
+      typeof battleQ === "number" &&
+      typeof battleR === "number"
+    ) {
+      this.game.moveBattleUnit(battleQ, battleR);
+      return;
+    }
+
+    if (action === "battle-attack" && battleUnitId) {
+      this.game.attackBattleUnit(battleUnitId);
+      return;
+    }
+
+    if (action === "battle-end-turn") {
+      this.game.endBattleTurn();
+      return;
+    }
+
+    if (action === "barracks-start-training") {
+      this.game.startBarracksTraining(unitId ?? "footman", troopCount ?? 1);
       return;
     }
 
     if (
       action === "resource-site-assault" &&
       resourceSiteId &&
-      typeof resourceSiteTroops === "number" &&
-      Number.isFinite(resourceSiteTroops)
+      resourceSiteUnits
     ) {
-      this.game.startResourceSiteAssault(resourceSiteId, resourceSiteTroops);
+      this.game.startResourceSiteAssault(resourceSiteId, resourceSiteUnits);
       return;
     }
 
-    if (action === "resource-site-workers" && resourceSiteId && this.state) {
-      const site = this.state.resourceSites.find((candidate) => candidate.id === resourceSiteId);
-      if (site) {
-        this.game.setResourceSiteWorkers(resourceSiteId, site.assignedWorkers + (delta ?? 0));
-      }
-    }
   }
 
   private handleTooltipOver(event: MouseEvent): void {
@@ -842,8 +864,8 @@ export class App {
       return false;
     }
 
-    if (this.conquestResultPreview) {
-      this.conquestResultPreview = null;
+    if (this.raidResultPreview) {
+      this.raidResultPreview = null;
       this.requestRender();
       this.playModalTransitionSound(wasModalOpen);
       return true;
@@ -930,7 +952,7 @@ export class App {
     this.mode = "game";
     this.pendingDeleteSaveId = null;
     this.resolvedDecisionPreview = null;
-    this.conquestResultPreview = null;
+    this.raidResultPreview = null;
     this.gameOverPreview = null;
     this.gameMenuView = null;
     this.gameMenuKeyboardIndex = 0;
@@ -938,14 +960,6 @@ export class App {
     this.game.start();
     this.updateAmbientLoop();
     this.requestRender();
-  }
-
-  private repeatAction(count: number | undefined, action: () => void): void {
-    const repetitions = Math.max(1, Math.floor(count ?? 1));
-
-    for (let index = 0; index < repetitions; index += 1) {
-      action();
-    }
   }
 
   private returnHome(): void {
@@ -957,7 +971,7 @@ export class App {
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
-    this.conquestResultPreview = null;
+    this.raidResultPreview = null;
     this.gameOverPreview = null;
     this.gameMenuView = null;
     this.lastActiveDecisionId = null;
@@ -979,9 +993,10 @@ export class App {
       this.villageModalPlotId ||
       this.villageInfoPanel ||
       this.resolvedDecisionPreview ||
-      this.conquestResultPreview ||
+      this.raidResultPreview ||
       this.gameOverPreview ||
       this.gameMenuView ||
+      this.state?.activeBattle ||
       this.state?.quests.activeDecision,
     );
   }
@@ -1097,7 +1112,7 @@ export class App {
       action === "open-weather-overview" ||
       action === "open-objective-quest" ||
       action === "open-market" ||
-      action === "open-oasis-overview" ||
+      action === "open-hero-inventory" ||
       action === "open-quest-log"
     );
   }
@@ -1367,7 +1382,7 @@ export class App {
     return `${topEntry.key}:${JSON.stringify(topEntry.params ?? {})}`;
   }
 
-  private maybeShowConquestResultModal(
+  private maybeShowRaidResultModal(
     state: GameState,
     previousSignature: string,
     nextSignature: string,
@@ -1381,17 +1396,12 @@ export class App {
       return;
     }
 
-    const resourceId = this.toResourceSiteResourceId(topEntry.params?.resourceId);
-    if (!resourceId) {
-      return;
-    }
-
-    if (topEntry.key === "logResourceSiteCaptured") {
+    if (topEntry.key === "logResourceSiteLooted") {
       const returnedTroops = this.toNonNegativeInt(topEntry.params?.count);
       const deaths = this.toNonNegativeInt(topEntry.params?.deaths);
-      this.conquestResultPreview = {
+      this.raidResultPreview = {
         outcome: "victory",
-        resourceId,
+        loot: this.parseLootSummary(topEntry.params?.loot),
         returnedTroops,
         deaths,
         sentTroops: returnedTroops + deaths,
@@ -1402,9 +1412,8 @@ export class App {
 
     if (topEntry.key === "logResourceSiteAssaultFailed") {
       const deaths = this.toNonNegativeInt(topEntry.params?.deaths);
-      this.conquestResultPreview = {
+      this.raidResultPreview = {
         outcome: "failed",
-        resourceId,
         returnedTroops: 0,
         deaths,
         sentTroops: deaths,
@@ -1413,19 +1422,6 @@ export class App {
       return;
     }
 
-    if (topEntry.key === "logResourceSiteAssaultOverrun") {
-      const sentTroops = this.toNonNegativeInt(topEntry.params?.sent);
-      this.conquestResultPreview = {
-        outcome: "overrun",
-        resourceId,
-        returnedTroops: 0,
-        deaths: sentTroops,
-        sentTroops,
-        requiredTroops: this.toNonNegativeInt(topEntry.params?.required),
-        resolvedAt: state.elapsedSeconds,
-      };
-      return;
-    }
   }
 
   private maybeShowGameOverModal(state: GameState): void {
@@ -1436,7 +1432,7 @@ export class App {
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
-    this.conquestResultPreview = null;
+    this.raidResultPreview = null;
     this.gameOverPreview = {
       communityName: state.communityName,
       endedAt: state.elapsedSeconds,
@@ -1455,14 +1451,31 @@ export class App {
     return Math.max(0, Math.floor(value));
   }
 
-  private toResourceSiteResourceId(
-    value: unknown,
-  ): ConquestResultPreview["resourceId"] | null {
-    if (value === "food" || value === "water" || value === "material" || value === "coal") {
-      return value;
+  private parseLootSummary(value: unknown): RaidResultPreview["loot"] {
+    if (typeof value !== "string" || value.trim().length <= 0) {
+      return {};
     }
 
-    return null;
+    const loot: RaidResultPreview["loot"] = {};
+    for (const entry of value.split(",")) {
+      const [resourceId, amountText] = entry.split(":");
+      if (!this.isStorageResourceId(resourceId)) {
+        continue;
+      }
+
+      const amount = Number(amountText);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        continue;
+      }
+
+      loot[resourceId] = Math.floor(amount);
+    }
+
+    return loot;
+  }
+
+  private isStorageResourceId(value: unknown): value is Exclude<ResourceId, "morale"> {
+    return value === "food" || value === "water" || value === "material" || value === "coal";
   }
 
   private installGodMode(): void {

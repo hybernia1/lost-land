@@ -4,6 +4,14 @@ import type { TerrainTextureDefinition, TerrainTextureKey, TerrainTileId } from 
 import type { MapNpcKindId } from "./mapNpcs";
 import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "./villagePlots";
 
+export type VillageHomeAreaDefinition = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type TerrainTilePlacement = {
   x: number;
   y: number;
@@ -83,6 +91,7 @@ export type VillageLayoutDefinition = {
   tileLayers: TerrainTileLayerDefinition[];
   objectLayers: VillageObjectLayerDefinition[];
   npcSpawns: VillageNpcSpawnDefinition[];
+  homeArea: VillageHomeAreaDefinition;
   plots: VillagePlotDefinition[];
   resourceSites: VillageResourceSiteDefinition[];
 };
@@ -99,3 +108,5 @@ export const villageLayoutDefinitions: VillageLayoutDefinition[] = [
 export const villageLayoutById = Object.fromEntries(
   villageLayoutDefinitions.map((layout) => [layout.id, layout]),
 ) as Record<string, VillageLayoutDefinition>;
+
+export const homeVillageArea = defaultVillageLayout.homeArea;

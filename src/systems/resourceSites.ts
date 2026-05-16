@@ -1,14 +1,16 @@
 import { defaultVillageLayout } from "../data/villageLayouts";
+import { combatUnitDefinitions, enemyUnitIds } from "../data/combatUnits";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type {
+  EnemyUnitCounts,
   GameState,
-  ResourceId,
-  ResourceSiteResourceId,
+  ResourceSiteLoot,
   ResourceSiteState,
+  UnitCounts,
 } from "../game/types";
+import { createBattleState, resolveOpeningEnemyTurn } from "./combat";
 import { pushLocalizedLog } from "./log";
-import { getGlobalProductionMultiplier } from "./production";
-import { getAcademyExpeditionDeathRiskMultiplier } from "./academy";
+import { getUnitCount, removeUnits, unitIds } from "./survivors";
 
 const resourceSiteDefinitions = defaultVillageLayout.resourceSites;
 const resourceSiteById = new Map(resourceSiteDefinitions.map((site) => [site.id, site]));
@@ -19,13 +21,9 @@ const homeTravelAnchorPlot = defaultVillageLayout.plots.find((plot) => plot.id =
 export function createInitialResourceSites(): ResourceSiteState[] {
   return resourceSiteDefinitions.map((site) => ({
     id: site.id,
-    resourceId: site.resourceId,
-    captured: false,
-    assignedWorkers: 0,
-    maxWorkers: site.maxWorkers,
-    yieldPerWorker: site.yieldPerWorker,
-    captureMinTroops: site.captureMinTroops,
-    captureBaseDeathRisk: site.captureBaseDeathRisk,
+    loot: normalizeResourceSiteLoot(site.loot),
+    looted: false,
+    defenderArmy: normalizeDefenderArmy(site.defenderArmy),
     assault: null,
   }));
 }
@@ -35,25 +33,15 @@ export function normalizeResourceSites(state: GameState): void {
 
   state.resourceSites = resourceSiteDefinitions.map((definition) => {
     const current = sitesById.get(definition.id);
-    const resourceId = current?.resourceId;
-    const normalizedResourceId: ResourceSiteResourceId = resourceId === "food" ||
-        resourceId === "water" ||
-        resourceId === "coal" ||
-        resourceId === "material"
-      ? resourceId
-      : definition.resourceId;
-    const maxWorkers = Math.max(1, Math.min(3, Math.floor(current?.maxWorkers ?? definition.maxWorkers)));
-    const assignedWorkers = Math.max(0, Math.min(maxWorkers, Math.floor(current?.assignedWorkers ?? 0)));
-    const captureMinTroops = Math.max(1, Math.floor(current?.captureMinTroops ?? definition.captureMinTroops));
-    const captureBaseDeathRisk = Math.max(
-      0.05,
-      Math.min(0.95, current?.captureBaseDeathRisk ?? definition.captureBaseDeathRisk),
-    );
+    const defenderArmy = current?.looted
+      ? normalizeDefenderArmy(current?.defenderArmy ?? definition.defenderArmy)
+      : normalizeDefenderArmy(definition.defenderArmy);
     const assault = current?.assault &&
         current.assault.troops > 0 &&
         current.assault.remainingSeconds > 0
       ? {
           troops: Math.max(1, Math.floor(current.assault.troops)),
+          units: normalizeAssaultUnits(current.assault.units, Math.max(1, Math.floor(current.assault.troops))),
           remainingSeconds: Math.max(0, current.assault.remainingSeconds),
           travelTiles: Math.max(1, Math.floor(current.assault.travelTiles)),
         }
@@ -61,13 +49,9 @@ export function normalizeResourceSites(state: GameState): void {
 
     return {
       id: definition.id,
-      resourceId: normalizedResourceId,
-      captured: Boolean(current?.captured),
-      assignedWorkers: Boolean(current?.captured) ? assignedWorkers : 0,
-      maxWorkers,
-      yieldPerWorker: Math.max(0.001, current?.yieldPerWorker ?? definition.yieldPerWorker),
-      captureMinTroops,
-      captureBaseDeathRisk,
+      loot: normalizeResourceSiteLoot(definition.loot),
+      looted: Boolean(current?.looted),
+      defenderArmy,
       assault,
     };
   });
@@ -76,62 +60,58 @@ export function normalizeResourceSites(state: GameState): void {
 export function startResourceSiteAssault(
   state: GameState,
   siteId: string,
-  troopCount: number,
+  units: UnitCounts,
 ): boolean {
   const site = getResourceSiteState(state, siteId);
   const definition = resourceSiteById.get(siteId);
-  const troops = Math.max(0, Math.floor(troopCount));
+  const requestedUnits = normalizeAssaultUnits(units, 0);
+  const troops = getUnitCount(requestedUnits);
 
   if (!site || !definition) {
     return false;
   }
 
-  if (site.captured) {
-    pushLocalizedLog(state, "logResourceSiteAlreadyCaptured", {
-      resourceId: site.resourceId,
-    });
+  if (site.looted) {
+    pushLocalizedLog(state, "logResourceSiteAlreadyLooted");
     return false;
   }
 
-  if (site.assault) {
-    pushLocalizedLog(state, "logResourceSiteAssaultAlreadyRunning", {
-      resourceId: site.resourceId,
-    });
+  if (site.assault || state.activeBattle) {
+    pushLocalizedLog(state, "logResourceSiteAssaultAlreadyRunning");
     return false;
   }
 
-  if (troops <= 0 || state.survivors.troops < troops) {
+  const availableTroops = getUnitCount(state.survivors.units);
+  if (troops <= 0 || !hasAvailableUnits(state.survivors.units, requestedUnits)) {
     pushLocalizedLog(state, "logResourceSiteNoTroops", {
-      resourceId: site.resourceId,
       count: troops,
-      available: state.survivors.troops,
+      available: availableTroops,
     });
     return false;
   }
 
   const travelTiles = getTravelTilesToSite(definition.id);
-  const travelHours = travelTiles;
+  const assaultUnits = removeUnits(state, requestedUnits);
 
-  state.survivors.troops -= troops;
+  if (!assaultUnits) {
+    return false;
+  }
+
   site.assault = {
     troops,
+    units: assaultUnits,
     travelTiles,
-    remainingSeconds: Math.max(1, travelHours * GAME_HOUR_REAL_SECONDS),
+    remainingSeconds: Math.max(1, travelTiles * GAME_HOUR_REAL_SECONDS),
   };
 
   pushLocalizedLog(state, "logResourceSiteAssaultStarted", {
     count: troops,
-    resourceId: site.resourceId,
-    hours: travelHours,
+    hours: travelTiles,
   });
   return true;
 }
 
 export function tickResourceSites(state: GameState, deltaSeconds: number): void {
-  if (state.resourceSites.length === 0) {
-    return;
-  }
-
   for (const site of state.resourceSites) {
     if (!site.assault) {
       continue;
@@ -139,43 +119,10 @@ export function tickResourceSites(state: GameState, deltaSeconds: number): void 
 
     site.assault.remainingSeconds = Math.max(0, site.assault.remainingSeconds - deltaSeconds);
 
-    if (site.assault.remainingSeconds > 0) {
-      continue;
+    if (site.assault.remainingSeconds <= 0) {
+      openResourceSiteBattle(state, site);
     }
-
-    resolveResourceSiteAssault(state, site);
   }
-}
-
-export function setResourceSiteWorkers(
-  state: GameState,
-  siteId: string,
-  targetWorkers: number,
-): boolean {
-  const site = getResourceSiteState(state, siteId);
-
-  if (!site || !site.captured || site.assault) {
-    return false;
-  }
-
-  const nextWorkers = Math.max(0, Math.min(site.maxWorkers, Math.floor(targetWorkers)));
-  const difference = nextWorkers - site.assignedWorkers;
-
-  if (difference === 0) {
-    return false;
-  }
-
-  if (difference > 0 && state.survivors.workers < difference) {
-    return false;
-  }
-
-  site.assignedWorkers = nextWorkers;
-  state.survivors.workers -= difference;
-  return true;
-}
-
-export function getAssignedResourceSiteWorkerCount(state: GameState): number {
-  return state.resourceSites.reduce((total, site) => total + site.assignedWorkers, 0);
 }
 
 export function getResourceSiteAssaultTroopCount(state: GameState): number {
@@ -183,45 +130,6 @@ export function getResourceSiteAssaultTroopCount(state: GameState): number {
     (total, site) => total + (site.assault?.troops ?? 0),
     0,
   );
-}
-
-export function removeOneResourceSiteWorker(state: GameState): boolean {
-  const site = state.resourceSites.find((candidate) => candidate.assignedWorkers > 0);
-
-  if (!site) {
-    return false;
-  }
-
-  site.assignedWorkers -= 1;
-  return true;
-}
-
-export function getResourceSiteProductionRates(state: GameState): Record<ResourceId, number> {
-  return getResourceSiteProductionDelta(state, 1);
-}
-
-export function getResourceSiteProductionDelta(
-  state: GameState,
-  deltaSeconds: number,
-): Record<ResourceId, number> {
-  const multiplier = getResourceSiteProductionMultiplier(state);
-  const delta: Record<ResourceId, number> = {
-    food: 0,
-    water: 0,
-    material: 0,
-    coal: 0,
-    morale: 0,
-  };
-
-  for (const site of state.resourceSites) {
-    if (!site.captured || site.assignedWorkers <= 0) {
-      continue;
-    }
-
-    delta[site.resourceId] += site.yieldPerWorker * site.assignedWorkers * multiplier * deltaSeconds;
-  }
-
-  return delta;
 }
 
 export function getTravelTilesToSite(siteId: string): number {
@@ -243,17 +151,54 @@ export function getTravelTilesToSite(siteId: string): number {
   const distanceTiles = (Math.abs(siteCenterX - homeCenterX) + Math.abs(siteCenterY - homeCenterY)) /
     tileSize;
 
-  return Math.max(1, Math.ceil(distanceTiles));
+  return Math.max(1, Math.ceil(distanceTiles * 0.5));
+}
+
+export function getResourceSiteDifficultyRating(site: Pick<ResourceSiteState, "defenderArmy" | "looted">): number {
+  if (site.looted) {
+    return 0;
+  }
+
+  const power = enemyUnitIds.reduce((total, unitId) => {
+    const count = Math.max(0, Math.floor(site.defenderArmy[unitId] ?? 0));
+    const definition = combatUnitDefinitions[unitId];
+    const unitPower = definition.maxHp +
+      definition.damage * 5 +
+      definition.range * 4 +
+      definition.move * 2 +
+      definition.initiative * 0.5;
+
+    return total + count * unitPower;
+  }, 0);
+
+  if (power <= 0) {
+    return 0;
+  }
+
+  if (power <= 90) {
+    return 1;
+  }
+
+  if (power <= 170) {
+    return 2;
+  }
+
+  if (power <= 280) {
+    return 3;
+  }
+
+  if (power <= 410) {
+    return 4;
+  }
+
+  return 5;
 }
 
 function getResourceSiteState(state: GameState, siteId: string): ResourceSiteState | undefined {
   return state.resourceSites.find((site) => site.id === siteId);
 }
 
-function resolveResourceSiteAssault(
-  state: GameState,
-  site: ResourceSiteState,
-): void {
+function openResourceSiteBattle(state: GameState, site: ResourceSiteState): void {
   const assault = site.assault;
 
   if (!assault) {
@@ -261,71 +206,51 @@ function resolveResourceSiteAssault(
   }
 
   site.assault = null;
-
-  if (assault.troops < site.captureMinTroops) {
-    pushLocalizedLog(state, "logResourceSiteAssaultOverrun", {
-      resourceId: site.resourceId,
-      required: site.captureMinTroops,
-      sent: assault.troops,
-    });
-    return;
-  }
-
-  const academyRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(
-    state.buildings.academy.level,
+  state.activeBattle = createBattleState(
+    site.id,
+    site.loot,
+    assault.units,
+    site.defenderArmy,
   );
-  const deaths = rollDeaths(
-    assault.troops,
-    site.captureBaseDeathRisk,
-    site.captureMinTroops,
-    academyRiskMultiplier,
-  );
-  const returningTroops = assault.troops - deaths;
-
-  if (returningTroops <= 0) {
-    pushLocalizedLog(state, "logResourceSiteAssaultFailed", {
-      resourceId: site.resourceId,
-      deaths,
-    });
-    return;
-  }
-
-  site.captured = true;
-  state.survivors.troops += returningTroops;
-
-  pushLocalizedLog(state, "logResourceSiteCaptured", {
-    resourceId: site.resourceId,
-    count: returningTroops,
-    deaths,
-  });
+  resolveOpeningEnemyTurn(state);
+  pushLocalizedLog(state, "logResourceSiteBattleStarted");
 }
 
-function rollDeaths(
-  troops: number,
-  baseDeathRisk: number,
-  captureMinTroops: number,
-  riskMultiplier: number,
-): number {
-  const riskScale = captureMinTroops / Math.max(captureMinTroops, troops);
-  const perTroopRisk = Math.max(
-    0.08,
-    Math.min(0.92, baseDeathRisk * riskScale * riskMultiplier * randomBetween(0.85, 1.25)),
-  );
-  let deaths = 0;
+function normalizeAssaultUnits(units: UnitCounts | undefined, fallbackTroops: number): UnitCounts {
+  if (!units) {
+    const fallback = createEmptyUnitCounts();
+    fallback.footman = fallbackTroops;
+    return fallback;
+  }
 
-  for (let index = 0; index < troops; index += 1) {
-    if (Math.random() < perTroopRisk) {
-      deaths += 1;
+  return Object.fromEntries(
+    unitIds.map((unitId) => [unitId, Math.max(0, Math.floor(units[unitId] ?? 0))]),
+  ) as UnitCounts;
+}
+
+function normalizeDefenderArmy(army: Partial<EnemyUnitCounts>): EnemyUnitCounts {
+  return Object.fromEntries(
+    enemyUnitIds.map((unitId) => [unitId, Math.max(0, Math.floor(army[unitId] ?? 0))]),
+  ) as EnemyUnitCounts;
+}
+
+function normalizeResourceSiteLoot(loot: Partial<ResourceSiteLoot> | undefined): ResourceSiteLoot {
+  const normalized: ResourceSiteLoot = {};
+
+  for (const resourceId of ["food", "water", "material", "coal"] as const) {
+    const amount = Math.max(0, Math.floor(loot?.[resourceId] ?? 0));
+    if (amount > 0) {
+      normalized[resourceId] = amount;
     }
   }
 
-  return deaths;
+  return normalized;
 }
 
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+function hasAvailableUnits(available: UnitCounts, requested: UnitCounts): boolean {
+  return unitIds.every((unitId) => Math.max(0, Math.floor(available[unitId] ?? 0)) >= requested[unitId]);
 }
 
-function getResourceSiteProductionMultiplier(state: GameState): number {
-  return getGlobalProductionMultiplier(state);
+function createEmptyUnitCounts(): UnitCounts {
+  return Object.fromEntries(unitIds.map((unitId) => [unitId, 0])) as UnitCounts;
 }

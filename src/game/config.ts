@@ -24,6 +24,38 @@ export const gameConfig = {
   market: {
     tradeCooldownHours: 4,
   },
+  barracks: {
+    troopTraining: {
+      footman: {
+        seconds: 60,
+        cost: {
+          food: 30,
+          water: 18,
+          material: 10,
+        },
+      },
+      archer: {
+        seconds: 90,
+        cost: {
+          food: 52,
+          water: 32,
+          material: 34,
+        },
+      },
+      bulwark: {
+        seconds: 120,
+        cost: {
+          food: 70,
+          water: 46,
+          material: 72,
+        },
+      },
+    },
+  },
+  combat: {
+    stackSize: 5,
+    stackDamageScaling: 0.65,
+  },
   audio: {
     uiVolume: 0.45,
     decisionAlertVolume: 0.86,

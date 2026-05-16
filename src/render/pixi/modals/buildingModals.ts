@@ -1,8 +1,9 @@
 import { Container, Graphics, Rectangle, Sprite } from "pixi.js";
 import { buildingById } from "../../../data/buildings";
 import { buildingVisualDefinitions } from "../../../data/buildingVisuals";
+import { combatUnitDefinitions } from "../../../data/combatUnits";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
-import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId } from "../../../game/types";
+import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId, UnitId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import {
   getBuildingBuildSeconds,
@@ -15,6 +16,7 @@ import {
   getWorkshopCoalRate,
   getWorkshopMaterialRate,
   hasAvailableBuildingSlot,
+  isBuildingInactiveDueToCoal,
   isMainBuildingRequirementMet,
 } from "../../../systems/buildings";
 import {
@@ -27,6 +29,12 @@ import {
   marketResourceIds,
 } from "../../../systems/market";
 import { canAfford } from "../../../systems/resources";
+import {
+  getBarracksTrainingCost,
+  getBarracksTrainingCostForCount,
+  getBarracksTrainingSeconds,
+  unitIds,
+} from "../../../systems/survivors";
 import { buildCategoryOrder, UI_PANEL_RADIUS, uiTextSize, uiTheme } from "../core/constants";
 import type {
   Bounds,
@@ -42,7 +50,8 @@ import type {
   TabOptions,
 } from "../core/types";
 import { getCostLineParts, getCurrentBuildingEffects, getNextLevelEffects } from "../helpers/buildingEffects";
-import { formatPercentBonus, formatRate, formatScoutingRemaining, formatTemplate, getHourlyRateLabel, getRateColor } from "../helpers/formatters";
+import { formatPercentBonus, formatRate, formatRealTimeRemaining, formatScoutingRemaining, formatTemplate, getHourlyRateLabel, getRateColor } from "../helpers/formatters";
+import { getUnitIconId } from "../helpers/unitIcons";
 import { drawActionStepper, drawLocalStepper } from "./modalControls";
 import { drawModalContentPlane, drawModalHeaderPlane } from "./modalLayout";
 
@@ -104,9 +113,11 @@ type BuildingModalsHost = {
   setMarketAmount: (value: number) => void;
   getBarracksTroopCount: () => number;
   setBarracksTroopCount: (value: number) => void;
+  getBarracksTrainingUnitId: () => UnitId;
+  setBarracksTrainingUnitId: (value: UnitId) => void;
 };
 
-type BuildingDetailTab = "overview" | "bonuses";
+type BuildingDetailTab = "overview" | "training" | "units" | "bonuses";
 const BUILDING_METRIC_ICON_SIZE = 30;
 const BUILDING_INFO_TOKEN_ICON_SIZE = 22;
 const BUILDING_INFO_TOKEN_HEIGHT = 28;
@@ -442,18 +453,20 @@ export function drawBuildingDetail(
   const metricCount = Math.max(1, Math.min(7, metrics.length));
   const metricWidth = (bodyWidth - metricGap * (metricCount - 1)) / metricCount;
   const metricY = contentTop + 120;
+  const hasControls = hasBuildingControlSection(buildingId);
+  const hasDetailTabs = true;
+  const activeDetailTab = hasDetailTabs ? getActiveBuildingDetailTab(host, buildingId) : "overview";
+  const showUpgradeFooter = activeDetailTab === "overview";
   const footerHeight = 54;
   const footerY = modalHeight - sideMargin - footerHeight;
   const sectionY = metricY + 98;
-  const sectionHeight = Math.max(176, footerY - sectionY - 22);
+  const sectionBottomY = showUpgradeFooter ? footerY - 22 : modalHeight - sideMargin;
+  const sectionHeight = Math.max(176, sectionBottomY - sectionY);
   const columnGap = 14;
-  const hasControls = hasBuildingControlSection(buildingId);
-  const hasDetailTabs = true;
   const controlWidth = hasControls ? Math.max(360, Math.floor((bodyWidth - columnGap) * 0.56)) : 0;
   const nextLevelWidth = hasControls ? bodyWidth - controlWidth - columnGap : bodyWidth;
   const controlX = sideMargin;
   const nextLevelX = hasControls ? controlX + controlWidth + columnGap : sideMargin;
-  const activeDetailTab = hasDetailTabs ? host.getActiveBuildingDetailTab() : "overview";
   const adjacentPlots = getAdjacentBuildingPlotIds(state, plotId);
   const titleWidth = modalWidth - titleX - sideMargin - (adjacentPlots ? 170 : 0);
 
@@ -488,7 +501,7 @@ export function drawBuildingDetail(
   });
 
   if (hasDetailTabs) {
-    drawBuildingDetailTabs(host, content, activeDetailTab, translations, sideMargin, sectionY, bodyWidth);
+    drawBuildingDetailTabs(host, content, buildingId, activeDetailTab, translations, sideMargin, sectionY, bodyWidth);
     if (activeDetailTab === "bonuses") {
       drawBuildingBonusOverviewSection(
         host,
@@ -503,6 +516,27 @@ export function drawBuildingDetail(
         Math.max(120, sectionHeight - 52),
         parent.x + sideMargin,
         parent.y + sectionY + 52,
+      );
+    } else if (activeDetailTab === "training" && buildingId === "barracks") {
+      drawBarracksTrainingSection(
+        host,
+        content,
+        state,
+        translations,
+        sideMargin,
+        sectionY + 52,
+        bodyWidth,
+        Math.max(120, sectionHeight - 52),
+      );
+    } else if (activeDetailTab === "units" && buildingId === "barracks") {
+      drawBarracksUnitsSection(
+        host,
+        content,
+        translations,
+        sideMargin,
+        sectionY + 52,
+        bodyWidth,
+        Math.max(120, sectionHeight - 52),
       );
     } else {
       const tabContentY = sectionY + 52;
@@ -555,6 +589,10 @@ export function drawBuildingDetail(
       nextLevelWidth,
       sectionHeight,
     );
+  }
+
+  if (!showUpgradeFooter) {
+    return;
   }
 
   const buttonLabel = upgrading
@@ -656,12 +694,26 @@ function drawBuildingModalNavigation(
 }
 
 function hasBuildingControlSection(buildingId: BuildingId): boolean {
-  return buildingId === "coalMine" || buildingId === "workshop" || buildingId === "market" || buildingId === "barracks";
+  return buildingId === "coalMine" || buildingId === "workshop" || buildingId === "market";
+}
+
+function getActiveBuildingDetailTab(
+  host: BuildingModalsHost,
+  buildingId: BuildingId,
+): BuildingDetailTab {
+  const activeTab = host.getActiveBuildingDetailTab();
+
+  if ((activeTab === "training" || activeTab === "units") && buildingId !== "barracks") {
+    return "overview";
+  }
+
+  return activeTab;
 }
 
 function drawBuildingDetailTabs(
   host: BuildingModalsHost,
   parent: Container,
+  buildingId: BuildingId,
   activeTab: BuildingDetailTab,
   translations: TranslationPack,
   x: number,
@@ -669,12 +721,19 @@ function drawBuildingDetailTabs(
   width: number,
 ): void {
   const labels = getBuildingDetailTabLabels(translations);
+  const tabs: Array<TabItem<BuildingDetailTab>> = [
+    { id: "overview", label: labels.overview },
+  ];
+
+  if (buildingId === "barracks") {
+    tabs.push({ id: "training", label: labels.training });
+    tabs.push({ id: "units", label: labels.units });
+  }
+
+  tabs.push({ id: "bonuses", label: labels.bonuses });
   host.drawTabs(
     parent,
-    [
-      { id: "overview", label: labels.overview },
-      { id: "bonuses", label: labels.bonuses },
-    ],
+    tabs,
     {
       x,
       y,
@@ -705,9 +764,7 @@ function drawBuildingBonusOverviewSection(
   absoluteX: number,
   absoluteY: number,
 ): void {
-  drawDetailPanel(parent, x, y, width, height);
   const copy = getBuildingBonusCopy(translations);
-  drawSectionTitle(host, parent, copy.title, x + 22, y + 24);
 
   if (host.getBuildingBonusScrollBuildingId() !== buildingId) {
     host.setBuildingBonusScrollBuildingId(buildingId);
@@ -717,22 +774,22 @@ function drawBuildingBonusOverviewSection(
   const rows = Array.from({ length: maxLevel }, (_, index) => index + 1);
   const rowGap = 8;
   const rowHeight = 42;
-  const listX = x + 22;
-  const listY = y + 64;
-  const viewportHeight = Math.max(48, height - 82);
+  const listX = x;
+  const listY = y;
+  const viewportHeight = Math.max(48, height);
   const contentHeight = rows.length * rowHeight + rowGap * Math.max(0, rows.length - 1);
   const maxScroll = Math.max(0, contentHeight - viewportHeight);
   const needsScroll = maxScroll > 1;
   const scrollbarGutter = needsScroll ? 18 : 0;
-  const rowWidth = width - 44 - scrollbarGutter;
+  const rowWidth = width - scrollbarGutter;
   const scrollY = Math.max(0, Math.min(maxScroll, host.getBuildingBonusScrollY()));
   host.setBuildingBonusScrollY(scrollY);
   host.setBuildingBonusScrollMax(maxScroll);
   host.setBuildingBonusScrollArea({
-    x: absoluteX + 22,
-    y: absoluteY + 60,
-    width: width - 44,
-    height: viewportHeight + 8,
+    x: absoluteX,
+    y: absoluteY,
+    width,
+    height: viewportHeight,
   });
 
   const listContent = new Container();
@@ -742,7 +799,7 @@ function drawBuildingBonusOverviewSection(
 
   const listMask = new Graphics();
   listMask.eventMode = "none";
-  listMask.rect(listX - 4, listY - 4, width - 36, viewportHeight + 8).fill({ color: 0xffffff, alpha: 1 });
+  listMask.rect(listX - 4, listY - 4, width + 8, viewportHeight + 8).fill({ color: 0xffffff, alpha: 1 });
   parent.addChild(listMask);
   listContent.mask = listMask;
 
@@ -754,7 +811,7 @@ function drawBuildingBonusOverviewSection(
   if (needsScroll) {
     drawBuildChoicesScrollbar(
       parent,
-      x + width - 34,
+      x + width - 12,
       listY,
       8,
       viewportHeight,
@@ -830,6 +887,8 @@ function drawBuildingBonusRow(
 function getBuildingDetailTabLabels(translations: TranslationPack): Record<BuildingDetailTab, string> {
   return {
     overview: translations.ui.buildingDetailOverview ?? "Overview",
+    training: translations.ui.training ?? "Training",
+    units: translations.ui.units ?? "Units",
     bonuses: translations.ui.buildingDetailBonuses ?? "Bonuses",
   };
 }
@@ -1097,12 +1156,6 @@ function drawBuildingControlSection(
     return;
   }
 
-  if (buildingId === "barracks") {
-    drawSectionTitle(host, parent, translations.ui.troopTraining ?? translations.roles.troops, x + 22, y + 24);
-    drawBarracksControlsContent(host, parent, state, translations, x, y + 56, width);
-    return;
-  }
-
   drawSectionTitle(host, parent, translations.ui.operations ?? "Operations", x + 22, y + 24);
   host.drawText(parent, translations.ui.resourceNoActiveEffects ?? "-", x + 22, y + 66, {
     fill: uiTheme.textMuted,
@@ -1339,7 +1392,112 @@ function getMarketTradeDisabledTooltip(
   return undefined;
 }
 
-function drawBarracksControlsContent(
+function drawBarracksUnitsSection(
+  host: BuildingModalsHost,
+  parent: Container,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  const contentX = x;
+  const contentY = y;
+  const gap = 14;
+  const rowHeight = Math.max(118, Math.floor((height - gap) / 2));
+  unitIds.forEach((unitId, index) => {
+    const unitY = contentY + index * (rowHeight + gap);
+    drawBarracksUnitCard(host, parent, unitId, translations, contentX, unitY, width, rowHeight);
+  });
+}
+
+function drawBarracksUnitCard(
+  host: BuildingModalsHost,
+  parent: Container,
+  unitId: UnitId,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  const definition = combatUnitDefinitions[unitId];
+  drawDetailPanel(parent, x, y, width, height, 0.3);
+
+  const name = translations.roles[unitId] ?? unitId;
+  const description = translations.ui[`${unitId}Description`] ?? "";
+  host.drawIcon(parent, getUnitIconId(unitId), x + 22, y + 30, 24);
+  host.drawText(parent, name, x + 52, y + 16, {
+    fill: uiTheme.text,
+    fontSize: uiTextSize.emphasis,
+    fontWeight: "900",
+  });
+  host.drawText(parent, description, x + 52, y + 44, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "700",
+    wordWrap: true,
+    wordWrapWidth: Math.max(260, width - 340),
+    lineHeight: 15,
+  });
+
+  const statsX = x + Math.max(330, Math.floor(width * 0.48));
+  const statGap = 8;
+  const statWidth = Math.max(64, Math.floor((width - (statsX - x) - 22 - statGap * 3) / 4));
+  const stats = [
+    { label: translations.ui.hp ?? "HP", value: `${definition.maxHp}` },
+    { label: translations.ui.damage ?? "DMG", value: `${definition.damage}` },
+    { label: translations.ui.range ?? "Range", value: `${definition.range}` },
+    { label: translations.ui.move ?? "Move", value: `${definition.move}` },
+  ];
+
+  stats.forEach((stat, index) => {
+    drawMiniStat(host, parent, stat.label, stat.value, statsX + index * (statWidth + statGap), y + 18, statWidth);
+  });
+
+  const costY = y + Math.min(height - 34, 82);
+  host.drawText(parent, translations.ui.trainingCost ?? "Cost", statsX, costY, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+  });
+  drawCostLine(host, parent, getBarracksTrainingCost(unitId), {
+    food: Number.POSITIVE_INFINITY,
+    water: Number.POSITIVE_INFINITY,
+    material: Number.POSITIVE_INFINITY,
+    coal: Number.POSITIVE_INFINITY,
+    morale: Number.POSITIVE_INFINITY,
+  }, translations, statsX + 58, costY - 5, false, Math.max(220, width - (statsX - x) - 80));
+  host.drawText(parent, `${translations.ui.trainingTime ?? "Training time"}: ${formatRealTimeRemaining(getBarracksTrainingSeconds(unitId))}`, statsX, costY + 30, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "800",
+  });
+}
+
+function drawMiniStat(
+  host: BuildingModalsHost,
+  parent: Container,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  width: number,
+): void {
+  drawDetailPanel(parent, x, y, width, 42, 0.28);
+  host.drawText(parent, label, x + 8, y + 5, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "800",
+  });
+  host.drawText(parent, value, x + 8, y + 21, {
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+  });
+}
+
+function drawBarracksTrainingSection(
   host: BuildingModalsHost,
   parent: Container,
   state: GameState,
@@ -1347,22 +1505,76 @@ function drawBarracksControlsContent(
   x: number,
   y: number,
   width: number,
+  height: number,
 ): void {
+  drawDetailPanel(parent, x, y, width, height);
+
+  const selectedUnitId = host.getBarracksTrainingUnitId();
+  const maxTrainableTroops = getMaxBarracksTrainingCount(state, selectedUnitId);
   const selectedTroops = Math.max(1, Math.floor(host.getBarracksTroopCount()));
-  const maxSelectableTroops = Math.max(1, Math.max(state.survivors.workers, state.survivors.troops));
+  const maxSelectableTroops = Math.max(1, maxTrainableTroops);
   host.setBarracksTroopCount(Math.min(selectedTroops, maxSelectableTroops));
+  const currentSelection = host.getBarracksTroopCount();
   const contentX = x + 22;
   const availableWidth = width - 44;
-  const statWidth = Math.max(118, Math.floor((availableWidth - 14) / 2));
+  const statGap = 10;
+  const statWidth = Math.max(92, Math.floor((availableWidth - statGap * unitIds.length) / (unitIds.length + 1)));
+  const cost = getBarracksTrainingCostForCount(selectedUnitId, currentSelection);
+  const trainDisabled = maxTrainableTroops <= 0 || !canAfford(state.resources, cost);
 
-  drawModalStatLine(host, parent, "people", translations.ui.availableWorkers, `${state.survivors.workers}`, contentX, y, statWidth);
-  drawModalStatLine(host, parent, "troop", translations.ui.availableTroops, `${state.survivors.troops}`, contentX + statWidth + 14, y, statWidth);
+  drawBarracksUnitSelector(host, parent, selectedUnitId, translations, contentX, y + 16);
+  unitIds.forEach((unitId, index) => {
+    drawModalStatLine(
+      host,
+      parent,
+      getUnitIconId(unitId),
+      translations.roles[unitId] ?? unitId,
+      `${state.survivors.units[unitId]}`,
+      contentX + (statWidth + statGap) * index,
+      y + 58,
+      statWidth,
+    );
+  });
+  drawModalStatLine(
+    host,
+    parent,
+    "clock",
+    translations.ui.troopTrainingQueue ?? "Training queue",
+    `${state.survivors.barracksTrainingQueue.length}`,
+    contentX + (statWidth + statGap) * unitIds.length,
+    y + 58,
+    statWidth,
+  );
+
+  const costY = y + 120;
+  host.drawText(parent, translations.ui.trainingCost ?? "Cost", contentX, costY, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+  });
+  drawCostLine(host, parent, cost, state.resources, translations, contentX + 76, costY - 5, true);
+  host.drawText(
+    parent,
+    `${translations.ui.trainingTime ?? "Training time"}: ${formatRealTimeRemaining(getBarracksTrainingSeconds(selectedUnitId))}`,
+    contentX,
+    costY + 34,
+    {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
+      fontWeight: "800",
+    },
+  );
+
+  const controlsY = y + 166;
+  const stepperWidth = 136;
+  const buttonX = contentX + stepperWidth + 24;
+  const buttonWidth = Math.max(220, availableWidth - stepperWidth - 24);
   drawLocalStepper(
     host,
     parent,
     `${host.getBarracksTroopCount()}`,
-    contentX + Math.max(0, Math.floor((availableWidth - 124) / 2)),
-    y + 62,
+    contentX,
+    controlsY,
     () => {
       host.setBarracksTroopCount(Math.max(1, host.getBarracksTroopCount() - 1));
       host.requestRender();
@@ -1372,34 +1584,180 @@ function drawBarracksControlsContent(
       host.requestRender();
     },
     host.getBarracksTroopCount() <= 1,
-    host.getBarracksTroopCount() >= maxSelectableTroops,
+    host.getBarracksTroopCount() >= maxTrainableTroops,
   );
 
-  const buttonY = y + 128;
-  const buttonGap = 12;
-  const buttonWidth = Math.floor((availableWidth - buttonGap) / 2);
   host.createModalButton(
     parent,
-    translations.ui.workerToTroop,
+    translations.ui.startTroopTraining ?? translations.ui.workerToTroop,
+    buttonX,
+    controlsY,
+    buttonWidth,
+    32,
+    { action: "barracks-start-training", unitId: selectedUnitId, troopCount: host.getBarracksTroopCount() },
+    trainDisabled,
+    trainDisabled ? getBarracksTrainingDisabledTooltip(state, translations, selectedUnitId, currentSelection) : undefined,
+  );
+
+  const queueY = controlsY + 50;
+  drawBarracksTrainingQueue(
+    host,
+    parent,
+    state,
+    translations,
     contentX,
-    buttonY,
-    buttonWidth,
-    32,
-    { action: "barracks-worker-to-troop", troopCount: host.getBarracksTroopCount() },
-    state.survivors.workers < host.getBarracksTroopCount(),
-    state.survivors.workers < host.getBarracksTroopCount() ? translations.ui.notEnoughWorkers : undefined,
+    queueY,
+    availableWidth,
+    y + height - queueY - 18,
   );
-  host.createModalButton(
-    parent,
-    translations.ui.troopToWorker,
-    contentX + buttonWidth + buttonGap,
-    buttonY,
-    buttonWidth,
-    32,
-    { action: "barracks-troop-to-worker", troopCount: host.getBarracksTroopCount() },
-    state.survivors.troops < host.getBarracksTroopCount(),
-    state.survivors.troops < host.getBarracksTroopCount() ? translations.ui.notEnoughTroops : undefined,
-  );
+}
+
+function drawBarracksUnitSelector(
+  host: BuildingModalsHost,
+  parent: Container,
+  activeUnitId: UnitId,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+): void {
+  let offsetX = 0;
+
+  for (const unitId of unitIds) {
+    const label = translations.roles[unitId] ?? unitId;
+    host.createRectButton(parent, {
+      label,
+      x: x + offsetX,
+      y,
+      width: 118,
+      height: 30,
+      active: unitId === activeUnitId,
+      tone: "secondary",
+      fontSize: uiTextSize.caption,
+      fontWeight: "900",
+      onTap: () => {
+        host.setBarracksTrainingUnitId(unitId);
+        host.setBarracksTroopCount(1);
+        host.playTabSwitchSound();
+        host.requestRender();
+      },
+    });
+    offsetX += 126;
+  }
+}
+
+function getMaxBarracksTrainingCount(state: GameState, unitId: UnitId): number {
+  const barracks = state.buildings.barracks;
+  if (
+    barracks.level <= 0 ||
+    barracks.upgradingRemaining > 0 ||
+    isBuildingInactiveDueToCoal(state, "barracks")
+  ) {
+    return 0;
+  }
+
+  const resourceLimit = Object.entries(getBarracksTrainingCost(unitId)).reduce((limit, [resourceId, amount]) => {
+    if ((amount ?? 0) <= 0) {
+      return limit;
+    }
+
+    const available = state.resources[resourceId as ResourceId] ?? 0;
+    return Math.min(limit, Math.floor(available / (amount ?? 1)));
+  }, Number.POSITIVE_INFINITY);
+
+  return Math.max(0, Number.isFinite(resourceLimit) ? resourceLimit : 0);
+}
+
+function getBarracksTrainingDisabledTooltip(
+  state: GameState,
+  translations: TranslationPack,
+  unitId: UnitId,
+  selectedTroops: number,
+): string | undefined {
+  const barracks = state.buildings.barracks;
+  if (barracks.upgradingRemaining > 0 || isBuildingInactiveDueToCoal(state, "barracks")) {
+    return translations.ui.trainingUnavailable ?? "Training is unavailable right now.";
+  }
+
+  if (!canAfford(state.resources, getBarracksTrainingCostForCount(unitId, selectedTroops))) {
+    return translations.ui.notEnoughResources;
+  }
+
+  return undefined;
+}
+
+function drawBarracksTrainingQueue(
+  host: BuildingModalsHost,
+  parent: Container,
+  state: GameState,
+  translations: TranslationPack,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  const queue = state.survivors.barracksTrainingQueue;
+  const safeHeight = Math.max(42, height);
+
+  drawSectionTitle(host, parent, translations.ui.troopTrainingQueue ?? "Training queue", x, y);
+
+  if (queue.length === 0) {
+    host.drawText(parent, translations.ui.troopTrainingQueueEmpty ?? "No troops in training.", x, y + 36, {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
+      fontWeight: "800",
+    });
+    return;
+  }
+
+  const rowGap = 8;
+  const rowHeight = 38;
+  const maxRows = Math.max(1, Math.floor((safeHeight - 34) / (rowHeight + rowGap)));
+  const visibleJobs = queue.slice(0, maxRows);
+
+  visibleJobs.forEach((job, index) => {
+    const rowY = y + 34 + index * (rowHeight + rowGap);
+    drawDetailPanel(parent, x, rowY, width, rowHeight, 0.28);
+
+    const isActive = index === 0;
+    const label = isActive
+      ? `${translations.ui.trainingActive ?? "Training"}: ${translations.roles[job.unitId] ?? job.unitId}`
+      : `${translations.ui.trainingQueued ?? "Queued"}: ${translations.roles[job.unitId] ?? job.unitId}`;
+    host.drawIcon(parent, isActive ? getUnitIconId(job.unitId) : "clock", x + 17, rowY + rowHeight / 2, 16);
+    host.drawText(parent, label, x + 38, rowY + 9, {
+      fill: isActive ? uiTheme.accentStrong : uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
+      fontWeight: "900",
+    });
+    host.drawText(parent, formatRealTimeRemaining(job.remainingSeconds), x + width - 82, rowY + 9, {
+      fill: uiTheme.text,
+      fontSize: uiTextSize.caption,
+      fontWeight: "900",
+    });
+
+    const progress = isActive
+      ? 1 - Math.max(0, Math.min(1, job.remainingSeconds / Math.max(1, job.durationSeconds)))
+      : 0;
+    const bar = new Graphics();
+    bar.rect(x + 110, rowY + 16, Math.max(20, width - 202), 6)
+      .fill({ color: uiTheme.surfaceSunken, alpha: 0.7 });
+    bar.rect(x + 110, rowY + 16, Math.max(0, width - 202) * progress, 6)
+      .fill({ color: uiTheme.accentStrong, alpha: 0.9 });
+    parent.addChild(bar);
+  });
+
+  if (queue.length > visibleJobs.length) {
+    host.drawText(
+      parent,
+      formatTemplate(translations.ui.trainingQueueMore ?? "+{count} more", { count: queue.length - visibleJobs.length }),
+      x,
+      y + 34 + visibleJobs.length * (rowHeight + rowGap),
+      {
+        fill: uiTheme.textMuted,
+        fontSize: uiTextSize.caption,
+        fontWeight: "800",
+      },
+    );
+  }
 }
 
 function drawModalStatLine(

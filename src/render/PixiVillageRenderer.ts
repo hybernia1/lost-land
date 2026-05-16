@@ -17,7 +17,11 @@ import {
 } from "../data/environment";
 import { decisionQuestById } from "../data/decisions";
 import { defaultVillageLayout } from "../data/villageLayouts";
-import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../data/villagePlots";
+import type {
+  VillagePlotDefinition,
+  VillageResourceSiteDefinition,
+  VillageResourceSitePalisadeType,
+} from "../data/villagePlots";
 import { DAY_START_HOUR, formatGameClock, GAME_HOUR_REAL_SECONDS, getDaylightState, getGameDay, NIGHT_START_HOUR } from "../game/time";
 import type {
   BuildingCategory,
@@ -28,6 +32,8 @@ import type {
   MarketResourceId,
   ResourceBag,
   ResourceId,
+  UnitCounts,
+  UnitId,
 } from "../game/types";
 import type { TranslationPack } from "../i18n/types";
 import {
@@ -72,6 +78,7 @@ import {
   getPopulation,
 } from "../systems/population";
 import { canAfford } from "../systems/resources";
+import { getTotalTroopCount, unitIds } from "../systems/survivors";
 import { getDecisionProfileKind } from "../systems/quests";
 import {
   CAMERA_MIN_ZOOM,
@@ -116,7 +123,7 @@ import type {
   BrandAlert,
   BuildingMetric,
   CircleButtonOptions,
-  ConquestResultPreview,
+  RaidResultPreview,
   DecisionHistoryRow,
   EffectLine,
   FormattedLogEntry,
@@ -131,7 +138,7 @@ import type {
   VillageInfoPanel,
 } from "./pixi/core/types";
 import {
-  drawConquestResultModal,
+  drawRaidResultModal,
   drawGameOverModal,
   drawQuestDecisionModal,
 } from "./pixi/modals/resultModals";
@@ -148,6 +155,7 @@ import { MapNpcController } from "./pixi/scene/mapNpcs";
 import { SettlementNpcController } from "./pixi/scene/settlementNpcs";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
+import { drawBattleModal } from "./pixi/modals/battleModal";
 import { drawVillageModal } from "./pixi/modals/villageModals";
 import { createModalPanel, drawModalHeaderPlane, resolveModalFrame } from "./pixi/modals/modalLayout";
 import {
@@ -231,7 +239,7 @@ export type GameMenuModel = {
 const STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE = 4096;
 let cullerPluginRegistered = false;
 export type {
-  ConquestResultPreview,
+  RaidResultPreview,
   GameOverPreview,
   PixiActionDetail,
   VillageInfoPanel,
@@ -302,12 +310,15 @@ export class PixiVillageRenderer {
   private decisionHistoryScrollY = 0;
   private activeResourceBreakdownTab: ResourceBreakdownTab = "production";
   private activeSidebarTab: HudSidebarTab = "tasks";
+  private activeSurvivorOverviewTab: "civilians" | "army" = "civilians";
   private selectedDecisionHistoryIndex: number | null = null;
   private activeModalPlotId: string | null = null;
   private activeBuildCategory: BuildingCategory = "resource";
-  private activeBuildingDetailTab: "overview" | "bonuses" = "overview";
+  private activeBuildingDetailTab: "overview" | "training" | "units" | "bonuses" = "overview";
+  private activeResourceSiteTab: "troops" | "enemy" = "troops";
   private barracksTroopCount = 1;
-  private readonly resourceSiteTroopCountById = new Map<string, number>();
+  private barracksTrainingUnitId: UnitId = "footman";
+  private readonly resourceSiteUnitCountById = new Map<string, UnitCounts>();
   private marketFromResource: MarketResourceId = "material";
   private marketToResource: MarketResourceId = "food";
   private marketAmount = 10;
@@ -428,7 +439,7 @@ export class PixiVillageRenderer {
     modalPlotId?: string | null,
     infoPanel?: VillageInfoPanel | null,
     resolvedDecisionPreview?: DecisionHistoryEntry | null,
-    conquestResultPreview?: ConquestResultPreview | null,
+    raidResultPreview?: RaidResultPreview | null,
     gameOverPreview?: GameOverPreview | null,
     gameMenu?: GameMenuModel | null,
   ): void {
@@ -439,6 +450,7 @@ export class PixiVillageRenderer {
     this.activeModalPlotId = modalPlotId ?? null;
     if (this.activeModalPlotId !== previousModalPlotId) {
       this.activeBuildingDetailTab = "overview";
+      this.activeResourceSiteTab = "troops";
       this.buildingBonusScrollY = 0;
       this.buildingBonusScrollBuildingId = null;
     }
@@ -447,7 +459,7 @@ export class PixiVillageRenderer {
       infoPanel ||
       state.quests.activeDecision ||
       resolvedDecisionPreview ||
-      conquestResultPreview ||
+      raidResultPreview ||
       gameOverPreview ||
       gameMenu,
     );
@@ -548,6 +560,9 @@ export class PixiVillageRenderer {
     this.drawHud(state, translations, hudWidth, hudHeight);
     drawVillageModal(this.villageModalsHost(), state, translations, hudWidth, hudHeight, modalPlotId ?? null);
     drawInfoPanel(this.infoPanelsHost(), state, translations, hudWidth, hudHeight, infoPanel ?? null);
+    if (translations) {
+      drawBattleModal(this.battleModalHost(), state.activeBattle, translations, hudWidth, hudHeight);
+    }
     drawQuestDecisionModal(
       this.resultModalsHost(),
       state,
@@ -556,12 +571,12 @@ export class PixiVillageRenderer {
       hudHeight,
       resolvedDecisionPreview ?? null,
     );
-    drawConquestResultModal(
+    drawRaidResultModal(
       this.resultModalsHost(),
       translations,
       hudWidth,
       hudHeight,
-      conquestResultPreview ?? null,
+      raidResultPreview ?? null,
     );
     drawGameOverModal(
       this.resultModalsHost(),
@@ -1767,6 +1782,10 @@ export class PixiVillageRenderer {
       setActiveResourceBreakdownTab: (value: ResourceBreakdownTab) => {
         this.activeResourceBreakdownTab = value;
       },
+      getActiveSurvivorOverviewTab: () => this.activeSurvivorOverviewTab,
+      setActiveSurvivorOverviewTab: (value: "civilians" | "army") => {
+        this.activeSurvivorOverviewTab = value;
+      },
       getResourceBreakdownScrollY: () => this.resourceBreakdownScrollY,
       setResourceBreakdownScrollY: (value: number) => {
         this.resourceBreakdownScrollY = value;
@@ -1884,6 +1903,18 @@ export class PixiVillageRenderer {
         tooltip?: string,
       ) => this.createModalButton(parent, label, x, y, width, height, detail, disabled, tooltip),
       createRectButton: (parent: Container, options: RectButtonOptions) => this.createRectButton(parent, options),
+      drawTabs: <T extends string>(
+        parent: Container,
+        tabs: Array<TabItem<T>>,
+        options: TabOptions<T>,
+      ) => this.drawTabs(parent, tabs, options),
+      getActiveResourceSiteTab: () => this.activeResourceSiteTab,
+      setActiveResourceSiteTab: (value: "troops" | "enemy") => {
+        this.activeResourceSiteTab = value;
+        this.requestRender();
+      },
+      getMapNpcTextures: (kindId: Parameters<VillageAssets["getMapNpcTextures"]>[0]) =>
+        this.assets.getMapNpcTextures(kindId),
       drawBuildChoices: (
         parent: Container,
         plotId: string,
@@ -1926,14 +1957,72 @@ export class PixiVillageRenderer {
         modalWidth,
         modalHeight,
       ),
-      getResourceSiteTroopCount: (siteId: string, availableTroops: number, minimumTroops: number) =>
-        this.getResourceSiteTroopCount(siteId, availableTroops, minimumTroops),
-      setResourceSiteTroopCount: (
+      getResourceSiteUnitCounts: (siteId: string, availableUnits: UnitCounts) =>
+        this.getResourceSiteUnitCounts(siteId, availableUnits),
+      setResourceSiteUnitCount: (
         siteId: string,
+        unitId: UnitId,
         nextValue: number,
-        availableTroops: number,
-        minimumTroops: number,
-      ) => this.setResourceSiteTroopCount(siteId, nextValue, availableTroops, minimumTroops),
+        availableUnits: UnitCounts,
+      ) => this.setResourceSiteUnitCount(siteId, unitId, nextValue, availableUnits),
+    };
+  }
+
+  private battleModalHost() {
+    return {
+      hudLayer: this.hudLayer,
+      drawModalBackdrop: (
+        overlay: Container,
+        width: number,
+        height: number,
+        closeAction?: PixiActionDetail,
+        blockClose = false,
+      ) => this.drawModalBackdrop(overlay, width, height, closeAction, blockClose),
+      drawPanel: (
+        parent: Container,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        fillAlpha?: number,
+        cornerRadius?: number,
+      ) => this.drawPanel(parent, x, y, width, height, fillAlpha, cornerRadius),
+      drawText: (
+        parent: Container,
+        text: string,
+        x: number,
+        y: number,
+        options: {
+          fill: number;
+          fontSize: number;
+          fontWeight?: TextStyleFontWeight;
+          alpha?: number;
+          align?: "left" | "center" | "right";
+          wordWrap?: boolean;
+          wordWrapWidth?: number;
+          lineHeight?: number;
+        },
+      ) => this.drawText(parent, text, x, y, options),
+      drawOverlayHeader: (
+        parent: Container,
+        panelWidth: number,
+        translations: TranslationPack,
+        options: {
+          iconId: string;
+          title: string;
+          closeAction?: PixiActionDetail;
+          kicker?: string;
+          subtitle?: string;
+          rightText?: string;
+        },
+      ) => this.drawOverlayHeader(parent, panelWidth, translations, options),
+      createRectButton: (parent: Container, options: RectButtonOptions) => this.createRectButton(parent, options),
+      bindAction: (target: Container, detail: PixiActionDetail) => this.bindAction(target, detail),
+      bindTooltip: (target: Container, text: string) => this.bindTooltip(target, text),
+      getMapNpcTextures: (kindId: Parameters<VillageAssets["getMapNpcTextures"]>[0]) =>
+        this.assets.getMapNpcTextures(kindId),
+      getSettlementBattleTileTexture: (tileId: Parameters<VillageAssets["getSettlementBattleTileTexture"]>[0]) =>
+        this.assets.getSettlementBattleTileTexture(tileId),
     };
   }
 
@@ -2030,7 +2119,7 @@ export class PixiVillageRenderer {
         this.activeBuildCategory = value;
       },
       getActiveBuildingDetailTab: () => this.activeBuildingDetailTab,
-      setActiveBuildingDetailTab: (value: "overview" | "bonuses") => {
+      setActiveBuildingDetailTab: (value: "overview" | "training" | "units" | "bonuses") => {
         this.activeBuildingDetailTab = value;
       },
       getBuildingBonusScrollBuildingId: () => this.buildingBonusScrollBuildingId,
@@ -2063,6 +2152,10 @@ export class PixiVillageRenderer {
       getBarracksTroopCount: () => this.barracksTroopCount,
       setBarracksTroopCount: (value: number) => {
         this.barracksTroopCount = value;
+      },
+      getBarracksTrainingUnitId: () => this.barracksTrainingUnitId,
+      setBarracksTrainingUnitId: (value: UnitId) => {
+        this.barracksTrainingUnitId = value;
       },
     };
   }
@@ -2100,6 +2193,8 @@ export class PixiVillageRenderer {
         (key) => this.assets.getTerrainTileAnimationFrames(key),
         (key) => this.assets.getTerrainTileTexture(key),
       ),
+      createResourceSiteSettlementSprite: (type: VillageResourceSitePalisadeType) =>
+        this.createResourceSiteSettlementSprite(type),
       trackTerrainSprite: (
         sprite: Sprite,
         tintByEnvironment?: Partial<Record<EnvironmentConditionId, number>>,
@@ -2419,18 +2514,7 @@ export class PixiVillageRenderer {
   }
 
   private getTotalResourceProductionRates(state: GameState): Record<ResourceId, number> {
-    const rates = getResourceProductionRates(state);
-    const multiplier = getGlobalProductionMultiplier(state);
-
-    for (const site of state.resourceSites) {
-      if (!site.captured || site.assignedWorkers <= 0) {
-        continue;
-      }
-
-      rates[site.resourceId] += site.yieldPerWorker * site.assignedWorkers * multiplier;
-    }
-
-    return rates;
+    return getResourceProductionRates(state);
   }
 
   private drawModalBackdrop(
@@ -2533,30 +2617,52 @@ export class PixiVillageRenderer {
     return headerBottom;
   }
 
-  private getResourceSiteTroopCount(
-    siteId: string,
-    availableTroops: number,
-    minimumTroops: number,
-  ): number {
-    const maxTroops = Math.max(1, availableTroops);
-    const desiredDefault = Math.max(1, Math.min(maxTroops, minimumTroops));
-    const current = this.resourceSiteTroopCountById.get(siteId) ?? desiredDefault;
-    const normalized = Math.max(1, Math.min(maxTroops, Math.floor(current)));
-    this.resourceSiteTroopCountById.set(siteId, normalized);
+  private getResourceSiteUnitCounts(siteId: string, availableUnits: UnitCounts): UnitCounts {
+    const current = this.resourceSiteUnitCountById.get(siteId) ?? this.getDefaultResourceSiteUnitCounts(availableUnits);
+    const normalized = this.normalizeResourceSiteUnitCounts(current, availableUnits);
+    this.resourceSiteUnitCountById.set(siteId, normalized);
     return normalized;
   }
 
-  private setResourceSiteTroopCount(
+  private setResourceSiteUnitCount(
     siteId: string,
+    unitId: UnitId,
     nextValue: number,
-    availableTroops: number,
-    minimumTroops: number,
+    availableUnits: UnitCounts,
   ): void {
-    const maxTroops = Math.max(1, availableTroops);
-    const fallback = Math.max(1, Math.min(maxTroops, minimumTroops));
-    const normalized = Math.max(1, Math.min(maxTroops, Math.floor(nextValue || fallback)));
-    this.resourceSiteTroopCountById.set(siteId, normalized);
+    const current = this.getResourceSiteUnitCounts(siteId, availableUnits);
+    const normalized = this.normalizeResourceSiteUnitCounts(
+      {
+        ...current,
+        [unitId]: Math.floor(nextValue),
+      },
+      availableUnits,
+    );
+    this.resourceSiteUnitCountById.set(siteId, normalized);
     this.requestRender();
+  }
+
+  private getDefaultResourceSiteUnitCounts(availableUnits: UnitCounts): UnitCounts {
+    const selected = this.createEmptyResourceSiteUnitCounts();
+    const firstAvailableUnitId = unitIds.find((unitId) => (availableUnits[unitId] ?? 0) > 0);
+    if (firstAvailableUnitId) {
+      selected[firstAvailableUnitId] = 1;
+    }
+
+    return selected;
+  }
+
+  private normalizeResourceSiteUnitCounts(units: UnitCounts, availableUnits: UnitCounts): UnitCounts {
+    return Object.fromEntries(
+      unitIds.map((unitId) => [
+        unitId,
+        Math.max(0, Math.min(Math.floor(availableUnits[unitId] ?? 0), Math.floor(units[unitId] ?? 0))),
+      ]),
+    ) as UnitCounts;
+  }
+
+  private createEmptyResourceSiteUnitCounts(): UnitCounts {
+    return Object.fromEntries(unitIds.map((unitId) => [unitId, 0])) as UnitCounts;
   }
 
   private createModalButton(
@@ -3186,6 +3292,11 @@ export class PixiVillageRenderer {
     return new Sprite(this.assets.getBuildingTexture(buildingId, level, built));
   }
 
+  private createResourceSiteSettlementSprite(type: VillageResourceSitePalisadeType): Sprite | null {
+    const texture = this.assets.getSettlementPalisadeTexture(type);
+    return texture ? new Sprite(texture) : null;
+  }
+
   private fitSprite(sprite: Sprite, maxWidth: number, maxHeight: number): void {
     const widthScale = maxWidth / sprite.texture.width;
     const heightScale = maxHeight / sprite.texture.height;
@@ -3556,7 +3667,7 @@ export class PixiVillageRenderer {
   }
 
   private getTroopHousingCapacity(state: GameState): number {
-    return state.buildings.barracks.level > 0 ? state.survivors.troops : 0;
+    return state.buildings.barracks.level > 0 ? getTotalTroopCount(state) : 0;
   }
 
   private getFormattedLogEntries(

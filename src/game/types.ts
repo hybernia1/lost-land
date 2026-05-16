@@ -71,10 +71,31 @@ export type ResourceDefinition = {
   softCap?: number;
 };
 
+export type UnitId = "footman" | "archer" | "bulwark";
+export type EnemyUnitId =
+  | "rat"
+  | "spider"
+  | "snake"
+  | "wolf"
+  | "zombie"
+  | "bandit"
+  | "berserkerZombie";
+export type CombatUnitId = UnitId | EnemyUnitId;
+export type CombatSide = "player" | "enemy";
+
+export type UnitCounts = Record<UnitId, number>;
+export type EnemyUnitCounts = Record<EnemyUnitId, number>;
+
 export type SurvivorRoles = {
   workers: number;
-  troops: number;
-  barracksTrainingProgress: number;
+  units: UnitCounts;
+  barracksTrainingQueue: BarracksTrainingJobState[];
+};
+
+export type BarracksTrainingJobState = {
+  unitId: UnitId;
+  remainingSeconds: number;
+  durationSeconds: number;
 };
 
 export type MarketResourceId = Exclude<ResourceId, "morale">;
@@ -118,24 +139,57 @@ export type EnvironmentState = {
   activeCrisis: EnvironmentCrisisState | null;
 };
 
-export type ResourceSiteResourceId = "food" | "water" | "coal" | "material";
+export type ResourceSiteLoot = Partial<Record<MarketResourceId, number>>;
 
 export type ResourceSiteAssaultState = {
   troops: number;
+  units: UnitCounts;
   remainingSeconds: number;
   travelTiles: number;
 };
 
 export type ResourceSiteState = {
   id: string;
-  resourceId: ResourceSiteResourceId;
-  captured: boolean;
-  assignedWorkers: number;
-  maxWorkers: number;
-  yieldPerWorker: number;
-  captureMinTroops: number;
-  captureBaseDeathRisk: number;
+  loot: ResourceSiteLoot;
+  looted: boolean;
+  defenderArmy: EnemyUnitCounts;
   assault: ResourceSiteAssaultState | null;
+};
+
+export type BattleUnitState = {
+  id: string;
+  unitId: CombatUnitId;
+  side: CombatSide;
+  count: number;
+  q: number;
+  r: number;
+  hp: number;
+  maxHp: number;
+  moved: boolean;
+  acted: boolean;
+};
+
+export type BattleLogEntry = {
+  key: "initiative" | "hit" | "text";
+  text?: string;
+  side?: CombatSide;
+  attackerUnitId?: CombatUnitId;
+  attackerCount?: number;
+  targetUnitId?: CombatUnitId;
+  targetCount?: number;
+  damage?: number;
+  losses?: number;
+};
+
+export type BattleState = {
+  id: string;
+  siteId: string;
+  loot: ResourceSiteLoot;
+  turn: CombatSide;
+  round: number;
+  selectedUnitId: string | null;
+  units: BattleUnitState[];
+  log: BattleLogEntry[];
 };
 
 export type ObjectiveQuestId =
@@ -219,9 +273,11 @@ export type GameState = {
   workMode: WorkMode;
   resources: Record<ResourceId, number>;
   capacities: Record<ResourceId, number>;
+  heroInventory: Record<ResourceId, number>;
   survivors: SurvivorRoles;
   quests: QuestState;
   resourceSites: ResourceSiteState[];
+  activeBattle: BattleState | null;
   market: MarketState;
   health: HealthState;
   environment: EnvironmentState;

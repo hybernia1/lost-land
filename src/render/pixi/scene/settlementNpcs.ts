@@ -9,11 +9,12 @@ import {
   type MapNpcKindId,
 } from "../../../data/mapNpcs";
 import {
-  resourceSiteNpcDefinitions,
+  resourceSiteEnemyNpcDefinitions,
   settlementNpcByBuildingId,
-  type ResourceSiteNpcDefinition,
+  type ResourceSiteEnemyNpcDefinition,
   type SettlementNpcDefinition,
 } from "../../../data/settlementNpcs";
+import { enemyUnitIds, isPlayerUnitId, playerUnitIds } from "../../../data/combatUnits";
 import type { VillageLayoutDefinition } from "../../../data/villageLayouts";
 import { isDaylightHour } from "../../../game/time";
 import type { BuildingId, GameState } from "../../../game/types";
@@ -54,7 +55,7 @@ type SettlementNpcEmitterRuntime = {
 };
 
 type SettlementNpcEmitterDefinition = Pick<SettlementNpcDefinition, "npcKindId" | "maxCount" | "wanderRadius"> |
-  ResourceSiteNpcDefinition;
+  ResourceSiteEnemyNpcDefinition;
 
 const SETTLEMENT_NPC_UPDATE_MIN_MS = 1000 / 15;
 const SETTLEMENT_NPC_MAX_TOTAL_COUNT = 28;
@@ -145,45 +146,45 @@ export class SettlementNpcController {
     sceneLayout: SceneLayout,
     getTextures: (kindId: MapNpcKindId) => MapNpcTextureSet | null,
   ): void {
-    if (!isSettlementActivityVisible(state)) {
-      return;
-    }
+    if (isSettlementActivityVisible(state)) {
+      for (const plotState of state.village.plots) {
+        if (!plotState.buildingId) {
+          continue;
+        }
 
-    for (const plotState of state.village.plots) {
-      if (!plotState.buildingId) {
-        continue;
+        const settlementDefinitions = settlementNpcByBuildingId[plotState.buildingId] ?? [];
+        const building = state.buildings[plotState.buildingId];
+        const plot = mapLayout.plots.find((candidate) => candidate.id === plotState.id);
+
+        if (settlementDefinitions.length === 0 || !building || !plot || building.level <= 0) {
+          continue;
+        }
+
+        for (const settlementDefinition of settlementDefinitions) {
+          const count = this.resolveEmitterCount(state, plotState.buildingId, settlementDefinition);
+
+          if (count <= 0) {
+            continue;
+          }
+
+          const textures = getTextures(settlementDefinition.npcKindId);
+
+          if (!textures) {
+            continue;
+          }
+
+          this.emitters.push({
+            id: `${plotState.id}:${plotState.buildingId}:${settlementDefinition.npcKindId}`,
+            settlementDefinition,
+            npcDefinition: mapNpcDefinitions[settlementDefinition.npcKindId],
+            textures,
+            bounds: getSettlementNpcBounds(mapLayout, sceneLayout, plot, settlementDefinition),
+            sceneLayout,
+            count,
+            active: false,
+          });
+        }
       }
-
-      const settlementDefinition = settlementNpcByBuildingId[plotState.buildingId];
-      const building = state.buildings[plotState.buildingId];
-      const plot = mapLayout.plots.find((candidate) => candidate.id === plotState.id);
-
-      if (!settlementDefinition || !building || !plot || building.level <= 0) {
-        continue;
-      }
-
-      const count = this.resolveEmitterCount(state, plotState.buildingId, settlementDefinition);
-
-      if (count <= 0) {
-        continue;
-      }
-
-      const textures = getTextures(settlementDefinition.npcKindId);
-
-      if (!textures) {
-        continue;
-      }
-
-      this.emitters.push({
-        id: `${plotState.id}:${plotState.buildingId}`,
-        settlementDefinition,
-        npcDefinition: mapNpcDefinitions[settlementDefinition.npcKindId],
-        textures,
-        bounds: getSettlementNpcBounds(mapLayout, sceneLayout, plot, settlementDefinition),
-        sceneLayout,
-        count,
-        active: false,
-      });
     }
 
     for (const siteState of state.resourceSites) {
@@ -193,41 +194,33 @@ export class SettlementNpcController {
         continue;
       }
 
-      const phaseDefinition = siteState.captured
-        ? siteState.assignedWorkers > 0
-          ? resourceSiteNpcDefinitions.occupied
-          : null
-        : resourceSiteNpcDefinitions.uncaptured;
+      if (!siteState.looted) {
+        for (const enemyDefinition of resourceSiteEnemyNpcDefinitions) {
+          const defenderCount = Math.max(0, Math.floor(siteState.defenderArmy[enemyDefinition.enemyUnitId] ?? 0));
+          const count = Math.min(enemyDefinition.maxCount, defenderCount);
 
-      if (!phaseDefinition) {
-        continue;
+          if (count <= 0) {
+            continue;
+          }
+
+          const textures = getTextures(enemyDefinition.npcKindId);
+
+          if (!textures) {
+            continue;
+          }
+
+          this.emitters.push({
+            id: `resource-site:${siteDefinition.id}:enemy:${enemyDefinition.enemyUnitId}`,
+            settlementDefinition: enemyDefinition,
+            npcDefinition: mapNpcDefinitions[enemyDefinition.npcKindId],
+            textures,
+            bounds: getResourceSiteNpcBounds(mapLayout, sceneLayout, siteDefinition),
+            sceneLayout,
+            count,
+            active: false,
+          });
+        }
       }
-
-      const count = siteState.captured
-        ? Math.min(phaseDefinition.maxCount, siteState.assignedWorkers)
-        : phaseDefinition.maxCount;
-
-      if (count <= 0) {
-        continue;
-      }
-
-      const textures = getTextures(phaseDefinition.npcKindId);
-
-      if (!textures) {
-        continue;
-      }
-
-      const phase = siteState.captured ? "occupied" : "uncaptured";
-      this.emitters.push({
-        id: `resource-site:${siteDefinition.id}:${phase}`,
-        settlementDefinition: phaseDefinition,
-        npcDefinition: mapNpcDefinitions[phaseDefinition.npcKindId],
-        textures,
-        bounds: getSettlementNpcBounds(mapLayout, sceneLayout, siteDefinition, phaseDefinition),
-        sceneLayout,
-        count,
-        active: false,
-      });
     }
   }
 
@@ -236,9 +229,10 @@ export class SettlementNpcController {
     buildingId: BuildingId,
     settlementDefinition: SettlementNpcDefinition,
   ): number {
-    if (settlementDefinition.requirement === "troops") {
-      return state.survivors.troops > 0
-        ? Math.min(settlementDefinition.maxCount, state.survivors.troops)
+    if (isPlayerUnitId(settlementDefinition.requirement)) {
+      const units = Math.max(0, Math.floor(state.survivors.units[settlementDefinition.requirement] ?? 0));
+      return units > 0
+        ? Math.min(settlementDefinition.maxCount, units)
         : 0;
     }
 
@@ -446,7 +440,11 @@ export class SettlementNpcController {
       .map(([buildingId, building]) => `${buildingId}:${building.level}:${building.workers}`)
       .join("|");
     const resourceSiteStateKey = state.resourceSites
-      .map((site) => `${site.id}:${site.captured ? 1 : 0}:${site.assignedWorkers}`)
+      .map((site) => [
+        site.id,
+        site.looted ? 1 : 0,
+        ...enemyUnitIds.map((unitId) => site.defenderArmy[unitId]),
+      ].join(":"))
       .join("|");
     const resourceSiteLayoutKey = mapLayout.resourceSites.map((site) => [
       site.id,
@@ -459,7 +457,7 @@ export class SettlementNpcController {
     return [
       active ? "active" : "sleeping",
       state.workMode,
-      state.survivors.troops,
+      playerUnitIds.map((unitId) => state.survivors.units[unitId]).join(":"),
       sceneLayout.scale.toFixed(4),
       sceneLayout.originX.toFixed(2),
       sceneLayout.originY.toFixed(2),
@@ -500,6 +498,21 @@ function getSettlementNpcBounds(
     y: centerY - height / 2,
     width,
     height,
+  };
+}
+
+function getResourceSiteNpcBounds(
+  mapLayout: VillageLayoutDefinition,
+  sceneLayout: SceneLayout,
+  site: { x: number; y: number; width: number; height: number },
+): Bounds {
+  const footprint = mapRectToSceneBounds(mapLayout, sceneLayout, site);
+
+  return {
+    x: footprint.x + footprint.width * 0.18,
+    y: footprint.y + footprint.height * 0.28,
+    width: footprint.width * 0.64,
+    height: footprint.height * 0.42,
   };
 }
 
