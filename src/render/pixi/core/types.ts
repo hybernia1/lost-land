@@ -199,6 +199,7 @@ export type FormattedLogEntry = {
 };
 
 export type ResourceBreakdownTab = "production" | "consumption";
+export type HudSidebarTab = "expeditions" | "tasks";
 export type RectButtonTone = "primary" | "secondary" | "toolbar";
 
 export type RectButtonOptions = {
@@ -213,6 +214,7 @@ export type RectButtonOptions = {
   tooltip?: string;
   disabled?: boolean;
   active?: boolean;
+  selected?: boolean;
   tone?: RectButtonTone;
   fontSize?: number;
   fontWeight?: TextStyleFontWeight;
@@ -253,7 +255,6 @@ export type BuildingEffectsContext = {
     populationLabel: string;
     treatmentLabel: string;
     housingCapacityLabel: string;
-    defenseLabel: string;
     productionLabel: string;
     unlocksTroopTrainingLabel: string;
     marketTradeLimitLabel: string;

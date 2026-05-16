@@ -19,6 +19,10 @@ export type CameraWheelHost = {
   buildChoicesScrollMax: number;
   buildChoicesScrollY: number;
   setBuildChoicesScrollY: (value: number) => void;
+  buildingBonusScrollArea: Bounds | null;
+  buildingBonusScrollMax: number;
+  buildingBonusScrollY: number;
+  setBuildingBonusScrollY: (value: number) => void;
   resourceBreakdownScrollArea: Bounds | null;
   resourceBreakdownScrollMax: number;
   resourceBreakdownScrollY: number;
@@ -156,6 +160,19 @@ function handleCameraZoom(hostState: CameraWheelHost, event: WheelEvent): void {
 }
 
 export function handleHostWheel(hostState: CameraWheelHost, event: WheelEvent): void {
+  if (handleScrollableWheel(
+    hostState.host,
+    hostState.hudPixelScale,
+    event,
+    hostState.buildingBonusScrollArea,
+    hostState.buildingBonusScrollMax,
+    hostState.buildingBonusScrollY,
+    hostState.setBuildingBonusScrollY,
+    hostState.requestRender,
+  )) {
+    return;
+  }
+
   if (handleScrollableWheel(
     hostState.host,
     hostState.hudPixelScale,

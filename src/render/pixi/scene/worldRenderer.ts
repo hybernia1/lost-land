@@ -14,7 +14,7 @@ import type { VillagePlotDefinition, VillageResourceSiteDefinition } from "../..
 import type { BuildingId, EnvironmentConditionId, GameState } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
 import { getBuildingWorkerLimit, isBuildingInactiveDueToCoal } from "../../../systems/buildings";
-import { VILLAGE_BUILDING_RENDER_SCALE } from "../core/constants";
+import { uiTextSize, uiTheme, VILLAGE_BUILDING_RENDER_SCALE } from "../core/constants";
 import type { Bounds, DrawTextFn, DrawIconFn, SceneLayout } from "../core/types";
 import { upgradingTooltip } from "../core/constants";
 import { getMapRenderBounds } from "./mapGeometry";
@@ -52,19 +52,19 @@ const RESOURCE_SITE_TONES: Record<"locked" | "assault" | "captured", ResourceSit
     fill: 0x211714,
     stroke: 0xb77763,
     iconBack: 0x2f1e1a,
-    accent: 0xd38a8a,
+    accent: uiTheme.negative,
   },
   assault: {
     fill: 0x2e2415,
     stroke: 0xe6b36c,
     iconBack: 0x3c2a15,
-    accent: 0xf1c17f,
+    accent: uiTheme.warning,
   },
   captured: {
     fill: 0x13241d,
     stroke: 0x8fc58b,
     iconBack: 0x1b3329,
-    accent: 0x9ed99b,
+    accent: uiTheme.positive,
   },
 };
 
@@ -357,8 +357,8 @@ function drawResourceSite(
     layer.addChild(workerBadge);
 
     host.drawText(layer, `${siteState.assignedWorkers}/${siteState.maxWorkers}`, -badgeWidth * 0.25, markerHeight * 0.31, {
-      fill: 0xe6f0e0,
-      fontSize: 10,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.micro,
       fontWeight: "900",
     });
     host.drawIcon(layer, "people", badgeWidth * 0.28, markerHeight * 0.48, 12);
@@ -498,7 +498,7 @@ export function drawPlot(
         plotLayer,
         building.upgradingRemaining,
         0,
-        -bounds.height * 0.72,
+        -bounds.height * 0.44,
         Math.max(64, Math.min(92, bounds.width * 0.82)),
         translations,
       );
@@ -557,7 +557,7 @@ function getBuildingLotShape(
       return { widthScale: 1.82, heightRatio: 0.48, groundYOffset: 0.25 };
     case "dormitory":
       return { widthScale: 2.22, heightRatio: 0.42, groundYOffset: 0.25 };
-    case "generator":
+    case "coalMine":
       return { widthScale: 1.68, heightRatio: 0.48, groundYOffset: 0.26 };
     case "hydroponics":
       return { widthScale: 2.02, heightRatio: 0.44, groundYOffset: 0.25 };

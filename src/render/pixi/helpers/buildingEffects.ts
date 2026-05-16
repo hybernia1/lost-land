@@ -120,7 +120,7 @@ export function getNextLevelEffects(
 
     if (rateDelta > 0) {
       effects.push({
-        iconId: "scout",
+        iconId: "troop",
         value: `+${formatRate(rateDelta)}/h`,
         tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(rateDelta)}/h`,
       });
@@ -142,7 +142,7 @@ export function getNextLevelEffects(
     const nextRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel + 1);
     if (nextRiskMultiplier < currentRiskMultiplier) {
       effects.push({
-        iconId: "shield",
+        iconId: "expedition",
         value: `-${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}%`,
         tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}% risk`,
       });
@@ -159,7 +159,7 @@ export function getNextLevelEffects(
     }
   }
 
-  if (buildingId === "generator") {
+  if (buildingId === "coalMine") {
     const currentLimit = currentLevel <= 0 ? 0 : Math.min(4, currentLevel + 1);
     const nextLimit = Math.min(4, currentLevel + 2);
     const currentMaxRate = getCoalMineCoalRate(currentLevel, currentLimit) * GAME_HOUR_REAL_SECONDS;
@@ -228,14 +228,6 @@ export function getNextLevelEffects(
         tooltip: `${translations.ui.marketCooldown ?? "Cooldown"} -${formatRate(currentCooldownHours - nextCooldownHours)}h`,
       });
     }
-  }
-
-  if (definition.defense) {
-    effects.push({
-      iconId: "shield",
-      value: `+${definition.defense}`,
-      tooltip: `${translations.ui.defense} +${definition.defense}`,
-    });
   }
 
   for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
@@ -334,7 +326,7 @@ export function getCurrentBuildingEffects(
   if (buildingId === "barracks") {
     const trainingRate = getBarracksTrainingRatePerGameHour(level);
     effects.push({
-      iconId: "scout",
+      iconId: "troop",
       value: `+${formatRate(trainingRate)}/h`,
       tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(trainingRate)}/h`,
     });
@@ -353,7 +345,7 @@ export function getCurrentBuildingEffects(
     const expeditionRiskReduction = (1 - getAcademyExpeditionDeathRiskMultiplier(level)) * 100;
     if (expeditionRiskReduction > 0) {
       effects.push({
-        iconId: "shield",
+        iconId: "expedition",
         value: `-${formatRate(expeditionRiskReduction)}%`,
         tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate(expeditionRiskReduction)}% risk`,
       });
@@ -389,14 +381,6 @@ export function getCurrentBuildingEffects(
         tooltip: `${translations.ui.marketTrades ?? "Trades"} ${getMarketTradeSlots(level)}`,
       });
     }
-  }
-
-  if (definition.defense) {
-    effects.push({
-      iconId: "shield",
-      value: `+${definition.defense * level}`,
-      tooltip: `${translations.ui.defense} +${definition.defense * level}`,
-    });
   }
 
   for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {

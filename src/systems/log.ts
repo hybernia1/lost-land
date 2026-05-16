@@ -40,17 +40,8 @@ export function getLocalizedInitialLogEntries(): LogEntry[] {
   ];
 }
 
-export function normalizeLogEntries(log: Array<LogEntry | string> = []): LogEntry[] {
-  return log
-    .map((entry) => {
-      if (typeof entry !== "string") {
-        return normalizeLogEntry(entry);
-      }
-
-      return getLegacyLogEntry(entry);
-    })
-    .filter((entry): entry is LogEntry => entry !== null)
-    .slice(0, 32);
+export function normalizeLogEntries(log: LogEntry[] = []): LogEntry[] {
+  return log.map(normalizeLogEntry).slice(0, 32);
 }
 
 export function formatLogEntry(entry: LogEntry, translations: TranslationPack): string {
@@ -98,13 +89,6 @@ export function pushLogEntry(state: GameState, entry: LogEntry): void {
 }
 
 export function getLogEntrySeverity(entry: LogEntry): LogEntrySeverity {
-  if (entry.key === "logScoutingReturned") {
-    const deaths = Number(entry.params?.deaths ?? 0);
-    if (deaths > 0) {
-      return "warning";
-    }
-  }
-
   return entry.severity ?? inferLogSeverity(entry.key);
 }
 
@@ -125,20 +109,6 @@ function normalizeLogEntry(entry: LogEntry): LogEntry {
     key: String(entry.key),
     params: entry.params,
     severity: normalizedSeverity,
-  };
-}
-
-function getLegacyLogEntry(entry: string): LogEntry | null {
-  const knownStaticEntries = new Map<string, LogEntry>([
-    [packs.en.ui.logDayOne, { source: "ui", key: "logDayOne" }],
-    [packs.cs.ui.logDayOne, { source: "ui", key: "logDayOne" }],
-    [packs.en.ui.logPerimeter, { source: "ui", key: "logPerimeter" }],
-    [packs.cs.ui.logPerimeter, { source: "ui", key: "logPerimeter" }],
-  ]);
-
-  return knownStaticEntries.get(entry) ?? {
-    source: "ui",
-    key: entry,
   };
 }
 

@@ -6,8 +6,6 @@ export const quests: QuestTranslationPack = {
       activeObjectives: "Active tasks",
       objectivesEmpty: "No active tasks.",
       decision: "Decision",
-      decisionRequired: "Immediate decision",
-      hiddenConsequences: "The consequences are not shown in advance.",
       notEnoughSupplies: "Not enough supplies",
       logObjectiveCompleted: "Task completed: {quest}.",
       logObjectiveRewardClaimed: "Reward claimed: {quest}.",
@@ -19,7 +17,7 @@ export const quests: QuestTranslationPack = {
         description: "Create room for supplies before production pressure rises.",
         reward: "+45 material, +10 food",
       },
-      buildGenerator: {
+      buildCoalMine: {
         title: "Build a coal mine",
         description: "Secure fuel before heated and technical buildings drain the reserve.",
         reward: "+50 material, +20 coal",
@@ -112,7 +110,7 @@ export const quests: QuestTranslationPack = {
         },
         results: {
           tradeFood: "Food changed hands and storage gained a useful pile of workable material.",
-          tradeWater: "Some water was exchanged for charged cells. The generator has a little more to draw from.",
+          tradeWater: "Some water was exchanged for charged cells. The camp has a little more coal to draw from.",
           refuse: "The trader shrugged and disappeared into the dusk. The stockpiles stayed exactly where they were.",
         },
       },
@@ -146,7 +144,7 @@ export const quests: QuestTranslationPack = {
           rationLock: "New locks and markings cost material, but future rationing will be easier to watch.",
         },
       },
-      generatorSpareParts: {
+      coalMineSpareParts: {
         title: "Mine spare parts",
         body:
           "The mechanic found a box of parts from a stripped fuel station. They could help the mine gear now, or be broken down for storage.",

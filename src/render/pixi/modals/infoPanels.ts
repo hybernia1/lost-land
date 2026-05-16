@@ -32,13 +32,12 @@ import {
 } from "../../../systems/resourceSites";
 import {
   canClaimObjectiveReward,
-  decisionProfileAxes,
   getActiveObjectiveQuests,
   getObjectiveQuestProgress,
   getDecisionProfileAxisValue,
   getDecisionProfileKind,
 } from "../../../systems/quests";
-import { decisionProfileIconByKind } from "../core/constants";
+import { decisionProfileIconByKind, uiTextSize, uiTheme } from "../core/constants";
 import type {
   Bounds,
   DecisionHistoryRow,
@@ -65,6 +64,7 @@ import {
   getHourlyRateLabel,
   getRateColor,
 } from "../helpers/formatters";
+import { createModalPanel, resolveModalFrame, type ModalFrameOptions } from "./modalLayout";
 
 type InfoPanelsHost = {
   hudLayer: Container;
@@ -122,6 +122,34 @@ type InfoPanelsHost = {
   getResourceBreakdownScrollTab: () => ResourceBreakdownTab;
   setResourceBreakdownScrollTab: (value: ResourceBreakdownTab) => void;
 };
+
+const INFO_SECTION_TOP_GAP = 18;
+const INFO_SECTION_TITLE_GAP = 30;
+const INFO_SECTION_BLOCK_GAP = 20;
+
+type InfoPanelShell = {
+  panel: Container;
+  panelWidth: number;
+  panelHeight: number;
+};
+
+function createInfoPanelShell(
+  host: InfoPanelsHost,
+  width: number,
+  height: number,
+  options: ModalFrameOptions,
+): InfoPanelShell {
+  const overlay = new Container();
+  host.hudLayer.addChild(overlay);
+  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
+  const frame = resolveModalFrame(width, height, options);
+  const panel = createModalPanel(overlay, host.drawPanel, frame);
+  return {
+    panel,
+    panelWidth: frame.width,
+    panelHeight: frame.height,
+  };
+}
 
 export function drawInfoPanel(
   host: InfoPanelsHost,
@@ -183,18 +211,11 @@ function drawObjectiveQuestPanel(
     return;
   }
 
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(620, width - 48);
-  const panelHeight = Math.max(300, Math.min(520, height - 72));
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
+    maxWidth: 620,
+    minHeight: 300,
+    maxHeight: 520,
+  });
 
   const progress = getObjectiveQuestProgress(state, objectiveDefinition);
   const objectiveState = state.quests.objectives.find((quest) => quest.definitionId === objectiveQuestId) ?? null;
@@ -206,6 +227,7 @@ function drawObjectiveQuestPanel(
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: "build",
     title: objectiveCopy.title,
+    subtitle: objectiveCopy.description,
     rightText: progressLabel,
     closeAction: { action: "close-village-modal" },
   });
@@ -214,28 +236,12 @@ function drawObjectiveQuestPanel(
   if (completedAt !== null) {
     const completedLabel = `${translations.ui.day ?? "Day"} ${getGameDay(completedAt)} / ${formatGameClock(completedAt)}`;
     host.drawText(panel, completedLabel, 24, cursorY, {
-      fill: 0x9ed99b,
-      fontSize: 12,
+      fill: uiTheme.positive,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
     });
     cursorY += 22;
   }
-
-  host.drawText(panel, objectiveCopy.description, 24, cursorY, {
-    fill: 0xd7ddd8,
-    fontSize: 13,
-    fontWeight: "700",
-    wordWrap: true,
-    wordWrapWidth: panelWidth - 48,
-  });
-
-  const descriptionHeight = host.measureWrappedTextHeight(
-    objectiveCopy.description,
-    13,
-    "700",
-    panelWidth - 48,
-  );
-  cursorY += descriptionHeight + 18;
 
   const progressToken = new Container();
   progressToken.x = 24;
@@ -243,8 +249,8 @@ function drawObjectiveQuestPanel(
   panel.addChild(progressToken);
   host.drawIcon(progressToken, "build", 8, 8, 14);
   const progressText = host.drawText(progressToken, `${progress.current}/${progress.required}`, 20, 0, {
-    fill: 0xf1df9a,
-    fontSize: 12,
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.small,
     fontWeight: "900",
   });
   progressToken.hitArea = new Rectangle(0, -2, progressText.width + 26, 20);
@@ -261,13 +267,13 @@ function drawObjectiveQuestPanel(
     const claimedAtLabel = `${translations.ui.day ?? "Day"} ${getGameDay(rewardClaimedAt)} / ${formatGameClock(rewardClaimedAt)}`;
     host.drawIcon(panel, "archive", 32, actionY + 9, 14);
     host.drawText(panel, translations.ui.questRewardClaimed ?? "Reward claimed", 46, actionY + 2, {
-      fill: 0x9ed99b,
-      fontSize: 12,
+      fill: uiTheme.positive,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
     });
     const right = host.drawText(panel, claimedAtLabel, panelWidth - 28, actionY + 2, {
-      fill: 0xaeb4b8,
-      fontSize: 11,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.caption,
       fontWeight: "800",
     });
     right.anchor.set(1, 0);
@@ -297,18 +303,11 @@ function drawQuestLogPanel(
   width: number,
   height: number,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(720, width - 48);
-  const panelHeight = Math.max(360, Math.min(620, height - 72));
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
+    maxWidth: 720,
+    minHeight: 360,
+    maxHeight: 620,
+  });
 
   const activeObjectives = getActiveObjectiveQuests(state);
   const completedObjectives = state.quests.objectives
@@ -323,18 +322,18 @@ function drawQuestLogPanel(
     closeAction: { action: "close-village-modal" },
   });
 
-  let cursorY = headerBottom + 8;
+  let cursorY = headerBottom + INFO_SECTION_TOP_GAP;
   host.drawText(panel, translations.ui.questLogActive ?? translations.quests.ui.activeObjectives, 24, cursorY, {
-    fill: 0xd8c890,
-    fontSize: 12,
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.small,
     fontWeight: "900",
   });
-  cursorY += 24;
+  cursorY += INFO_SECTION_TITLE_GAP;
 
   if (activeObjectives.length === 0) {
     host.drawText(panel, translations.ui.questLogNoActive ?? translations.quests.ui.objectivesEmpty, 24, cursorY, {
-      fill: 0xbfc7be,
-      fontSize: 12,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.small,
       fontWeight: "800",
     });
     cursorY += 24;
@@ -344,17 +343,18 @@ function drawQuestLogPanel(
       const objectiveCopy = translations.quests.objectives[quest.definitionId];
       const progress = getObjectiveQuestProgress(state, objectiveDefinition);
       const row = new Graphics();
-      row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x171b16, alpha: 0.78 });
+      row.rect(18, cursorY - 4, panelWidth - 36, 28)
+        .fill({ color: uiTheme.surfaceMuted, alpha: 0.44 });
       panel.addChild(row);
       host.drawIcon(panel, "build", 32, cursorY + 9, 14);
       host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
-        fill: 0xf4eedf,
-        fontSize: 12,
+        fill: uiTheme.text,
+        fontSize: uiTextSize.small,
         fontWeight: "900",
       });
       const progressLabel = host.drawText(panel, `${progress.current}/${progress.required}`, panelWidth - 28, cursorY + 2, {
-        fill: 0xf1df9a,
-        fontSize: 12,
+        fill: uiTheme.accentStrong,
+        fontSize: uiTextSize.small,
         fontWeight: "900",
       });
       progressLabel.anchor.set(1, 0);
@@ -366,49 +366,53 @@ function drawQuestLogPanel(
     });
   }
 
-  cursorY += 8;
+  cursorY += INFO_SECTION_BLOCK_GAP;
   host.drawText(panel, translations.ui.questLogCompleted ?? "Completed tasks", 24, cursorY, {
-    fill: 0xd8c890,
-    fontSize: 12,
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.small,
     fontWeight: "900",
   });
-  cursorY += 24;
+  cursorY += INFO_SECTION_TITLE_GAP;
 
   if (completedObjectives.length === 0) {
     host.drawText(panel, translations.ui.questLogNoCompleted ?? "No completed tasks yet.", 24, cursorY, {
-      fill: 0xbfc7be,
-      fontSize: 12,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.small,
       fontWeight: "800",
     });
     return;
   }
 
-  if (pendingRewardObjectives.length > 0) {
-    host.drawText(panel, translations.ui.questRewardClaim ?? "Claim reward", 24, cursorY, {
-      fill: 0xf1df9a,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-    cursorY += 20;
-  }
-
   pendingRewardObjectives.forEach((quest) => {
     const objectiveCopy = translations.quests.objectives[quest.definitionId];
+    const canClaimReward = canClaimObjectiveReward(state, quest.definitionId);
     const row = new Graphics();
-    row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x202316, alpha: 0.9 });
+    row.rect(18, cursorY - 4, panelWidth - 36, 28)
+      .fill({ color: uiTheme.rewardSurface, alpha: 0.82 });
     panel.addChild(row);
     host.drawIcon(panel, "quest-log", 32, cursorY + 9, 14);
     host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
-      fill: 0xf4eedf,
-      fontSize: 12,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.small,
       fontWeight: "900",
+      wordWrap: true,
+      wordWrapWidth: panelWidth - 96,
     });
-    const right = host.drawText(panel, translations.ui.questRewardClaim ?? "Claim reward", panelWidth - 28, cursorY + 2, {
-      fill: 0xf1df9a,
-      fontSize: 11,
-      fontWeight: "900",
-    });
-    right.anchor.set(1, 0);
+    const claimIcon = host.drawIcon(panel, "done", panelWidth - 34, cursorY + 9, 15);
+    claimIcon.hitArea = new Rectangle(-8, -8, 30, 30);
+    claimIcon.alpha = canClaimReward ? 1 : 0.48;
+    host.bindTooltip(
+      claimIcon,
+      canClaimReward
+        ? (translations.ui.questRewardClaim ?? "Claim reward")
+        : (translations.ui.questRewardClaimBlocked ?? "No free capacity for reward resources."),
+    );
+    if (canClaimReward) {
+      host.bindAction(claimIcon, {
+        action: "claim-objective-reward",
+        objectiveQuestId: quest.definitionId,
+      });
+    }
     host.bindAction(row, {
       action: "open-objective-quest",
       objectiveQuestId: quest.definitionId,
@@ -420,20 +424,21 @@ function drawQuestLogPanel(
   claimedObjectives.slice(0, claimedRows).forEach((quest) => {
     const objectiveCopy = translations.quests.objectives[quest.definitionId];
     const row = new Graphics();
-    row.rect(18, cursorY - 4, panelWidth - 36, 28).fill({ color: 0x171b16, alpha: 0.66 });
+    row.rect(18, cursorY - 4, panelWidth - 36, 28)
+      .fill({ color: uiTheme.surfaceMuted, alpha: 0.34 });
     panel.addChild(row);
     host.drawIcon(panel, "archive", 32, cursorY + 9, 14);
     host.drawText(panel, objectiveCopy?.title ?? quest.definitionId, 46, cursorY + 2, {
-      fill: 0xc8ceca,
-      fontSize: 12,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.small,
       fontWeight: "800",
     });
     const completedAtLabel = quest.completedAt === null
       ? ""
       : `${translations.ui.day ?? "Day"} ${getGameDay(quest.completedAt)} / ${formatGameClock(quest.completedAt)}`;
     const right = host.drawText(panel, completedAtLabel, panelWidth - 28, cursorY + 2, {
-      fill: 0x9ed99b,
-      fontSize: 11,
+      fill: uiTheme.positive,
+      fontSize: uiTextSize.caption,
       fontWeight: "800",
     });
     right.anchor.set(1, 0);
@@ -452,17 +457,12 @@ function drawSurvivorOverviewPanel(
   width: number,
   height: number,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = 308;
-  const panelHeight = 302;
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
+  const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
+    maxWidth: 420,
+    minHeight: 378,
+    preferredHeight: 378,
+    maxHeight: 420,
+  });
 
   const housing = getHousingStatus(state);
   const buildingWorkers = getAssignedBuildingWorkerCount(state);
@@ -471,7 +471,6 @@ function drawSurvivorOverviewPanel(
   const conqueringTroops = getResourceSiteAssaultTroopCount(state);
   const totalPopulation = getPopulation(state);
 
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: "people",
     title: translations.ui.survivors,
@@ -484,8 +483,8 @@ function drawSurvivorOverviewPanel(
     { iconId: "build", value: `${buildingWorkers}`, label: translations.ui.buildingWorkers, tooltip: translations.ui.buildingWorkers },
     { iconId: "material", value: `${constructionWorkers}`, label: translations.ui.constructionCrew, tooltip: translations.ui.constructionCrew },
     { iconId: "people", value: `${resourceSiteWorkers}`, label: translations.ui.resourceSiteWorkers ?? "Site workers", tooltip: translations.ui.resourceSiteWorkers ?? "Site workers" },
-    { iconId: "scout", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
-    { iconId: "shield", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
+    { iconId: "troop", value: `${state.survivors.troops}`, label: translations.ui.availableTroops, tooltip: translations.ui.availableTroops },
+    { iconId: "expedition", value: `${conqueringTroops}`, label: translations.ui.conqueringTroops ?? "On conquest", tooltip: translations.ui.conqueringTroops ?? "On conquest" },
     { iconId: "crisis-injured", value: `${state.health.injured}`, label: translations.roles.injured, tooltip: translations.roles.injured, missing: state.health.injured > 0 },
     {
       iconId: "crisis-shelter",
@@ -505,9 +504,9 @@ function drawSurvivorOverviewPanel(
   rows.forEach((row, index) => {
     drawWorkforceRow(host, panel, {
       ...row,
-      x: 18,
-      y: headerBottom + 2 + index * 23,
-      width: panelWidth - 28,
+      x: 28,
+      y: headerBottom + 12 + index * 29,
+      width: panelWidth - 56,
     });
   });
 }
@@ -519,59 +518,35 @@ function drawDecisionArchivePanel(
   width: number,
   height: number,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(720, width - 48);
-  const panelHeight = Math.max(420, Math.min(620, height - 72));
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth, panelHeight } = createInfoPanelShell(host, width, height, {
+    maxWidth: 720,
+    minHeight: 420,
+    maxHeight: 620,
+  });
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: "archive",
     title: translations.ui.decisionArchive ?? "Decision archive",
     closeAction: { action: "close-village-modal" },
   });
 
-  const profileHeadingY = headerBottom + 2;
-  host.drawText(panel, translations.ui.leadershipProfile ?? "Leadership profile", 28, profileHeadingY, {
-    fill: 0xd8c890,
-    fontSize: 13,
-    fontWeight: "900",
-  });
-  host.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, profileHeadingY + 34, 24);
-  host.drawText(panel, getDecisionProfileOverallLabel(state, translations), 62, profileHeadingY + 22, {
-    fill: 0xf1df9a,
-    fontSize: 20,
+  const profileHeadingY = headerBottom + 10;
+  host.drawIcon(panel, decisionProfileIconByKind[getDecisionProfileKind(state)], 40, profileHeadingY + 12, 24);
+  host.drawText(panel, getDecisionProfileOverallLabel(state, translations), 62, profileHeadingY, {
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.sectionTitle,
     fontWeight: "900",
   });
 
-  const axesStartY = profileHeadingY + 66;
-  decisionProfileAxes.forEach((axis, index) => {
-    drawDecisionProfileAxis(
-      host,
-      panel,
-      translations.ui[axis.leftLabelKey] ?? axis.leftLabelKey,
-      translations.ui[axis.rightLabelKey] ?? axis.rightLabelKey,
-      getDecisionProfileAxisValue(state, axis.id),
-      28,
-      axesStartY + index * 48,
-      panelWidth - 56,
-    );
-  });
+  const compassY = profileHeadingY + 42;
+  drawDecisionProfileCompass(host, panel, state, translations, 28, compassY, panelWidth - 56);
 
-  const historyY = axesStartY + decisionProfileAxes.length * 48 + 12;
+  const historyY = compassY + 214 + INFO_SECTION_BLOCK_GAP;
   host.drawText(panel, translations.ui.decisionHistory ?? "Decision history", 28, historyY, {
-    fill: 0xd8c890,
-    fontSize: 13,
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.body,
     fontWeight: "900",
   });
-  const viewportY = historyY + 28;
+  const viewportY = historyY + INFO_SECTION_TITLE_GAP;
   const viewportHeight = Math.max(84, panelHeight - viewportY - 20);
   const content = new Container();
   const mask = new Graphics();
@@ -597,8 +572,8 @@ function drawDecisionArchivePanel(
 
   if (history.length === 0) {
     host.drawText(panel, translations.ui.noDecisionHistory ?? "No decisions recorded yet.", 28, historyY + 30, {
-      fill: 0xbfc7be,
-      fontSize: 14,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.bodyLarge,
     });
     return;
   }
@@ -640,9 +615,9 @@ function drawDecisionArchivePanel(
     const thumbY = viewportY + (trackHeight - thumbHeight) * (nextScrollY / scrollMax);
     const track = new Graphics();
     track.rect(panelWidth - 18, viewportY, 5, trackHeight)
-      .fill({ color: 0x0b0d0a, alpha: 0.72 });
+      .fill({ color: uiTheme.surfaceSunken, alpha: 0.38 });
     track.rect(panelWidth - 18, thumbY, 5, thumbHeight)
-      .fill({ color: 0xe0c46f, alpha: 0.6 });
+      .fill({ color: uiTheme.accentStrong, alpha: 0.5 });
     panel.addChild(track);
   }
 }
@@ -672,7 +647,7 @@ function drawDecisionHistoryRow(
 
   const background = new Graphics();
   background.rect(0, 0, width, height)
-    .fill({ color: expanded ? 0x1b1f18 : 0x171a14, alpha: 0.76 });
+    .fill({ color: expanded ? uiTheme.rowActive : uiTheme.row, alpha: 0.76 });
   rowLayer.addChild(background);
 
   host.bindLocalAction(rowLayer, () => {
@@ -682,18 +657,18 @@ function drawDecisionHistoryRow(
   rowLayer.hitArea = new Rectangle(0, 0, width, height);
 
   host.drawText(rowLayer, `${day} ${time}`, 14, 11, {
-    fill: 0xaeb6ad,
-    fontSize: 11,
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
     fontWeight: "900",
   });
   host.drawText(rowLayer, definitionCopy?.title ?? entry.definitionId, 104, 7, {
-    fill: 0xf5efdf,
-    fontSize: 13,
+    fill: uiTheme.text,
+    fontSize: uiTextSize.body,
     fontWeight: "900",
   });
   host.drawText(rowLayer, optionLabel, 104, 23, {
-    fill: 0xd7ddd8,
-    fontSize: 12,
+    fill: uiTheme.text,
+    fontSize: uiTextSize.small,
     fontWeight: "700",
   });
 
@@ -712,16 +687,16 @@ function drawDecisionHistoryRow(
 
   const bodyWidth = width - 28;
   const bodyLabel = host.drawText(rowLayer, definitionCopy?.body ?? "", 14, 52, {
-    fill: 0xc9d0ca,
-    fontSize: 12,
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.small,
     fontWeight: "700",
     wordWrap: true,
     wordWrapWidth: bodyWidth,
   });
   const resultY = bodyLabel.y + bodyLabel.height + 8;
   host.drawText(rowLayer, result, 14, resultY, {
-    fill: 0xf1df9a,
-    fontSize: 12,
+    fill: uiTheme.accentStrong,
+    fontSize: uiTextSize.small,
     fontWeight: "800",
     wordWrap: true,
     wordWrapWidth: bodyWidth,
@@ -742,49 +717,114 @@ function getDecisionHistoryRowHeight(
   const definitionCopy = translations.quests.decisions[row.entry.definitionId];
   const resultText = definitionCopy?.results[row.entry.optionId] ?? "";
   const contentWidth = width - 28;
-  const bodyHeight = host.measureWrappedTextHeight(definitionCopy?.body ?? "", 12, "700", contentWidth);
-  const resultHeight = host.measureWrappedTextHeight(resultText, 12, "800", contentWidth);
+  const bodyHeight = host.measureWrappedTextHeight(definitionCopy?.body ?? "", uiTextSize.small, "700", contentWidth);
+  const resultHeight = host.measureWrappedTextHeight(resultText, uiTextSize.small, "800", contentWidth);
 
   return Math.max(96, Math.ceil(52 + bodyHeight + 8 + resultHeight + 12));
 }
 
-function drawDecisionProfileAxis(
+function drawDecisionProfileCompass(
   host: InfoPanelsHost,
   parent: Container,
-  leftLabel: string,
-  rightLabel: string,
-  value: number,
+  state: GameState,
+  translations: TranslationPack,
   x: number,
   y: number,
   width: number,
 ): void {
-  host.drawText(parent, leftLabel, x, y, {
-    fill: value < -15 ? 0xf1df9a : 0xbfc7be,
-    fontSize: 12,
+  const height = 214;
+  const mapSize = Math.min(172, Math.max(144, width - 340));
+  const mapX = x + Math.floor((width - mapSize) / 2);
+  const mapY = y + 24;
+  const xValue = getDecisionProfileAxisValue(state, "communityMarket");
+  const yValue = getDecisionProfileAxisValue(state, "authorityAutonomy");
+  const pointX = mapX + ((xValue + 100) / 200) * mapSize;
+  const pointY = mapY + ((100 - yValue) / 200) * mapSize;
+
+  const panel = new Graphics();
+  panel.rect(x, y, width, height)
+    .fill({ color: uiTheme.surfaceMuted, alpha: 0.28 });
+  parent.addChild(panel);
+
+  const map = new Graphics();
+  map.rect(mapX, mapY, mapSize, mapSize)
+    .fill({ color: uiTheme.surfaceSunken, alpha: 0.48 });
+  map.rect(mapX + mapSize / 2 - 1, mapY, 2, mapSize)
+    .fill({ color: uiTheme.borderStrong, alpha: 0.2 });
+  map.rect(mapX, mapY + mapSize / 2 - 1, mapSize, 2)
+    .fill({ color: uiTheme.borderStrong, alpha: 0.2 });
+  map.rect(mapX, mapY, mapSize, mapSize)
+    .stroke({ color: uiTheme.border, alpha: 0.32, width: 1 });
+  parent.addChild(map);
+
+  const topLabel = host.drawText(parent, translations.ui.profileAuthority, mapX + mapSize / 2, mapY - 18, {
+    fill: yValue > 15 ? uiTheme.accentStrong : uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
     fontWeight: "900",
+    align: "center",
   });
-  const right = host.drawText(parent, rightLabel, x + width, y, {
-    fill: value > 15 ? 0xf1df9a : 0xbfc7be,
-    fontSize: 12,
+  topLabel.anchor.x = 0.5;
+  const bottomLabel = host.drawText(parent, translations.ui.profileAutonomy, mapX + mapSize / 2, mapY + mapSize + 5, {
+    fill: yValue < -15 ? uiTheme.accentStrong : uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+    align: "center",
+  });
+  bottomLabel.anchor.x = 0.5;
+  const communityLabel = host.drawText(parent, translations.ui.profileCommunity, mapX - 14, mapY + mapSize / 2 - 8, {
+    fill: xValue < -15 ? uiTheme.accentStrong : uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
     fontWeight: "900",
     align: "right",
   });
-  right.anchor.x = 1;
+  communityLabel.anchor.x = 1;
+  const rightLabel = host.drawText(parent, translations.ui.profileMarket, mapX + mapSize + 14, mapY + mapSize / 2 - 8, {
+    fill: xValue > 15 ? uiTheme.accentStrong : uiTheme.textMuted,
+    fontSize: uiTextSize.caption,
+    fontWeight: "900",
+  });
 
-  const trackY = y + 22;
-  const track = new Graphics();
-  track.rect(x, trackY, width, 8)
-    .fill({ color: 0x0b0d0a, alpha: 0.78 });
-  const centerX = x + width / 2;
-  track.rect(centerX - 1, trackY - 4, 2, 16)
-    .fill({ color: 0xd8c890, alpha: 0.42 });
-  parent.addChild(track);
+  const point = new Graphics();
+  point.circle(pointX, pointY, 13)
+    .fill({ color: uiTheme.shadow, alpha: 0.16 });
+  point.circle(pointX, pointY, 8)
+    .fill({ color: uiTheme.barFill, alpha: 0.96 });
+  point.circle(pointX, pointY, 3)
+    .fill({ color: uiTheme.text, alpha: 0.98 });
+  parent.addChild(point);
 
-  const knobX = x + ((value + 100) / 200) * width;
-  const knob = new Graphics();
-  knob.circle(knobX, trackY + 4, 7)
-    .fill({ color: 0xe0c46f, alpha: 0.95 });
-  parent.addChild(knob);
+  host.drawText(parent, translations.ui.profileCommunalAuthority, mapX + 10, mapY + 10, {
+    fill: xValue < 0 && yValue >= 0 ? uiTheme.accentStrong : uiTheme.textSoft,
+    fontSize: uiTextSize.tiny,
+    fontWeight: "900",
+    wordWrap: true,
+    wordWrapWidth: mapSize / 2 - 16,
+  });
+  const marketAuthorityLabel = host.drawText(parent, translations.ui.profileMarketAuthority, mapX + mapSize - 10, mapY + 10, {
+    fill: xValue >= 0 && yValue >= 0 ? uiTheme.accentStrong : uiTheme.textSoft,
+    fontSize: uiTextSize.tiny,
+    fontWeight: "900",
+    align: "right",
+    wordWrap: true,
+    wordWrapWidth: mapSize / 2 - 16,
+  });
+  marketAuthorityLabel.anchor.x = 1;
+  host.drawText(parent, translations.ui.profileCommunalAutonomy, mapX + 10, mapY + mapSize - 30, {
+    fill: xValue < 0 && yValue < 0 ? uiTheme.accentStrong : uiTheme.textSoft,
+    fontSize: uiTextSize.tiny,
+    fontWeight: "900",
+    wordWrap: true,
+    wordWrapWidth: mapSize / 2 - 16,
+  });
+  const marketAutonomyLabel = host.drawText(parent, translations.ui.profileMarketAutonomy, mapX + mapSize - 10, mapY + mapSize - 30, {
+    fill: xValue >= 0 && yValue < 0 ? uiTheme.accentStrong : uiTheme.textSoft,
+    fontSize: uiTextSize.tiny,
+    fontWeight: "900",
+    align: "right",
+    wordWrap: true,
+    wordWrapWidth: mapSize / 2 - 16,
+  });
+  marketAutonomyLabel.anchor.x = 1;
 }
 
 function drawWorkforceRow(
@@ -806,20 +846,20 @@ function drawWorkforceRow(
   row.y = options.y;
   parent.addChild(row);
 
-  host.drawIcon(row, options.iconId, 8, 9, 14);
-  host.drawText(row, options.label, 28, 1, {
-    fill: 0xaeb4b8,
-    fontSize: 11,
+  host.drawIcon(row, options.iconId, 10, 12, 17);
+  host.drawText(row, options.label, 34, 2, {
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.body,
     fontWeight: "800",
   });
   const value = host.drawText(row, options.value, options.width, 1, {
-    fill: options.missing ? 0xff6f7d : 0xf1df9a,
-    fontSize: 13,
+    fill: options.missing ? uiTheme.negative : uiTheme.accentStrong,
+    fontSize: uiTextSize.value,
     fontWeight: "900",
   });
   value.anchor.set(1, 0);
 
-  row.hitArea = new Rectangle(0, -2, options.width, 23);
+  row.hitArea = new Rectangle(0, -3, options.width, 29);
   host.bindTooltip(row, options.tooltip);
 }
 
@@ -830,19 +870,12 @@ function drawWeatherOverviewPanel(
   width: number,
   height: number,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(620, width - 48);
-  const panelHeight = 356;
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
+    maxWidth: 620,
+    minHeight: 356,
+    preferredHeight: 356,
+    maxHeight: 356,
+  });
 
   const condition = state.environment.condition;
   const definition = getEnvironmentDefinition(condition);
@@ -859,28 +892,22 @@ function drawWeatherOverviewPanel(
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: getEnvironmentPanelIconId(condition),
     title: translations.ui.weatherOverview ?? translations.ui.environment,
+    subtitle: getEnvironmentDescription(state, translations),
     rightText: conditionLabel,
     closeAction: { action: "close-village-modal" },
   });
-  const descriptionLabel = host.drawText(panel, getEnvironmentDescription(state, translations), 24, headerBottom + 2, {
-    fill: 0xc8cabb,
-    fontSize: 13,
-    fontWeight: "700",
-    wordWrap: true,
-    wordWrapWidth: panelWidth - 48,
-  });
-  const statusY = descriptionLabel.y + descriptionLabel.height + 12;
+  const statusY = headerBottom + 12;
   host.drawText(panel, translations.ui.weatherStatus ?? "Status", 24, statusY, {
-    fill: 0xaeb4b8,
-    fontSize: 12,
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.small,
     fontWeight: "800",
   });
   drawBreakdownRow(host, panel, translations.ui.environmentIntensity, `${intensity}/${ENVIRONMENT_MAX_INTENSITY}`, intensity, panelWidth, statusY + 32);
   drawBreakdownRow(host, panel, translations.ui.environmentEndsIn, endsIn, condition === "stable" ? 0 : -0.01, panelWidth, statusY + 66);
   const penaltiesY = statusY + 100;
   host.drawText(panel, translations.ui.weatherPenalties ?? "Potential penalties", 24, penaltiesY, {
-    fill: 0xaeb4b8,
-    fontSize: 12,
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.small,
     fontWeight: "800",
   });
   drawBreakdownRow(
@@ -950,18 +977,11 @@ function drawOasisOverviewPanel(
   width: number,
   height: number,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(700, width - 48);
-  const panelHeight = Math.max(300, Math.min(560, height - 72));
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
+    maxWidth: 700,
+    minHeight: 300,
+    maxHeight: 560,
+  });
 
   const capturedSites = state.resourceSites.filter((site) => site.captured);
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
@@ -974,8 +994,8 @@ function drawOasisOverviewPanel(
 
   if (capturedSites.length === 0) {
     host.drawText(panel, translations.ui.quickNoCapturedOases ?? "No captured oasis yet.", 24, bodyY + 8, {
-      fill: 0xbfc7be,
-      fontSize: 13,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
       fontWeight: "800",
     });
     return;
@@ -986,7 +1006,7 @@ function drawOasisOverviewPanel(
     const rowY = bodyY + index * rowHeight;
     const row = new Graphics();
     row.rect(18, rowY, panelWidth - 36, rowHeight - 8)
-      .fill({ color: 0x161a15, alpha: 0.78 });
+      .fill({ color: uiTheme.surfaceMuted, alpha: 0.44 });
     panel.addChild(row);
 
     const resourceName = translations.resources[site.resourceId] ?? site.resourceId;
@@ -994,8 +1014,8 @@ function drawOasisOverviewPanel(
     const yieldPerHour = site.yieldPerWorker * GAME_HOUR_REAL_SECONDS;
     host.drawIcon(panel, site.resourceId, 34, rowY + 31, 18);
     host.drawText(panel, `${resourceName} ${translations.ui.resourceSiteTitle ?? "Oasis"}`, 52, rowY + 10, {
-      fill: 0xf4eedf,
-      fontSize: 14,
+      fill: uiTheme.text,
+      fontSize: uiTextSize.bodyLarge,
       fontWeight: "900",
     });
     host.drawText(
@@ -1004,37 +1024,24 @@ function drawOasisOverviewPanel(
       52,
       rowY + 30,
       {
-        fill: 0xaeb4b8,
-        fontSize: 11,
+        fill: uiTheme.textMuted,
+        fontSize: uiTextSize.caption,
         fontWeight: "800",
       },
     );
 
-    const buttonX = panelWidth - 156;
-    const buttonY = rowY + 16;
-    const openButton = new Graphics();
-    openButton.rect(buttonX, buttonY, 122, 34)
-      .fill({ color: 0xe0c46f, alpha: 1 });
-    panel.addChild(openButton);
-    const openLabel = host.drawText(
+    host.createModalButton(
       panel,
       translations.ui.openOasis ?? "Open oasis",
-      buttonX + 61,
-      buttonY + 9,
+      panelWidth - 156,
+      rowY + 16,
+      122,
+      34,
       {
-        fill: 0x15180f,
-        fontSize: 12,
-        fontWeight: "900",
+        action: "open-resource-site-modal",
+        resourceSiteId: site.id,
       },
-    );
-    openLabel.anchor.set(0.5, 0);
-
-    host.bindAction(openButton, {
-      action: "open-resource-site-modal",
-      resourceSiteId: site.id,
-    });
-    host.bindTooltip(
-      openButton,
+      false,
       `${translations.ui.openOasis ?? "Open oasis"}\n${resourceName}`,
     );
   });
@@ -1048,18 +1055,11 @@ function drawResourceBreakdownPanel(
   height: number,
   resourceId: ResourceId,
 ): void {
-  const overlay = new Container();
-  host.hudLayer.addChild(overlay);
-  host.drawModalBackdrop(overlay, width, height, { action: "close-village-modal" });
-
-  const panelWidth = Math.min(620, width - 48);
-  const panelHeight = Math.max(320, Math.min(520, height - 72));
-  const panel = new Container();
-  panel.x = (width - panelWidth) / 2;
-  panel.y = Math.max(36, (height - panelHeight) / 2);
-  panel.eventMode = "static";
-  overlay.addChild(panel);
-  host.drawPanel(panel, 0, 0, panelWidth, panelHeight, 1, 0);
+  const { panel, panelWidth, panelHeight } = createInfoPanelShell(host, width, height, {
+    maxWidth: 620,
+    minHeight: 320,
+    maxHeight: 520,
+  });
 
   const breakdown = getResourceBreakdown(state, resourceId);
   appendResourceSiteBreakdownLines(state, resourceId, breakdown);
@@ -1070,13 +1070,14 @@ function drawResourceBreakdownPanel(
   const headerBottom = host.drawOverlayHeader(panel, panelWidth, translations, {
     iconId: resourceId,
     title: translations.resources[resourceId],
+    subtitle: translations.resourceDescriptions[resourceId],
     rightText: stockLabel,
     closeAction: { action: "close-village-modal" },
   });
   const sectionStartY = headerBottom + 4;
   host.drawText(panel, translations.ui.resourceBreakdown, 24, sectionStartY, {
-    fill: 0xaeb4b8,
-    fontSize: 12,
+    fill: uiTheme.textMuted,
+    fontSize: uiTextSize.small,
     fontWeight: "800",
   });
 
@@ -1135,8 +1136,8 @@ function drawResourceBreakdownPanel(
     host.setResourceBreakdownScrollY(0);
     host.setResourceBreakdownScrollMax(0);
     host.drawText(panel, translations.ui.resourceNoActiveEffects, 24, viewportY, {
-      fill: 0xc8cabb,
-      fontSize: 13,
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
       fontWeight: "700",
     });
     return;
@@ -1183,9 +1184,9 @@ function drawResourceBreakdownPanel(
     const thumbY = viewportY + (trackHeight - thumbHeight) * (scrollY / maxScroll);
     const scrollbar = new Graphics();
     scrollbar.rect(panelWidth - 20, viewportY, 5, trackHeight)
-      .fill({ color: 0x0b0d0a, alpha: 0.76 });
+      .fill({ color: uiTheme.surfaceSunken, alpha: 0.42 });
     scrollbar.rect(panelWidth - 20, thumbY, 5, thumbHeight)
-      .fill({ color: 0xe0c46f, alpha: 0.66 });
+      .fill({ color: uiTheme.barFill, alpha: 0.66 });
     panel.addChild(scrollbar);
   }
 }
@@ -1202,17 +1203,17 @@ function drawBreakdownRow(
 ): void {
   const row = new Graphics();
   row.rect(18, y - 7, width - 36, 28)
-    .fill({ color: highlighted ? 0x262719 : 0x0f120e, alpha: highlighted ? 0.72 : 0.38 });
+    .fill({ color: highlighted ? uiTheme.rowActive : uiTheme.row, alpha: highlighted ? 0.72 : 0.38 });
   parent.addChild(row);
 
   host.drawText(parent, label, 32, y, {
-    fill: highlighted ? 0xf5efdf : 0xd8d2bd,
-    fontSize: 12,
+    fill: highlighted ? uiTheme.text : uiTheme.textMuted,
+    fontSize: uiTextSize.small,
     fontWeight: highlighted ? "900" : "800",
   });
   const valueText = host.drawText(parent, value, width - 32, y, {
     fill: getRateColor(ratePerSecond),
-    fontSize: 12,
+    fontSize: uiTextSize.small,
     fontWeight: "900",
   });
   valueText.anchor.set(1, 0);

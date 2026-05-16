@@ -179,7 +179,7 @@ export function getBuildingWorkerLimit(state: GameState, buildingId: BuildingId)
   const building = state.buildings[buildingId];
 
   if (
-    (buildingId !== "generator" && buildingId !== "workshop") ||
+    (buildingId !== "coalMine" && buildingId !== "workshop") ||
     building.level <= 0
   ) {
     return 0;
@@ -351,7 +351,7 @@ export function getResourceBreakdown(
       continue;
     }
 
-    if (definition.id === "generator") {
+    if (definition.id === "coalMine") {
       const baseRatePerSecond = resourceId === "coal"
         ? getCoalMineCoalRate(building.level, building.workers)
         : 0;
@@ -740,7 +740,7 @@ function getProductionDelta(
       continue;
     }
 
-    if (definition.id === "generator") {
+    if (definition.id === "coalMine") {
       delta.coal +=
         getCoalMineCoalRate(building.level, building.workers) *
         productionMultiplier *
@@ -834,13 +834,6 @@ export function recalculateCapacities(state: GameState): void {
   }
 }
 
-export function getDefenseScore(state: GameState): number {
-  return buildingDefinitions.reduce((score, definition) => {
-    const building = state.buildings[definition.id];
-    return score + (definition.defense ?? 0) * building.level;
-  }, state.survivors.troops * 6);
-}
-
 function applyRate(
   delta: ResourceBag,
   bag: ResourceBag | undefined,
@@ -915,7 +908,7 @@ function getPositiveMoraleProductionRate(state: GameState): number {
     if (
       building.level <= 0 ||
       building.upgradingRemaining > 0 ||
-      definition.id === "generator" ||
+      definition.id === "coalMine" ||
       definition.id === "workshop" ||
       isBuildingInactiveDueToCoal(state, definition.id)
     ) {

@@ -1,4 +1,5 @@
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
+import { uiTheme } from "../core/constants";
 
 export function formatRate(value: number): string {
   if (Math.abs(value) >= 10) {
@@ -46,12 +47,12 @@ export function getRateColor(ratePerSecond: number): number {
   const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
 
   if (hourlyRate > 0.05) {
-    return 0x8fe0b8;
+    return uiTheme.positive;
   }
 
   if (hourlyRate < -0.05) {
-    return 0xff9aa2;
+    return uiTheme.negative;
   }
 
-  return 0xaeb4b8;
+  return uiTheme.textMuted;
 }

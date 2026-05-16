@@ -197,8 +197,8 @@ cleanly instead of carrying compatibility branches.
   building only when the player starts construction there. Do not render every
   building as pre-placed by default.
 - The palisade is a real unique building, not only decoration. It can only be
-  built on the dedicated perimeter plot near the gate, improves defense, and
-  each completed level attracts one survivor.
+  built on the dedicated perimeter plot near the gate, improves perimeter
+  presence, and each completed level attracts one survivor.
 - Building construction/upgrades are limited to two active jobs at a time. Show
   the active building queue in the lower-left scene overlay.
 - Start from a title menu with New Game, Continue, and Settings. Settings should

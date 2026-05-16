@@ -1,22 +1,23 @@
 import type { GameState } from "../../../game/types";
 import { getLogEntrySeverity } from "../../../systems/log";
+import { uiTheme } from "../core/constants";
 
 export function getLogEntryFillColor(entry: GameState["log"][number], latest: boolean): number {
   const severity = getLogEntrySeverity(entry);
 
   if (severity === "critical") {
-    return 0xff707a;
+    return uiTheme.negative;
   }
 
   if (severity === "warning") {
-    return 0xf1c17f;
+    return uiTheme.warning;
   }
 
   if (severity === "positive") {
-    return 0x9ed99b;
+    return uiTheme.positive;
   }
 
-  return latest ? 0xf1df9a : 0xc8cabb;
+  return latest ? uiTheme.accentStrong : uiTheme.textMuted;
 }
 
 export function getLogEntryIconId(entry: GameState["log"][number]): string {
@@ -44,17 +45,13 @@ export function getLogEntryIconId(entry: GameState["log"][number]): string {
     return "people";
   }
 
-  if (key === "logScoutingStarted" || key === "logScoutingReturned") {
-    return "scout";
-  }
-
   if (
     key === "logResourceSiteAssaultStarted" ||
     key === "logResourceSiteAssaultFailed" ||
     key === "logResourceSiteAssaultOverrun" ||
     key === "logResourceSiteCaptured"
   ) {
-    return "shield";
+    return "expedition";
   }
 
   if (key === "logMarketTrade") {

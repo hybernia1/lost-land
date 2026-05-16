@@ -6,23 +6,19 @@ import type { ActiveEnvironmentConditionId, BrandAlertTone } from "./types";
 export const decisionProfileIconByKind: Record<DecisionProfileKind, string> = {
   noData: "profile-no-data",
   balanced: "profile-balanced",
-  philanthropist: "profile-philanthropist",
-  principled: "profile-principled",
-  merciful: "profile-merciful",
-  security: "profile-security",
-  open: "profile-open",
-  cautious: "profile-cautious",
+  communalAuthority: "profile-principled",
+  marketAuthority: "profile-security",
+  communalAutonomy: "profile-merciful",
+  marketAutonomy: "profile-open",
 };
 
 export const decisionProfileLabelKeyByKind: Record<DecisionProfileKind, string> = {
   noData: "profileNoData",
   balanced: "profileBalanced",
-  philanthropist: "profilePhilanthropist",
-  principled: "profilePrincipled",
-  merciful: "profileMerciful",
-  security: "profileSecurity",
-  open: "profileOpen",
-  cautious: "profileCautious",
+  communalAuthority: "profileCommunalAuthority",
+  marketAuthority: "profileMarketAuthority",
+  communalAutonomy: "profileCommunalAutonomy",
+  marketAutonomy: "profileMarketAutonomy",
 };
 
 export const environmentAlertIconByCondition: Record<ActiveEnvironmentConditionId, string> = {
@@ -43,18 +39,58 @@ export const resourceColors: Record<ResourceId, number> = {
   morale: 0xe9a0a0,
 };
 
-export const VILLAGE_BUILDING_RENDER_SCALE = 2;
-const BUILDING_PREVIEW_BASE_RENDER_SCALE = 1.3;
-export const BUILDING_PREVIEW_RENDER_SCALE = Math.max(
-  1,
-  VILLAGE_BUILDING_RENDER_SCALE / BUILDING_PREVIEW_BASE_RENDER_SCALE,
-);
-export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
+export const uiTheme = {
+  background: 0x061928,
+  backgroundLower: 0x03111d,
+  surface: 0x12324c,
+  surfaceMuted: 0x0c263b,
+  surfaceSunken: 0x061725,
+  modalContent: 0x0a2a42,
+  modalContentPanel: 0x0f3552,
+  modalHeader: 0x082338,
+  hudChrome: 0x061b2b,
+  sidePanel: 0x061b2b,
+  topStrip: 0x061b2b,
+  border: 0x2c5f7f,
+  borderStrong: 0x80bddf,
+  text: 0xf0dfbd,
+  textMuted: 0x9ebbd0,
+  textSoft: 0x6f93aa,
+  accent: 0x6da9cc,
+  accentStrong: 0xf0c96f,
+  accentSurface: 0x1a587f,
+  actionSurface: 0x4a8c32,
+  actionSurfaceDark: 0x2f641f,
+  actionBorder: 0x93d05f,
+  rewardSurface: 0x123d5a,
+  row: 0x0b2b43,
+  rowActive: 0x164d72,
+  barTrack: 0x04111c,
+  barMarker: 0x6da9cc,
+  barFill: 0xf0c96f,
+  positive: 0x8fca78,
+  positiveSurface: 0x245f43,
+  negative: 0xe9857c,
+  negativeSurface: 0x653235,
+  warning: 0xe8b75c,
+  cold: 0x8bc9e7,
+  overlay: 0x020811,
+  tooltip: 0x061725,
+  shadow: 0x020811,
+};
 
-export const HUD_DESIGN_SCALE = 1.2;
-export const HUD_TOP_STRIP_HEIGHT = 68;
-export const HUD_SIDE_PANEL_MARGIN = 0;
+export const VILLAGE_BUILDING_RENDER_SCALE = 2;
+export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "support"];
+
+export const HUD_DESIGN_SCALE = 1;
+export const HUD_CHROME_ALPHA = 1;
+export const UI_PANEL_RADIUS = 8;
+export const UI_CONTROL_RADIUS = 0;
+export const UI_BADGE_RADIUS = 4;
+export const HUD_TOP_STRIP_HEIGHT = 82;
 export const HUD_LEFT_PANEL_WIDTH = 366;
+export const HUD_SIDE_PANEL_MARGIN = 20;
+export const HUD_SIDE_PANEL_CONTENT_WIDTH = HUD_LEFT_PANEL_WIDTH - HUD_SIDE_PANEL_MARGIN * 2;
 export const CAMERA_MIN_ZOOM = 0.72;
 export const CAMERA_MAX_ZOOM = 1.35;
 export const CAMERA_ZOOM_STEP = 0.0018;
@@ -77,9 +113,29 @@ export const RAIN_LAYER_A_MIN_COUNT = 540;
 export const RAIN_LAYER_A_MAX_COUNT = 1300;
 export const RAIN_LAYER_B_MIN_COUNT = 360;
 export const RAIN_LAYER_B_MAX_COUNT = 880;
-export const HUD_FONT_FAMILY = "\"Segoe UI\", \"Noto Sans\", Arial, sans-serif";
+export const HUD_FONT_FAMILY = "Georgia, Cambria, \"Times New Roman\", serif";
 export const HUD_FONT_WEIGHT_NORMAL: TextStyleFontWeight = "400";
-export const HUD_FONT_WEIGHT_BOLD: TextStyleFontWeight = "700";
+export const HUD_FONT_WEIGHT_BOLD: TextStyleFontWeight = "600";
+
+export const uiTextSize = {
+  tiny: 9,
+  micro: 10,
+  caption: 11,
+  small: 12,
+  body: 13,
+  bodyLarge: 14,
+  emphasis: 15,
+  control: 16,
+  value: 17,
+  actionValue: 18,
+  sectionTitle: 20,
+  screenTitle: 21,
+  overlayTitle: 22,
+  resultTitle: 24,
+  brandTitle: 25,
+  modalTitle: 30,
+  frontTitle: 48,
+} as const;
 
 export function getHudTextLineHeight(fontSize: number): number {
   return Math.max(1, Math.round(fontSize * 1.35));

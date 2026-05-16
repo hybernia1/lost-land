@@ -1,6 +1,15 @@
 import { Container, Graphics, Text, type TextStyleFontWeight } from "pixi.js";
-import { getHudTextLineHeight, HUD_FONT_FAMILY, normalizeHudFontWeight } from "../core/constants";
+import {
+  getHudTextLineHeight,
+  HUD_FONT_FAMILY,
+  normalizeHudFontWeight,
+  UI_CONTROL_RADIUS,
+  UI_PANEL_RADIUS,
+  uiTextSize,
+  uiTheme,
+} from "../core/constants";
 import type { CircleButtonOptions, PixiActionDetail, RectButtonOptions, RectButtonTone } from "../core/types";
+import { drawBluePanelBackground } from "./panelBackground";
 
 type UiPrimitivesHost = {
   drawIcon: (parent: Container, iconId: string, x: number, y: number, size: number) => Container;
@@ -68,9 +77,17 @@ export function drawPanelPrimitive(
   height: number,
   fillAlpha = 0.76,
 ): Graphics {
+  const background = drawBluePanelBackground(parent, x, y, width, height, Math.min(1, Math.max(fillAlpha, 0.82)));
+  const backgroundMask = new Graphics();
+  backgroundMask.roundRect(x, y, width, height, UI_PANEL_RADIUS).fill({ color: 0xffffff, alpha: 1 });
+  parent.addChild(backgroundMask);
+  background.mask = backgroundMask;
+
   const panel = new Graphics();
-  panel.rect(x, y, width, height);
-  panel.fill({ color: 0x10120e, alpha: fillAlpha });
+  panel.roundRect(x, y, width, height, UI_PANEL_RADIUS);
+  panel
+    .fill({ color: uiTheme.surface, alpha: 0.1 })
+    .stroke({ color: uiTheme.border, alpha: 0.5, width: 1 });
   parent.addChild(panel);
   return panel;
 }
@@ -79,35 +96,53 @@ export function getRectButtonStyle(
   tone: RectButtonTone,
   disabled: boolean,
   active: boolean,
-): { fill: number; fillAlpha: number; textFill: number } {
+): { fill: number; fillAlpha: number; textFill: number; border: number; borderAlpha: number } {
   if (disabled) {
     return {
-      fill: 0x34362e,
-      fillAlpha: tone === "secondary" ? 0.52 : 0.62,
-      textFill: 0xaeb4b8,
+      fill: uiTheme.surfaceSunken,
+      fillAlpha: tone === "secondary" ? 0.44 : 0.58,
+      textFill: uiTheme.textMuted,
+      border: uiTheme.border,
+      borderAlpha: 0.24,
     };
   }
 
-  if (active || tone === "primary") {
+  if (tone === "primary") {
     return {
-      fill: 0xe0c46f,
-      fillAlpha: 1,
-      textFill: 0x141719,
+      fill: uiTheme.actionSurface,
+      fillAlpha: 0.9,
+      textFill: uiTheme.text,
+      border: uiTheme.actionBorder,
+      borderAlpha: 0.86,
+    };
+  }
+
+  if (active) {
+    return {
+      fill: uiTheme.surfaceMuted,
+      fillAlpha: 0.86,
+      textFill: uiTheme.text,
+      border: uiTheme.borderStrong,
+      borderAlpha: 0.74,
     };
   }
 
   if (tone === "secondary") {
     return {
-      fill: 0x262719,
-      fillAlpha: 0.92,
-      textFill: 0xf1df9a,
+      fill: uiTheme.surfaceSunken,
+      fillAlpha: 0.7,
+      textFill: uiTheme.accentStrong,
+      border: uiTheme.border,
+      borderAlpha: 0.46,
     };
   }
 
   return {
-    fill: 0x2d2f23,
-    fillAlpha: 0.84,
-    textFill: 0xf4eedf,
+    fill: uiTheme.surfaceMuted,
+    fillAlpha: 0.72,
+    textFill: uiTheme.text,
+    border: uiTheme.border,
+    borderAlpha: 0.48,
   };
 }
 
@@ -137,20 +172,41 @@ export function createRectButtonPrimitive(
   button.y = options.y;
 
   const style = getRectButtonStyle(options.tone ?? "toolbar", options.disabled ?? false, options.active ?? false);
+  const selected = options.selected ?? false;
+  const radius = Math.min(UI_CONTROL_RADIUS, options.height / 2);
+  const tone = options.tone ?? "toolbar";
   const box = new Graphics();
-  box.rect(0, 0, options.width, options.height).fill({ color: style.fill, alpha: style.fillAlpha });
+  box.roundRect(0, 0, options.width, options.height, radius)
+    .fill({ color: style.fill, alpha: style.fillAlpha });
+  if (!options.disabled && tone === "primary") {
+    box.roundRect(1, 1, options.width - 2, Math.max(0, options.height - 2), Math.max(0, radius - 1))
+      .fill({ color: uiTheme.actionSurfaceDark, alpha: 0.28 });
+    box.rect(2, 2, Math.max(0, options.width - 4), Math.max(0, options.height * 0.45))
+      .fill({ color: uiTheme.actionBorder, alpha: 0.1 });
+  }
+  box.roundRect(0, 0, options.width, options.height, radius)
+    .stroke({ color: selected ? uiTheme.accentStrong : style.border, alpha: selected ? 0.96 : style.borderAlpha, width: selected ? 1.8 : tone === "primary" ? 1.4 : 1 });
+  if (options.disabled) {
+    box.roundRect(0, 0, options.width, options.height, radius)
+      .fill({ color: uiTheme.border, alpha: 0.12 });
+  } else if (selected) {
+    box.roundRect(3, 3, Math.max(0, options.width - 6), Math.max(0, options.height - 6), Math.max(0, radius - 3))
+      .stroke({ color: uiTheme.text, alpha: 0.22, width: 1 });
+  } else if (options.active) {
+    box.rect(6, options.height - 3, Math.max(0, options.width - 12), 1.5).fill({ color: uiTheme.borderStrong, alpha: 0.42 });
+  }
   button.addChild(box);
 
   if (options.iconId) {
     const icon = host.drawIcon(button, options.iconId, options.width / 2, options.height / 2, Math.min(options.width, options.height) - 14);
-    icon.alpha = options.active ? 0.9 : 1;
+    icon.alpha = options.active || selected ? 0.9 : 1;
   }
 
   if (options.label) {
     drawCenteredText(button, options.label, options.width / 2, options.height / 2, {
       fill: style.textFill,
-      fontSize: options.fontSize ?? 13,
-      fontWeight: options.fontWeight ?? "900",
+      fontSize: options.fontSize ?? uiTextSize.body,
+      fontWeight: normalizeHudFontWeight(options.fontWeight ?? "700"),
     });
   }
 
@@ -189,26 +245,31 @@ export function createCircleButtonPrimitive(
 
   const box = new Graphics();
   const fillColor = disabled
-    ? 0x34362e
+    ? uiTheme.surfaceSunken
     : options.active
-      ? 0xe0c46f
-      : 0x2d2f23;
+      ? uiTheme.accentSurface
+      : uiTheme.surface;
   const fillAlpha = disabled
-    ? 0.72
+    ? 0.42
     : options.active
-      ? 1
-      : 0.92;
+      ? 0.92
+      : 0.86;
+  const shadow = new Graphics();
+  shadow.circle(1.5, 2.5, options.radius)
+    .fill({ color: uiTheme.shadow, alpha: disabled ? 0.08 : 0.16 });
+  button.addChild(shadow);
   box.circle(0, 0, options.radius)
     .fill({ color: fillColor, alpha: fillAlpha });
+  box.circle(0, 0, options.radius)
+    .stroke({ color: uiTheme.border, alpha: disabled ? 0.32 : 0.68, width: 1.2 });
+  if (!disabled) {
+    box.circle(0, 0, Math.max(0, options.radius - 5))
+      .fill({ color: options.active ? uiTheme.accentSurface : uiTheme.surfaceMuted, alpha: options.active ? 0.32 : 0.42 });
+  }
   button.addChild(box);
 
-  const border = new Graphics();
-  border.circle(0, 0, options.radius)
-    .stroke({ color: disabled ? 0x595d52 : options.active ? 0xf3e0a2 : 0x45493a, width: 1.5, alpha: 0.9 });
-  button.addChild(border);
-
   const icon = host.drawIcon(button, options.iconId, 0, 0, options.radius * 1.08);
-  icon.alpha = disabled ? 0.45 : options.active ? 0.92 : 1;
+  icon.alpha = disabled ? 0.44 : 1;
   if (!disabled) {
     host.bindAction(button, options.detail);
   } else {
@@ -239,8 +300,8 @@ export function createPillPrimitive(
   },
 ): Container {
   const group = new Container();
-  const labelFill = options.labelFill ?? 0xe9e4d2;
-  const sublabelFill = options.sublabelFill ?? 0xaeb4b8;
+  const labelFill = options.labelFill ?? uiTheme.text;
+  const sublabelFill = options.sublabelFill ?? uiTheme.textMuted;
   const compact = options.compact ?? false;
 
   const text = new Text({
@@ -248,7 +309,7 @@ export function createPillPrimitive(
     style: {
       fill: labelFill,
       fontFamily: HUD_FONT_FAMILY,
-      fontSize: compact ? 12 : 13,
+      fontSize: compact ? uiTextSize.small : uiTextSize.body,
       fontWeight: normalizeHudFontWeight("800"),
     },
   });
@@ -258,7 +319,7 @@ export function createPillPrimitive(
       style: {
         fill: sublabelFill,
         fontFamily: HUD_FONT_FAMILY,
-        fontSize: compact ? 9 : 10,
+        fontSize: compact ? uiTextSize.tiny : uiTextSize.micro,
         fontWeight: normalizeHudFontWeight("800"),
       },
     })
@@ -266,7 +327,9 @@ export function createPillPrimitive(
   const width = Math.max(compact ? 62 : 68, Math.max(text.width, subtext?.width ?? 0) + (compact ? 38 : 44));
   const height = subtext ? (compact ? 38 : 46) : (compact ? 30 : 34);
   const panel = new Graphics();
-  panel.rect(0, 0, width, height).fill({ color: 0x10120e, alpha: compact ? 0.64 : 0.76 });
+  panel.roundRect(0, 0, width, height, UI_CONTROL_RADIUS)
+    .fill({ color: uiTheme.surface, alpha: compact ? 0.46 : 0.62 })
+    .stroke({ color: uiTheme.border, alpha: compact ? 0.42 : 0.52, width: 1 });
   group.addChild(panel);
   host.drawIcon(group, options.iconId, compact ? 15 : 17, height / 2, compact ? 14 : 16);
   text.x = compact ? 28 : 32;

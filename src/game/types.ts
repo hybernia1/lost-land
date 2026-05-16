@@ -12,7 +12,7 @@ export type BuildingId =
   | "hydroponics"
   | "waterStill"
   | "workshop"
-  | "generator"
+  | "coalMine"
   | "market"
   | "watchtower"
   | "barracks"
@@ -22,7 +22,6 @@ export type BuildingId =
 export type BuildingCategory =
   | "resource"
   | "housing"
-  | "defense"
   | "support";
 
 export type ResourceBag = Partial<Record<ResourceId, number>>;
@@ -49,7 +48,6 @@ export type BuildingDefinition = {
   alwaysConsumes?: ResourceBag;
   storageBonus?: ResourceBag;
   housing?: number;
-  defense?: number;
   requiredMainBuildingLevel?: number;
   requiredMainBuildingLevelByUpgradeLevel?: number[];
 };
@@ -142,7 +140,7 @@ export type ResourceSiteState = {
 
 export type ObjectiveQuestId =
   | "buildStorage"
-  | "buildGenerator"
+  | "buildCoalMine"
   | "buildDormitory"
   | "buildWaterStill"
   | "buildHydroponics";
@@ -155,7 +153,7 @@ export type DecisionQuestId =
   | "traderAtDusk"
   | "nightScreams"
   | "waterTheft"
-  | "generatorSpareParts"
+  | "coalMineSpareParts"
   | "provenTheft"
   | "collapsedUnderpass"
   | "brokenWaterFilter";
@@ -164,9 +162,8 @@ export type SuddenQuestId =
   | "cropSpoilage";
 
 export type DecisionProfileAxisId =
-  | "philanthropyPrinciple"
-  | "mercySecurity"
-  | "opennessCaution";
+  | "communityMarket"
+  | "authorityAutonomy";
 
 export type DecisionOptionId = string;
 

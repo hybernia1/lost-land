@@ -29,8 +29,8 @@ export const objectiveQuestDefinitions: ObjectiveQuestDefinition[] = [
     reward: { material: 45, food: 10 },
   },
   {
-    id: "buildGenerator",
-    buildingId: "generator",
+    id: "buildCoalMine",
+    buildingId: "coalMine",
     requiredLevel: 1,
     prerequisiteIds: ["buildStorage"],
     reward: { material: 50, coal: 20 },
@@ -39,7 +39,7 @@ export const objectiveQuestDefinitions: ObjectiveQuestDefinition[] = [
     id: "buildWaterStill",
     buildingId: "waterStill",
     requiredLevel: 1,
-    prerequisiteIds: ["buildGenerator"],
+    prerequisiteIds: ["buildCoalMine"],
     reward: { material: 45, water: 12 },
   },
   {

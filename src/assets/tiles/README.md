@@ -1,6 +1,6 @@
 ﻿# Tile Atlases
 
-Map tiles are grouped by Tiled layer purpose. Legacy top-down atlases use a
+Map tiles are grouped by Tiled layer purpose. Older top-down atlases use a
 128x128 grid. Isometric tiles can use their own map grid sizes.
 
 Transparent overlay atlases use PNG alpha so they can be layered in Tiled
