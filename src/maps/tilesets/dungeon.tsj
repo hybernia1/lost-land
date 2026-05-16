@@ -1,0 +1,7235 @@
+{
+  "columns": 16,
+  "image": "../../assets/tiles/dungeon.png",
+  "imageheight": 4608,
+  "imagewidth": 2048,
+  "margin": 0,
+  "name": "dungeon",
+  "objectalignment": "bottom",
+  "properties": [
+    {
+      "name": "edgeOverscan",
+      "type": "float",
+      "value": 0.5
+    },
+    {
+      "name": "tintRain",
+      "type": "color",
+      "value": "#ff909fb2"
+    },
+    {
+      "name": "tintSnowFront",
+      "type": "color",
+      "value": "#ffd5e0ef"
+    }
+  ],
+  "spacing": 0,
+  "tilecount": 288,
+  "tiledversion": "1.12.1",
+  "tileheight": 256,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrel_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrel"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrel_N.png"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrel_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrel"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrel_E.png"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrel_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrel"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrel_S.png"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrel_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrel"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrel_W.png"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrels_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrels"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrels_N.png"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrels_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrels"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrels_E.png"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrels_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrels"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrels_S.png"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrels_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrels"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrels_W.png"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrelsStacked_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrelsStacked"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrelsStacked_N.png"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrelsStacked_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrelsStacked"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrelsStacked_E.png"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrelsStacked_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrelsStacked"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrelsStacked_S.png"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "barrelsStacked_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "barrelsStacked"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "barrelsStacked_W.png"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridge_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridge"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridge_N.png"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridge_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridge"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridge_E.png"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridge_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridge"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridge_S.png"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridge_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridge"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridge_W.png"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridgeBroken_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridgeBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridgeBroken_N.png"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridgeBroken_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridgeBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridgeBroken_E.png"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridgeBroken_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridgeBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridgeBroken_S.png"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "bridgeBroken_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "bridgeBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "bridgeBroken_W.png"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chair_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chair"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chair_N.png"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chair_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chair"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chair_E.png"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chair_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chair"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chair_S.png"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chair_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chair"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chair_W.png"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestClosed_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestClosed_N.png"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestClosed_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestClosed_E.png"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestClosed_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestClosed_S.png"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestClosed_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestClosed_W.png"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestOpen_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestOpen_N.png"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestOpen_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestOpen_E.png"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestOpen_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestOpen_S.png"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "chestOpen_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "chestOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "chestOpen_W.png"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirt"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirt_N.png"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirt"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirt_E.png"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirt"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirt_S.png"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirt_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirt"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirt_W.png"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirtTiles_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirtTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirtTiles_N.png"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirtTiles_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirtTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirtTiles_E.png"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirtTiles_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirtTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirtTiles_S.png"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "dirtTiles_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "dirtTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "dirtTiles_W.png"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planks_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planks"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planks_N.png"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planks_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planks"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planks_E.png"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planks_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planks"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planks_S.png"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planks_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planks"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planks_W.png"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksBroken_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksBroken_N.png"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksBroken_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksBroken_E.png"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksBroken_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksBroken_S.png"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksBroken_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksBroken_W.png"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksHole_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksHole_N.png"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksHole_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksHole_E.png"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksHole_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksHole_S.png"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "planksHole_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "planksHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "planksHole_W.png"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairs_N.png"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairs_E.png"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairs_S.png"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairs_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairs_W.png"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsAged_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsAged_N.png"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsAged_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsAged_E.png"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsAged_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsAged_S.png"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsAged_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsAged_W.png"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsCorner_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsCorner_N.png"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsCorner_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsCorner_E.png"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsCorner_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsCorner_S.png"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsCorner_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsCorner_W.png"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsSpiral_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsSpiral"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsSpiral_N.png"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsSpiral_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsSpiral"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsSpiral_E.png"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsSpiral_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsSpiral"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsSpiral_S.png"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stairsSpiral_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stairsSpiral"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stairsSpiral_W.png"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stone"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stone_N.png"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stone"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stone_E.png"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stone"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stone_S.png"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stone_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stone"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stone_W.png"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumn_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumn_N.png"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumn_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumn_E.png"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumn_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumn_S.png"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumn_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumn_W.png"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumnWood_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumnWood"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumnWood_N.png"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumnWood_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumnWood"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumnWood_E.png"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumnWood_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumnWood"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumnWood_S.png"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneColumnWood_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneColumnWood"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneColumnWood_W.png"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneCorner_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneCorner_N.png"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneCorner_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneCorner_E.png"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneCorner_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneCorner_S.png"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneCorner_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneCorner_W.png"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneInset_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneInset"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneInset_N.png"
+        }
+      ]
+    },
+    {
+      "id": 85,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneInset_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneInset"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneInset_E.png"
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneInset_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneInset"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneInset_S.png"
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneInset_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneInset"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneInset_W.png"
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneLeft_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneLeft_N.png"
+        }
+      ]
+    },
+    {
+      "id": 89,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneLeft_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneLeft_E.png"
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneLeft_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneLeft_S.png"
+        }
+      ]
+    },
+    {
+      "id": 91,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneLeft_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneLeft_W.png"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneMissingTiles_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneMissingTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneMissingTiles_N.png"
+        }
+      ]
+    },
+    {
+      "id": 93,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneMissingTiles_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneMissingTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneMissingTiles_E.png"
+        }
+      ]
+    },
+    {
+      "id": 94,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneMissingTiles_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneMissingTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneMissingTiles_S.png"
+        }
+      ]
+    },
+    {
+      "id": 95,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneMissingTiles_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneMissingTiles"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneMissingTiles_W.png"
+        }
+      ]
+    },
+    {
+      "id": 96,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneRight_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneRight_N.png"
+        }
+      ]
+    },
+    {
+      "id": 97,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneRight_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneRight_E.png"
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneRight_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneRight_S.png"
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneRight_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneRight_W.png"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSide_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSide"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSide_N.png"
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSide_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSide"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSide_E.png"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSide_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSide"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSide_S.png"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSide_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSide"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSide_W.png"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSideUneven_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSideUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSideUneven_N.png"
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSideUneven_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSideUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSideUneven_E.png"
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSideUneven_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSideUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSideUneven_S.png"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSideUneven_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSideUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSideUneven_W.png"
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneStep_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneStep"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneStep_N.png"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneStep_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneStep"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneStep_E.png"
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneStep_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneStep"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneStep_S.png"
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneStep_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneStep"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneStep_W.png"
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSteps_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSteps"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSteps_N.png"
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSteps_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSteps"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSteps_E.png"
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSteps_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSteps"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSteps_S.png"
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneSteps_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneSteps"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneSteps_W.png"
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneTile_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneTile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneTile_N.png"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneTile_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneTile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneTile_E.png"
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneTile_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneTile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneTile_S.png"
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneTile_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneTile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneTile_W.png"
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneUneven_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneUneven_N.png"
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneUneven_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneUneven_E.png"
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneUneven_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneUneven_S.png"
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneUneven_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneUneven"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneUneven_W.png"
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWall_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWall"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWall_N.png"
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWall_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWall"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWall_E.png"
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWall_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWall"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWall_S.png"
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWall_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWall"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWall_W.png"
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAged_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAged_N.png"
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAged_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAged_E.png"
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAged_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAged_S.png"
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAged_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAged"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAged_W.png"
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedLeft_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedLeft_N.png"
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedLeft_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedLeft_E.png"
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedLeft_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedLeft_S.png"
+        }
+      ]
+    },
+    {
+      "id": 135,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedLeft_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedLeft_W.png"
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedRight_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedRight_N.png"
+        }
+      ]
+    },
+    {
+      "id": 137,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedRight_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedRight_E.png"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedRight_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedRight_S.png"
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallAgedRight_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallAgedRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallAgedRight_W.png"
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallArchway_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallArchway"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallArchway_N.png"
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallArchway_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallArchway"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallArchway_E.png"
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallArchway_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallArchway"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallArchway_S.png"
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallArchway_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallArchway"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallArchway_W.png"
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBroken_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBroken_N.png"
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBroken_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBroken_E.png"
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBroken_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBroken_S.png"
+        }
+      ]
+    },
+    {
+      "id": 147,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBroken_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBroken_W.png"
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_N.png"
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_E.png"
+        }
+      ]
+    },
+    {
+      "id": 150,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_S.png"
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenLeft"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenLeft_W.png"
+        }
+      ]
+    },
+    {
+      "id": 152,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenRight_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenRight_N.png"
+        }
+      ]
+    },
+    {
+      "id": 153,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenRight_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenRight_E.png"
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenRight_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenRight_S.png"
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallBrokenRight_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallBrokenRight"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallBrokenRight_W.png"
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumn_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumn_N.png"
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumn_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumn_E.png"
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumn_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumn_S.png"
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumn_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumn_W.png"
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumnIn_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumnIn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumnIn_N.png"
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumnIn_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumnIn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumnIn_E.png"
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumnIn_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumnIn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumnIn_S.png"
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallColumnIn_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallColumnIn"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallColumnIn_W.png"
+        }
+      ]
+    },
+    {
+      "id": 164,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallCorner_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallCorner_N.png"
+        }
+      ]
+    },
+    {
+      "id": 165,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallCorner_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallCorner_E.png"
+        }
+      ]
+    },
+    {
+      "id": 166,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallCorner_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallCorner_S.png"
+        }
+      ]
+    },
+    {
+      "id": 167,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallCorner_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallCorner"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallCorner_W.png"
+        }
+      ]
+    },
+    {
+      "id": 168,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoor_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoor"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoor_N.png"
+        }
+      ]
+    },
+    {
+      "id": 169,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoor_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoor"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoor_E.png"
+        }
+      ]
+    },
+    {
+      "id": 170,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoor_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoor"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoor_S.png"
+        }
+      ]
+    },
+    {
+      "id": 171,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoor_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoor"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoor_W.png"
+        }
+      ]
+    },
+    {
+      "id": 172,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorBars_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorBars_N.png"
+        }
+      ]
+    },
+    {
+      "id": 173,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorBars_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorBars_E.png"
+        }
+      ]
+    },
+    {
+      "id": 174,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorBars_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorBars_S.png"
+        }
+      ]
+    },
+    {
+      "id": 175,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorBars_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorBars_W.png"
+        }
+      ]
+    },
+    {
+      "id": 176,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorClosed_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorClosed_N.png"
+        }
+      ]
+    },
+    {
+      "id": 177,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorClosed_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorClosed_E.png"
+        }
+      ]
+    },
+    {
+      "id": 178,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorClosed_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorClosed_S.png"
+        }
+      ]
+    },
+    {
+      "id": 179,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorClosed_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorClosed_W.png"
+        }
+      ]
+    },
+    {
+      "id": 180,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorOpen_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorOpen_N.png"
+        }
+      ]
+    },
+    {
+      "id": 181,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorOpen_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorOpen_E.png"
+        }
+      ]
+    },
+    {
+      "id": 182,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorOpen_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorOpen_S.png"
+        }
+      ]
+    },
+    {
+      "id": 183,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallDoorOpen_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallDoorOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallDoorOpen_W.png"
+        }
+      ]
+    },
+    {
+      "id": 184,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGate_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGate_N.png"
+        }
+      ]
+    },
+    {
+      "id": 185,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGate_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGate_E.png"
+        }
+      ]
+    },
+    {
+      "id": 186,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGate_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGate_S.png"
+        }
+      ]
+    },
+    {
+      "id": 187,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGate_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGate_W.png"
+        }
+      ]
+    },
+    {
+      "id": 188,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateBars_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateBars_N.png"
+        }
+      ]
+    },
+    {
+      "id": 189,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateBars_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateBars_E.png"
+        }
+      ]
+    },
+    {
+      "id": 190,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateBars_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateBars_S.png"
+        }
+      ]
+    },
+    {
+      "id": 191,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateBars_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateBars_W.png"
+        }
+      ]
+    },
+    {
+      "id": 192,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateClosed_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateClosed_N.png"
+        }
+      ]
+    },
+    {
+      "id": 193,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateClosed_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateClosed_E.png"
+        }
+      ]
+    },
+    {
+      "id": 194,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateClosed_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateClosed_S.png"
+        }
+      ]
+    },
+    {
+      "id": 195,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateClosed_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateClosed"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateClosed_W.png"
+        }
+      ]
+    },
+    {
+      "id": 196,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateOpen_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateOpen_N.png"
+        }
+      ]
+    },
+    {
+      "id": 197,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateOpen_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateOpen_E.png"
+        }
+      ]
+    },
+    {
+      "id": 198,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateOpen_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateOpen_S.png"
+        }
+      ]
+    },
+    {
+      "id": 199,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallGateOpen_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallGateOpen"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallGateOpen_W.png"
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHalf_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHalf"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHalf_N.png"
+        }
+      ]
+    },
+    {
+      "id": 201,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHalf_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHalf"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHalf_E.png"
+        }
+      ]
+    },
+    {
+      "id": 202,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHalf_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHalf"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHalf_S.png"
+        }
+      ]
+    },
+    {
+      "id": 203,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHalf_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHalf"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHalf_W.png"
+        }
+      ]
+    },
+    {
+      "id": 204,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHole_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHole_N.png"
+        }
+      ]
+    },
+    {
+      "id": 205,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHole_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHole_E.png"
+        }
+      ]
+    },
+    {
+      "id": 206,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHole_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHole_S.png"
+        }
+      ]
+    },
+    {
+      "id": 207,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallHole_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallHole"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallHole_W.png"
+        }
+      ]
+    },
+    {
+      "id": 208,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRound_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRound_N.png"
+        }
+      ]
+    },
+    {
+      "id": 209,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRound_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRound_E.png"
+        }
+      ]
+    },
+    {
+      "id": 210,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRound_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRound_S.png"
+        }
+      ]
+    },
+    {
+      "id": 211,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRound_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRound_W.png"
+        }
+      ]
+    },
+    {
+      "id": 212,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundBroken_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundBroken_N.png"
+        }
+      ]
+    },
+    {
+      "id": 213,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundBroken_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundBroken_E.png"
+        }
+      ]
+    },
+    {
+      "id": 214,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundBroken_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundBroken_S.png"
+        }
+      ]
+    },
+    {
+      "id": 215,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundBroken_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundBroken_W.png"
+        }
+      ]
+    },
+    {
+      "id": 216,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundWindow_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundWindow_N.png"
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundWindow_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundWindow_E.png"
+        }
+      ]
+    },
+    {
+      "id": 218,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundWindow_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundWindow_S.png"
+        }
+      ]
+    },
+    {
+      "id": 219,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallRoundWindow_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallRoundWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallRoundWindow_W.png"
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallStructure_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallStructure"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallStructure_N.png"
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallStructure_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallStructure"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallStructure_E.png"
+        }
+      ]
+    },
+    {
+      "id": 222,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallStructure_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallStructure"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallStructure_S.png"
+        }
+      ]
+    },
+    {
+      "id": 223,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallStructure_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallStructure"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallStructure_W.png"
+        }
+      ]
+    },
+    {
+      "id": 224,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallTop_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallTop"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallTop_N.png"
+        }
+      ]
+    },
+    {
+      "id": 225,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallTop_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallTop"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallTop_E.png"
+        }
+      ]
+    },
+    {
+      "id": 226,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallTop_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallTop"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallTop_S.png"
+        }
+      ]
+    },
+    {
+      "id": 227,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallTop_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallTop"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallTop_W.png"
+        }
+      ]
+    },
+    {
+      "id": 228,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindow_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindow_N.png"
+        }
+      ]
+    },
+    {
+      "id": 229,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindow_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindow_E.png"
+        }
+      ]
+    },
+    {
+      "id": 230,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindow_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindow_S.png"
+        }
+      ]
+    },
+    {
+      "id": 231,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindow_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindow"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindow_W.png"
+        }
+      ]
+    },
+    {
+      "id": 232,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindowBars_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindowBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindowBars_N.png"
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindowBars_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindowBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindowBars_E.png"
+        }
+      ]
+    },
+    {
+      "id": 234,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindowBars_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindowBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindowBars_S.png"
+        }
+      ]
+    },
+    {
+      "id": 235,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "stoneWallWindowBars_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "stoneWallWindowBars"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "stoneWallWindowBars_W.png"
+        }
+      ]
+    },
+    {
+      "id": 236,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableChairsBroken_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableChairsBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableChairsBroken_N.png"
+        }
+      ]
+    },
+    {
+      "id": 237,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableChairsBroken_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableChairsBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableChairsBroken_E.png"
+        }
+      ]
+    },
+    {
+      "id": 238,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableChairsBroken_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableChairsBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableChairsBroken_S.png"
+        }
+      ]
+    },
+    {
+      "id": 239,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableChairsBroken_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableChairsBroken"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableChairsBroken_W.png"
+        }
+      ]
+    },
+    {
+      "id": 240,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRound_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRound_N.png"
+        }
+      ]
+    },
+    {
+      "id": 241,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRound_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRound_E.png"
+        }
+      ]
+    },
+    {
+      "id": 242,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRound_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRound_S.png"
+        }
+      ]
+    },
+    {
+      "id": 243,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRound_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRound"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRound_W.png"
+        }
+      ]
+    },
+    {
+      "id": 244,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundChairs_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundChairs_N.png"
+        }
+      ]
+    },
+    {
+      "id": 245,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundChairs_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundChairs_E.png"
+        }
+      ]
+    },
+    {
+      "id": 246,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundChairs_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundChairs_S.png"
+        }
+      ]
+    },
+    {
+      "id": 247,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundChairs_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundChairs_W.png"
+        }
+      ]
+    },
+    {
+      "id": 248,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundItemsChairs_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundItemsChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundItemsChairs_N.png"
+        }
+      ]
+    },
+    {
+      "id": 249,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundItemsChairs_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundItemsChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundItemsChairs_E.png"
+        }
+      ]
+    },
+    {
+      "id": 250,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundItemsChairs_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundItemsChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundItemsChairs_S.png"
+        }
+      ]
+    },
+    {
+      "id": 251,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableRoundItemsChairs_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableRoundItemsChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableRoundItemsChairs_W.png"
+        }
+      ]
+    },
+    {
+      "id": 252,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShort_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShort"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShort_N.png"
+        }
+      ]
+    },
+    {
+      "id": 253,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShort_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShort"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShort_E.png"
+        }
+      ]
+    },
+    {
+      "id": 254,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShort_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShort"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShort_S.png"
+        }
+      ]
+    },
+    {
+      "id": 255,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShort_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShort"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShort_W.png"
+        }
+      ]
+    },
+    {
+      "id": 256,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShortChairs_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShortChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShortChairs_N.png"
+        }
+      ]
+    },
+    {
+      "id": 257,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShortChairs_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShortChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShortChairs_E.png"
+        }
+      ]
+    },
+    {
+      "id": 258,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShortChairs_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShortChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShortChairs_S.png"
+        }
+      ]
+    },
+    {
+      "id": 259,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "tableShortChairs_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "tableShortChairs"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "tableShortChairs_W.png"
+        }
+      ]
+    },
+    {
+      "id": 260,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrate_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrate_N.png"
+        }
+      ]
+    },
+    {
+      "id": 261,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrate_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrate_E.png"
+        }
+      ]
+    },
+    {
+      "id": 262,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrate_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrate_S.png"
+        }
+      ]
+    },
+    {
+      "id": 263,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrate_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrate"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrate_W.png"
+        }
+      ]
+    },
+    {
+      "id": 264,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrates_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrates"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrates_N.png"
+        }
+      ]
+    },
+    {
+      "id": 265,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrates_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrates"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrates_E.png"
+        }
+      ]
+    },
+    {
+      "id": 266,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrates_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrates"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrates_S.png"
+        }
+      ]
+    },
+    {
+      "id": 267,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenCrates_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenCrates"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenCrates_W.png"
+        }
+      ]
+    },
+    {
+      "id": 268,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenPile_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenPile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenPile_N.png"
+        }
+      ]
+    },
+    {
+      "id": 269,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenPile_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenPile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenPile_E.png"
+        }
+      ]
+    },
+    {
+      "id": 270,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenPile_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenPile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenPile_S.png"
+        }
+      ]
+    },
+    {
+      "id": 271,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenPile_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenPile"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenPile_W.png"
+        }
+      ]
+    },
+    {
+      "id": 272,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportBeams_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportBeams"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportBeams_N.png"
+        }
+      ]
+    },
+    {
+      "id": 273,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportBeams_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportBeams"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportBeams_E.png"
+        }
+      ]
+    },
+    {
+      "id": 274,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportBeams_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportBeams"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportBeams_S.png"
+        }
+      ]
+    },
+    {
+      "id": 275,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportBeams_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportBeams"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportBeams_W.png"
+        }
+      ]
+    },
+    {
+      "id": 276,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupports_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupports"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupports_N.png"
+        }
+      ]
+    },
+    {
+      "id": 277,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupports_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupports"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupports_E.png"
+        }
+      ]
+    },
+    {
+      "id": 278,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupports_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupports"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupports_S.png"
+        }
+      ]
+    },
+    {
+      "id": 279,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupports_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupports"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupports_W.png"
+        }
+      ]
+    },
+    {
+      "id": 280,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBeam_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBeam"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBeam_N.png"
+        }
+      ]
+    },
+    {
+      "id": 281,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBeam_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBeam"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBeam_E.png"
+        }
+      ]
+    },
+    {
+      "id": 282,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBeam_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBeam"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBeam_S.png"
+        }
+      ]
+    },
+    {
+      "id": 283,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBeam_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBeam"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBeam_W.png"
+        }
+      ]
+    },
+    {
+      "id": 284,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBlock_N"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBlock"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "N"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBlock_N.png"
+        }
+      ]
+    },
+    {
+      "id": 285,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBlock_E"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBlock"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "E"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBlock_E.png"
+        }
+      ]
+    },
+    {
+      "id": 286,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBlock_S"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBlock"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "S"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBlock_S.png"
+        }
+      ]
+    },
+    {
+      "id": 287,
+      "properties": [
+        {
+          "name": "tileId",
+          "type": "string",
+          "value": "woodenSupportsBlock_W"
+        },
+        {
+          "name": "assetId",
+          "type": "string",
+          "value": "woodenSupportsBlock"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "sourceFile",
+          "type": "string",
+          "value": "woodenSupportsBlock_W.png"
+        }
+      ]
+    }
+  ],
+  "tilewidth": 128,
+  "type": "tileset",
+  "version": "1.10"
+}

@@ -25,4 +25,3 @@
   - Source page: https://opengameart.org/content/rain-loopable
   - Direct package: https://opengameart.org/sites/default/files/Rain%20OGG.zip
   - Selected local file: `3.ogg` (renamed to `ambient-rain-loop.ogg`)
-- License summary file: `LICENSE-opengameart-ambient-cc0.txt`
