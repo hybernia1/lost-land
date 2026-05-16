@@ -981,13 +981,16 @@ function drawMetricCard(
 
   drawDetailPanel(card, 0, 0, width, height, 0.34);
 
-  host.drawIcon(card, metric.iconId, 30, height / 2, BUILDING_METRIC_ICON_SIZE);
-  host.drawText(card, metric.value, 70, 26, {
+  const compact = width < 132;
+  const iconX = compact ? 28 : 30;
+  const valueX = compact ? 60 : 70;
+  const valueFontSize = compact ? uiTextSize.value : uiTextSize.actionValue;
+
+  host.drawIcon(card, metric.iconId, iconX, height / 2, BUILDING_METRIC_ICON_SIZE);
+  host.drawText(card, metric.value, valueX, 26, {
     fill: metric.fill ?? uiTheme.text,
-    fontSize: uiTextSize.actionValue,
+    fontSize: valueFontSize,
     fontWeight: "900",
-    wordWrap: true,
-    wordWrapWidth: width - 82,
   });
 
   if (metric.tooltip) {
