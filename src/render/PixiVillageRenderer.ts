@@ -1274,6 +1274,18 @@ export class PixiVillageRenderer {
     const contentHeight = model.saves.length * rowStride - rowGap;
     this.frontSaveScrollMax = Math.max(0, contentHeight - listHeight);
     this.frontSaveScrollY = Math.max(0, Math.min(this.frontSaveScrollMax, this.frontSaveScrollY));
+    const needsScroll = this.frontSaveScrollMax > 0;
+    const scrollbarGutter = needsScroll ? 22 : 0;
+    const rowX = listX + 8;
+    const rowWidth = listWidth - 16 - scrollbarGutter;
+    this.frontSaveScrollArea = { x: listX, y: listY, width: listWidth, height: listHeight };
+
+    const listContent = new Container();
+    this.hudLayer.addChild(listContent);
+    const listMask = new Graphics();
+    listMask.rect(rowX, listY, rowWidth, listHeight).fill({ color: 0xffffff, alpha: 1 });
+    this.hudLayer.addChild(listMask);
+    listContent.mask = listMask;
 
     const rowStartY = listY - this.frontSaveScrollY;
     for (let index = 0; index < model.saves.length; index += 1) {
@@ -1285,16 +1297,16 @@ export class PixiVillageRenderer {
 
       const cardFill = save.loadable ? uiTheme.surface : uiTheme.surfaceSunken;
       const card = new Graphics();
-      card.rect(listX + 8, rowY, listWidth - 16, rowHeight)
+      card.rect(rowX, rowY, rowWidth, rowHeight)
         .fill({ color: cardFill, alpha: 0.96 });
-      this.hudLayer.addChild(card);
+      listContent.addChild(card);
 
-      this.drawText(this.hudLayer, save.communityName, listX + 20, rowY + 10, {
+      this.drawText(listContent, save.communityName, listX + 20, rowY + 10, {
         fill: uiTheme.text,
         fontSize: uiTextSize.control,
         fontWeight: "900",
       });
-      this.drawText(this.hudLayer, `${t.ui.day ?? "Day"} ${getGameDay(save.elapsedSeconds)} / ${formatGameClock(save.elapsedSeconds)}`, listX + 20, rowY + 34, {
+      this.drawText(listContent, `${t.ui.day ?? "Day"} ${getGameDay(save.elapsedSeconds)} / ${formatGameClock(save.elapsedSeconds)}`, listX + 20, rowY + 34, {
         fill: uiTheme.accentStrong,
         fontSize: uiTextSize.small,
         fontWeight: "800",
@@ -1303,7 +1315,7 @@ export class PixiVillageRenderer {
       if (!save.loadable) {
         const versionTag = typeof save.version === "number" ? ` (v${save.version})` : "";
         this.drawText(
-          this.hudLayer,
+          listContent,
           `${t.ui.legacySaveLocked ?? "Legacy save cannot be loaded."}${versionTag}`,
           listX + 20,
           rowY + 52,
@@ -1315,9 +1327,11 @@ export class PixiVillageRenderer {
         );
       }
 
-      this.createRectButton(this.hudLayer, {
+      const deleteButtonX = rowX + rowWidth - 10 - 92;
+      const loadButtonX = deleteButtonX - 8 - 92;
+      this.createRectButton(listContent, {
         label: t.ui.loadSave ?? "Load",
-        x: listX + listWidth - 210,
+        x: loadButtonX,
         y: rowY + 14,
         width: 92,
         height: 30,
@@ -1330,9 +1344,9 @@ export class PixiVillageRenderer {
         tone: save.loadable ? "toolbar" : "secondary",
       });
 
-      this.createRectButton(this.hudLayer, {
+      this.createRectButton(listContent, {
         label: t.ui.deleteSave ?? "Delete",
-        x: listX + listWidth - 110,
+        x: deleteButtonX,
         y: rowY + 14,
         width: 92,
         height: 30,
@@ -1345,8 +1359,8 @@ export class PixiVillageRenderer {
       });
     }
 
-    if (this.frontSaveScrollMax > 0) {
-      const trackX = listX + listWidth - 10;
+    if (needsScroll) {
+      const trackX = listX + listWidth - 12;
       const trackY = listY + 8;
       const trackHeight = listHeight - 16;
       const track = new Graphics();
