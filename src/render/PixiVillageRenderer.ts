@@ -597,7 +597,7 @@ export class PixiVillageRenderer {
     const frame = resolveModalFrame(width, height, {
       maxWidth: 430,
       minHeight: 292,
-      preferredHeight: model.view === "settings" ? 318 : 300,
+      preferredHeight: model.view === "settings" ? 342 : 300,
       marginY: 56,
       topMin: 46,
     });
@@ -629,8 +629,8 @@ export class PixiVillageRenderer {
       width: buttonWidth,
       height: 42,
       detail: { action: "game-menu-continue" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-continue" }),
-      tone: "primary",
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-continue" }),
+      tone: "toolbar",
     });
 
     buttonY += 52;
@@ -641,7 +641,7 @@ export class PixiVillageRenderer {
       width: buttonWidth,
       height: 42,
       detail: { action: "game-menu-settings" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-settings" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-settings" }),
       tone: "toolbar",
     });
 
@@ -653,7 +653,7 @@ export class PixiVillageRenderer {
       width: buttonWidth,
       height: 42,
       detail: { action: "game-menu-quit" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-quit" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-quit" }),
       tone: "secondary",
     });
   }
@@ -681,35 +681,35 @@ export class PixiVillageRenderer {
       lineHeight: 18,
     });
 
-    let buttonX = contentX;
-    const buttonY = headerBottom + 102;
+    const buttonWidth = Math.min(contentWidth, 230);
+    let buttonY = headerBottom + 90;
     for (const locale of model.locales) {
       const active = locale.id === model.activeLocale;
-      const widthHint = Math.max(110, Math.min(176, locale.label.length * 12 + 42));
       this.createRectButton(panel, {
         label: locale.label,
-        x: buttonX,
+        x: contentX,
         y: buttonY,
-        width: widthHint,
+        width: buttonWidth,
         height: 38,
         detail: { action: "select-locale", value: locale.id },
-        active: active || this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+        active,
+        selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
           action: "select-locale",
           value: locale.id,
         }),
-        tone: active ? "primary" : "toolbar",
+        tone: "toolbar",
       });
-      buttonX += widthHint + 10;
+      buttonY += 46;
     }
 
     this.createRectButton(panel, {
       label: translations.ui.back ?? "Back",
       x: contentX,
-      y: buttonY + 58,
+      y: buttonY + 12,
       width: 132,
       height: 38,
       detail: { action: "game-menu-back" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-back" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "game-menu-back" }),
       tone: "secondary",
     });
   }
@@ -1050,7 +1050,7 @@ export class PixiVillageRenderer {
         width: 100,
         height: 34,
         detail: { action: "back-menu" },
-        active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "back-menu" }),
+        selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "back-menu" }),
         tone: "secondary",
       });
     }
@@ -1092,8 +1092,8 @@ export class PixiVillageRenderer {
       width: buttonWidth,
       height: 44,
       detail: { action: "new-game" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "new-game" }),
-      tone: "primary",
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "new-game" }),
+      tone: "toolbar",
     });
 
     buttonY += 52;
@@ -1105,7 +1105,7 @@ export class PixiVillageRenderer {
       height: 44,
       detail: { action: "continue" },
       disabled: !model.canContinue,
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "continue" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "continue" }),
       tone: model.canContinue ? "toolbar" : "secondary",
     });
 
@@ -1117,7 +1117,7 @@ export class PixiVillageRenderer {
       width: buttonWidth,
       height: 44,
       detail: { action: "settings" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "settings" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "settings" }),
       tone: "toolbar",
     });
   }
@@ -1170,7 +1170,7 @@ export class PixiVillageRenderer {
       width: 126,
       height: 36,
       detail: { action: "community-name-backspace" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "community-name-backspace" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "community-name-backspace" }),
       tone: "secondary",
     });
     this.createRectButton(this.hudLayer, {
@@ -1180,7 +1180,7 @@ export class PixiVillageRenderer {
       width: 90,
       height: 36,
       detail: { action: "community-name-clear" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "community-name-clear" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "community-name-clear" }),
       tone: "secondary",
     });
     this.createRectButton(this.hudLayer, {
@@ -1190,7 +1190,7 @@ export class PixiVillageRenderer {
       width: 228,
       height: 36,
       detail: { action: "start-new-community" },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "start-new-community" }),
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, { action: "start-new-community" }),
       tone: "primary",
     });
   }
@@ -1211,25 +1211,26 @@ export class PixiVillageRenderer {
       lineHeight: 19,
     });
 
-    let buttonX = panelX + 22;
-    const buttonY = cursorY + 90;
+    const buttonX = panelX + 22;
+    let buttonY = cursorY + 90;
+    const buttonWidth = Math.min(260, panelWidth - 44);
     for (const locale of model.locales) {
       const active = locale.id === model.activeLocale;
-      const widthHint = Math.max(110, Math.min(180, locale.label.length * 12 + 42));
       this.createRectButton(this.hudLayer, {
         label: locale.label,
         x: buttonX,
         y: buttonY,
-        width: widthHint,
+        width: buttonWidth,
         height: 38,
         detail: { action: "select-locale", value: locale.id },
-        active: active || this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+        active,
+        selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
           action: "select-locale",
           value: locale.id,
         }),
-        tone: active ? "primary" : "toolbar",
+        tone: "toolbar",
       });
-      buttonX += widthHint + 10;
+      buttonY += 46;
     }
   }
 
@@ -1322,11 +1323,11 @@ export class PixiVillageRenderer {
         height: 30,
         detail: { action: "load-save", value: save.id },
         disabled: !save.loadable,
-        active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+        selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
           action: "load-save",
           value: save.id,
         }),
-        tone: save.loadable ? "primary" : "secondary",
+        tone: save.loadable ? "toolbar" : "secondary",
       });
 
       this.createRectButton(this.hudLayer, {
@@ -1336,7 +1337,7 @@ export class PixiVillageRenderer {
         width: 92,
         height: 30,
         detail: { action: "delete-save", value: save.id },
-        active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+        selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
           action: "delete-save",
           value: save.id,
         }),
@@ -1420,7 +1421,7 @@ export class PixiVillageRenderer {
       width: 96,
       height: 32,
       detail: { action: "cancel-delete-save", value: save.id },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
         action: "cancel-delete-save",
         value: save.id,
       }),
@@ -1433,7 +1434,7 @@ export class PixiVillageRenderer {
       width: 96,
       height: 32,
       detail: { action: "confirm-delete-save", value: save.id },
-      active: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
+      selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
         action: "confirm-delete-save",
         value: save.id,
       }),

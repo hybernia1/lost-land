@@ -119,11 +119,11 @@ export function getRectButtonStyle(
 
   if (active) {
     return {
-      fill: uiTheme.accentSurface,
-      fillAlpha: 0.72,
+      fill: uiTheme.surfaceMuted,
+      fillAlpha: 0.86,
       textFill: uiTheme.text,
       border: uiTheme.borderStrong,
-      borderAlpha: 0.78,
+      borderAlpha: 0.74,
     };
   }
 
@@ -172,6 +172,7 @@ export function createRectButtonPrimitive(
   button.y = options.y;
 
   const style = getRectButtonStyle(options.tone ?? "toolbar", options.disabled ?? false, options.active ?? false);
+  const selected = options.selected ?? false;
   const radius = Math.min(UI_CONTROL_RADIUS, options.height / 2);
   const tone = options.tone ?? "toolbar";
   const box = new Graphics();
@@ -184,18 +185,21 @@ export function createRectButtonPrimitive(
       .fill({ color: uiTheme.actionBorder, alpha: 0.1 });
   }
   box.roundRect(0, 0, options.width, options.height, radius)
-    .stroke({ color: style.border, alpha: style.borderAlpha, width: tone === "primary" ? 1.4 : 1 });
+    .stroke({ color: selected ? uiTheme.accentStrong : style.border, alpha: selected ? 0.96 : style.borderAlpha, width: selected ? 1.8 : tone === "primary" ? 1.4 : 1 });
   if (options.disabled) {
     box.roundRect(0, 0, options.width, options.height, radius)
       .fill({ color: uiTheme.border, alpha: 0.12 });
+  } else if (selected) {
+    box.roundRect(3, 3, Math.max(0, options.width - 6), Math.max(0, options.height - 6), Math.max(0, radius - 3))
+      .stroke({ color: uiTheme.text, alpha: 0.22, width: 1 });
   } else if (options.active) {
-    box.rect(2, options.height - 2, Math.max(0, options.width - 4), 1.5).fill({ color: uiTheme.borderStrong, alpha: 0.42 });
+    box.rect(6, options.height - 3, Math.max(0, options.width - 12), 1.5).fill({ color: uiTheme.borderStrong, alpha: 0.42 });
   }
   button.addChild(box);
 
   if (options.iconId) {
     const icon = host.drawIcon(button, options.iconId, options.width / 2, options.height / 2, Math.min(options.width, options.height) - 14);
-    icon.alpha = options.active ? 0.9 : 1;
+    icon.alpha = options.active || selected ? 0.9 : 1;
   }
 
   if (options.label) {

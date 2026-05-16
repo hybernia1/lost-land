@@ -214,6 +214,7 @@ export type RectButtonOptions = {
   tooltip?: string;
   disabled?: boolean;
   active?: boolean;
+  selected?: boolean;
   tone?: RectButtonTone;
   fontSize?: number;
   fontWeight?: TextStyleFontWeight;
