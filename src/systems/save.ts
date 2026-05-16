@@ -17,10 +17,7 @@ type SaveIndexEntry = {
   elapsedSeconds: number;
 };
 
-export type SaveSummary = SaveIndexEntry & {
-  loadable: boolean;
-  version: number | null;
-};
+export type SaveSummary = SaveIndexEntry;
 
 export function saveGame(state: GameState): void {
   const savedAt = new Date().toISOString();
@@ -50,10 +47,8 @@ export function loadGame(saveId?: string): GameState | null {
 }
 
 export function listSavedGames(): SaveSummary[] {
-  const index = readIndex();
-  const indexById = new Map(index.map((entry) => [entry.id, entry]));
   const summaries = collectSaveIds()
-    .map((saveId) => readSaveSummary(saveId, indexById.get(saveId)))
+    .map(readSaveSummary)
     .filter((summary): summary is SaveSummary => summary !== null)
     .sort((left, right) => right.savedAt.localeCompare(left.savedAt));
 
@@ -91,7 +86,6 @@ function parseSave(rawSave: string): GameState | null {
 
 function getLatestSaveId(): string | null {
   const latestLoadable = listSavedGames()
-    .filter((summary) => summary.loadable)
     .sort((left, right) => right.savedAt.localeCompare(left.savedAt))[0];
 
   return latestLoadable?.id ?? null;
@@ -145,59 +139,34 @@ function collectSaveIds(): string[] {
   return Array.from(ids);
 }
 
-function readSaveSummary(
-  saveId: string,
-  indexedSummary?: SaveIndexEntry,
-): SaveSummary | null {
+function readSaveSummary(saveId: string): SaveSummary | null {
   const rawSave = localStorage.getItem(getSlotKey(saveId));
 
   if (!rawSave) {
     return null;
   }
 
-  let parsedVersion: number | null = null;
-  let parsedSavedAt: string | null = null;
-  let parsedCommunityName: string | null = null;
-  let parsedElapsedSeconds: number | null = null;
-
   try {
     const parsed = JSON.parse(rawSave) as Partial<SaveFile>;
 
-    parsedVersion = typeof parsed.version === "number" ? parsed.version : null;
-    parsedSavedAt = typeof parsed.savedAt === "string" ? parsed.savedAt : null;
-
     if (
-      parsed.state &&
-      typeof parsed.state === "object" &&
-      "communityName" in parsed.state &&
-      "elapsedSeconds" in parsed.state
+      parsed.version !== SAVE_VERSION ||
+      typeof parsed.savedAt !== "string" ||
+      !parsed.state ||
+      typeof parsed.state !== "object" ||
+      typeof parsed.state.communityName !== "string" ||
+      typeof parsed.state.elapsedSeconds !== "number"
     ) {
-      const communityName = parsed.state.communityName;
-      const elapsedSeconds = parsed.state.elapsedSeconds;
-      parsedCommunityName = typeof communityName === "string" ? communityName : null;
-      parsedElapsedSeconds = typeof elapsedSeconds === "number" ? elapsedSeconds : null;
+      return null;
     }
+
+    return {
+      id: saveId,
+      communityName: parsed.state.communityName,
+      savedAt: parsed.savedAt,
+      elapsedSeconds: parsed.state.elapsedSeconds,
+    };
   } catch {
-    // Keep summary from index when legacy/corrupted payload is not parseable.
+    return null;
   }
-
-  const loadable = parsedVersion === SAVE_VERSION && loadSlot(saveId) !== null;
-
-  return {
-    id: saveId,
-    communityName:
-      parsedCommunityName ??
-      indexedSummary?.communityName ??
-      saveId,
-    savedAt:
-      parsedSavedAt ??
-      indexedSummary?.savedAt ??
-      new Date(0).toISOString(),
-    elapsedSeconds:
-      parsedElapsedSeconds ??
-      indexedSummary?.elapsedSeconds ??
-      0,
-    loadable,
-    version: parsedVersion,
-  };
 }

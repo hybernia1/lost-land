@@ -45,10 +45,6 @@ export function getLogEntryIconId(entry: GameState["log"][number]): string {
     return "people";
   }
 
-  if (key === "logScoutingStarted" || key === "logScoutingReturned") {
-    return "scout";
-  }
-
   if (
     key === "logResourceSiteAssaultStarted" ||
     key === "logResourceSiteAssaultFailed" ||

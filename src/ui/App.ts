@@ -161,7 +161,7 @@ export class App {
     const model: FrontScreenModel = {
       mode: frontMode,
       translations: this.t(),
-      canContinue: saves.some((save) => save.loadable),
+      canContinue: saves.length > 0,
       communityNameDraft: this.communityNameDraft,
       locales: this.getLocaleOptions(),
       activeLocale: this.locale,
@@ -169,8 +169,6 @@ export class App {
         id: save.id,
         communityName: save.communityName,
         elapsedSeconds: save.elapsedSeconds,
-        loadable: save.loadable,
-        version: save.version,
       })),
       pendingDeleteSaveId: this.pendingDeleteSaveId,
       keyboardSelectedAction: this.getSelectedKeyboardAction(keyboardActions, this.frontKeyboardIndex),
@@ -1003,7 +1001,7 @@ export class App {
     if (this.mode === "menu") {
       return [
         { action: "new-game" },
-        ...(saves.some((save) => save.loadable) ? [{ action: "continue" }] : []),
+        ...(saves.length > 0 ? [{ action: "continue" }] : []),
         { action: "settings" },
       ];
     }
@@ -1031,7 +1029,7 @@ export class App {
       return [
         { action: "back-menu" },
         ...saves.flatMap((save): PixiActionDetail[] => [
-          ...(save.loadable ? [{ action: "load-save", value: save.id }] : []),
+          { action: "load-save", value: save.id },
           { action: "delete-save", value: save.id },
         ]),
       ];
@@ -1550,7 +1548,7 @@ export class App {
 
     if (action === "load-save" && value) {
       const selectedSave = listSavedGames().find((save) => save.id === value);
-      if (!selectedSave?.loadable) {
+      if (!selectedSave) {
         return true;
       }
       if (this.game.load(value)) {

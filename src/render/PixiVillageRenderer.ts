@@ -205,8 +205,6 @@ export type FrontScreenSaveEntry = {
   id: string;
   communityName: string;
   elapsedSeconds: number;
-  loadable: boolean;
-  version: number | null;
 };
 
 export type FrontScreenModel = {
@@ -1287,10 +1285,9 @@ export class PixiVillageRenderer {
         continue;
       }
 
-      const cardFill = save.loadable ? uiTheme.surface : uiTheme.surfaceSunken;
       const card = new Graphics();
       card.rect(rowX, rowY, rowWidth, rowHeight)
-        .fill({ color: cardFill, alpha: 0.96 });
+        .fill({ color: uiTheme.surface, alpha: 0.96 });
       listContent.addChild(card);
 
       this.drawText(listContent, save.communityName, listX + 20, rowY + 10, {
@@ -1304,21 +1301,6 @@ export class PixiVillageRenderer {
         fontWeight: "800",
       });
 
-      if (!save.loadable) {
-        const versionTag = typeof save.version === "number" ? ` (v${save.version})` : "";
-        this.drawText(
-          listContent,
-          `${t.ui.legacySaveLocked ?? "Legacy save cannot be loaded."}${versionTag}`,
-          listX + 20,
-          rowY + 52,
-          {
-            fill: uiTheme.textMuted,
-            fontSize: uiTextSize.caption,
-            fontWeight: "700",
-          },
-        );
-      }
-
       const deleteButtonX = rowX + rowWidth - 10 - 92;
       const loadButtonX = deleteButtonX - 8 - 92;
       this.createRectButton(listContent, {
@@ -1328,12 +1310,11 @@ export class PixiVillageRenderer {
         width: 92,
         height: 30,
         detail: { action: "load-save", value: save.id },
-        disabled: !save.loadable,
         selected: this.isKeyboardSelectedAction(model.keyboardSelectedAction, {
           action: "load-save",
           value: save.id,
         }),
-        tone: save.loadable ? "toolbar" : "secondary",
+        tone: "toolbar",
       });
 
       this.createRectButton(listContent, {

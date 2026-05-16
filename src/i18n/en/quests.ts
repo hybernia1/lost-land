@@ -6,8 +6,6 @@ export const quests: QuestTranslationPack = {
       activeObjectives: "Active tasks",
       objectivesEmpty: "No active tasks.",
       decision: "Decision",
-      decisionRequired: "Immediate decision",
-      hiddenConsequences: "The consequences are not shown in advance.",
       notEnoughSupplies: "Not enough supplies",
       logObjectiveCompleted: "Task completed: {quest}.",
       logObjectiveRewardClaimed: "Reward claimed: {quest}.",
