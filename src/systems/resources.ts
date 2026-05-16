@@ -1,5 +1,5 @@
 import { resourceIds } from "../data/resources";
-import type { ResourceBag, ResourceId } from "../game/types";
+import type { GameState, ResourceBag, ResourceId } from "../game/types";
 
 export function addResources(
   target: Record<ResourceId, number>,
@@ -16,6 +16,52 @@ export function addResources(
     const nextValue = target[resourceId] + value;
     target[resourceId] = clampResource(resourceId, nextValue, capacities);
   }
+}
+
+export function addRewardResources(state: GameState, delta: ResourceBag): void {
+  for (const resourceId of resourceIds) {
+    const value = delta[resourceId] ?? 0;
+
+    if (value === 0) {
+      continue;
+    }
+
+    if (value < 0 || resourceId === "morale") {
+      state.resources[resourceId] = clampResource(resourceId, state.resources[resourceId] + value, state.capacities);
+      continue;
+    }
+
+    const capacity = Math.max(0, state.capacities[resourceId]);
+    const freeSpace = Math.max(0, capacity - state.resources[resourceId]);
+    const stored = Math.min(value, freeSpace);
+    const overflow = value - stored;
+
+    state.resources[resourceId] += stored;
+    state.heroInventory[resourceId] += overflow;
+  }
+}
+
+export function transferHeroInventoryToStorage(
+  state: GameState,
+  resourceId: ResourceId,
+  amount: number,
+): number {
+  if (resourceId === "morale") {
+    return 0;
+  }
+
+  const requested = Math.max(0, Math.floor(amount));
+  const available = Math.max(0, Math.floor(state.heroInventory[resourceId] ?? 0));
+  const freeSpace = Math.max(0, Math.floor(state.capacities[resourceId] - state.resources[resourceId]));
+  const moved = Math.min(requested, available, freeSpace);
+
+  if (moved <= 0) {
+    return 0;
+  }
+
+  state.heroInventory[resourceId] -= moved;
+  state.resources[resourceId] += moved;
+  return moved;
 }
 
 export function canAfford(

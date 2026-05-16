@@ -6,7 +6,7 @@ import type { TranslationPack } from "../../../i18n/types";
 import { canAffordDecisionOption } from "../../../systems/quests";
 import { uiTextSize, uiTheme } from "../core/constants";
 import type {
-  ConquestResultPreview,
+  RaidResultPreview,
   DrawOverlayHeaderFn,
   DrawPanelFn,
   DrawTextFn,
@@ -225,66 +225,55 @@ export function drawQuestDecisionModal(
   }
 }
 
-export function drawConquestResultModal(
+export function drawRaidResultModal(
   host: ResultModalsHost,
   translations: TranslationPack | undefined,
   width: number,
   height: number,
-  conquestResultPreview: ConquestResultPreview | null,
+  raidResultPreview: RaidResultPreview | null,
 ): void {
-  if (!translations || !conquestResultPreview) {
+  if (!translations || !raidResultPreview) {
     return;
   }
 
   const panelWidth = resolveModalWidth(width, { maxWidth: 520 });
-  const resourceName = translations.resources[conquestResultPreview.resourceId];
-  const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(conquestResultPreview.resolvedAt)} ${formatGameClock(conquestResultPreview.resolvedAt)}`;
-  const isVictory = conquestResultPreview.outcome === "victory";
-  const isOverrun = conquestResultPreview.outcome === "overrun";
+  const resolvedDay = `${translations.ui.day ?? "Day"} ${getGameDay(raidResultPreview.resolvedAt)} ${formatGameClock(raidResultPreview.resolvedAt)}`;
+  const isVictory = raidResultPreview.outcome === "victory";
   const summary = isVictory
-    ? formatTemplate(
-      translations.ui.conquestVictorySummary ?? "{resource} oasis secured.",
-      { resource: resourceName },
-    )
-    : formatTemplate(
-      translations.ui.conquestDefeatSummary ?? "{resource} oasis assault failed.",
-      { resource: resourceName },
-    );
+    ? translations.ui.raidVictorySummary ?? "Settlement looted."
+    : translations.ui.raidDefeatSummary ?? "Settlement assault failed.";
   const sentLine = formatTemplate(
-    translations.ui.conquestVictorySent ?? "Assault force: {count}",
-    { count: conquestResultPreview.sentTroops },
+    translations.ui.raidVictorySent ?? "Assault force: {count}",
+    { count: raidResultPreview.sentTroops },
   );
   const returnedLine = formatTemplate(
-    translations.ui.conquestVictoryReturned ?? "Returned: {count}",
-    { count: conquestResultPreview.returnedTroops },
+    translations.ui.raidVictoryReturned ?? "Returned: {count}",
+    { count: raidResultPreview.returnedTroops },
   );
   const fallenLine = formatTemplate(
-    translations.ui.conquestVictoryFallen ?? "Fallen: {count}",
-    { count: conquestResultPreview.deaths },
+    translations.ui.raidVictoryFallen ?? "Fallen: {count}",
+    { count: raidResultPreview.deaths },
   );
   const body = isVictory
-    ? (conquestResultPreview.deaths > 0
-      ? translations.ui.conquestVictoryBodyWithLosses ?? "The oasis is ours, but the fight cost lives."
-      : translations.ui.conquestVictoryBodyNoLosses ?? "The team secured the oasis without losses.")
-    : (isOverrun
-      ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis resistance."
-      : translations.ui.conquestDefeatBodyFailed ?? "No one returned from the assault.");
+    ? (raidResultPreview.deaths > 0
+      ? translations.ui.raidVictoryBodyWithLosses ?? "The loot is ours, but the fight cost lives."
+      : translations.ui.raidVictoryBodyNoLosses ?? "The team recovered loot without losses.")
+    : translations.ui.raidDefeatBodyFailed ?? "No one returned from the assault.";
+  const lootImpacts = isVictory ? getRaidLootImpacts(raidResultPreview, translations) : [];
   const summaryHeight = host.measureWrappedTextHeight(summary, uiTextSize.resultTitle, "900", panelWidth - 120);
   const bodyHeight = host.measureWrappedTextHeight(body, uiTextSize.body, "800", panelWidth - 56);
   const dayY = 38 + summaryHeight + 8;
   const bodyBaseY = dayY + 22;
-  const sentBaseY = bodyBaseY + bodyHeight + 16;
+  const lootBlockHeight = lootImpacts.length > 0 ? 42 : 0;
+  const sentBaseY = bodyBaseY + bodyHeight + 16 + lootBlockHeight;
   const returnedBaseY = sentBaseY + 32;
   const fallenBaseY = returnedBaseY + 32;
-  const requirementBaseY = fallenBaseY + 32;
-  let panelHeight = Math.ceil(
-    (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0 ? requirementBaseY : fallenBaseY) + 40,
-  );
+  const panelHeight = Math.ceil(fallenBaseY + 40);
   const shell = createResultModalShell(
     host,
     width,
     height,
-    { action: "close-conquest-result" },
+    { action: "close-raid-result" },
     false,
     {
       maxWidth: 520,
@@ -298,11 +287,11 @@ export function drawConquestResultModal(
   const headerBottom = host.drawOverlayHeader(panel, resolvedPanelWidth, translations, {
     iconId: "expedition",
     kicker: isVictory
-      ? translations.ui.conquestVictoryTitle ?? "Oasis secured"
-      : translations.ui.conquestDefeatTitle ?? "Oasis assault failed",
+      ? translations.ui.raidVictoryTitle ?? "Loot recovered"
+      : translations.ui.raidDefeatTitle ?? "Settlement assault failed",
     title: summary,
     subtitle: resolvedDay,
-    closeAction: { action: "close-conquest-result" },
+    closeAction: { action: "close-raid-result" },
   });
   const bodyY = Math.max(bodyBaseY, headerBottom + 2);
   const bodyLabel = host.drawText(panel, body, 28, bodyY, {
@@ -312,10 +301,18 @@ export function drawConquestResultModal(
     wordWrap: true,
     wordWrapWidth: resolvedPanelWidth - 56,
   });
-  const sentY = bodyLabel.y + bodyLabel.height + 16;
+  let sentY = bodyLabel.y + bodyLabel.height + 16;
+  if (lootImpacts.length > 0) {
+    const lootLabel = host.drawText(panel, translations.ui.raidVictoryLoot ?? "Loot", 28, sentY, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.caption,
+      fontWeight: "900",
+    });
+    host.drawDecisionImpactChips(panel, lootImpacts, resolvedPanelWidth - 28, lootLabel.y + 22);
+    sentY += 42;
+  }
   const returnedY = sentY + 32;
   const fallenY = returnedY + 32;
-  const requirementY = fallenY + 32;
 
   host.drawText(panel, sentLine, 28, sentY, {
     fill: uiTheme.text,
@@ -323,32 +320,34 @@ export function drawConquestResultModal(
     fontWeight: "900",
   });
   host.drawText(panel, returnedLine, 28, returnedY, {
-    fill: conquestResultPreview.returnedTroops > 0 ? uiTheme.positive : uiTheme.textMuted,
+    fill: raidResultPreview.returnedTroops > 0 ? uiTheme.positive : uiTheme.textMuted,
     fontSize: uiTextSize.emphasis,
     fontWeight: "900",
   });
   host.drawText(panel, fallenLine, 28, fallenY, {
-    fill: conquestResultPreview.deaths > 0 ? uiTheme.negative : uiTheme.textMuted,
+    fill: raidResultPreview.deaths > 0 ? uiTheme.negative : uiTheme.textMuted,
     fontSize: uiTextSize.emphasis,
     fontWeight: "900",
   });
 
-  if (isOverrun && (conquestResultPreview.requiredTroops ?? 0) > 0) {
-    host.drawText(
-      panel,
-      formatTemplate(
-        translations.ui.conquestDefeatRequirement ?? "Required minimum: {required}",
-        { required: conquestResultPreview.requiredTroops ?? 0 },
-      ),
-      28,
-      requirementY,
-      {
-        fill: uiTheme.warning,
-        fontSize: uiTextSize.body,
-        fontWeight: "900",
-      },
-    );
-  }
+}
+
+function getRaidLootImpacts(
+  raidResultPreview: RaidResultPreview,
+  translations: TranslationPack,
+): EffectLine[] {
+  const loot = raidResultPreview.loot ?? {};
+  return (["food", "water", "material", "coal"] as const)
+    .map((resourceId) => ({
+      resourceId,
+      amount: Math.max(0, Math.floor(loot[resourceId] ?? 0)),
+    }))
+    .filter((entry) => entry.amount > 0)
+    .map((entry) => ({
+      iconId: entry.resourceId,
+      value: `+${entry.amount}`,
+      tooltip: `${translations.resources[entry.resourceId]}: +${entry.amount}`,
+    }));
 }
 
 export function drawGameOverModal(

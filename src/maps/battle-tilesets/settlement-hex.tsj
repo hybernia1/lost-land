@@ -1,0 +1,49 @@
+{
+  "columns": 5,
+  "image": "../../assets/battle-tiles/settlement/settlement-hex-tiles.png",
+  "imageheight": 56,
+  "imagewidth": 320,
+  "margin": 0,
+  "name": "settlement-hex",
+  "spacing": 0,
+  "tilecount": 5,
+  "tiledversion": "1.11.0",
+  "tileheight": 56,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        { "name": "tileId", "type": "string", "value": "sand" }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        { "name": "tileId", "type": "string", "value": "sandDark" }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        { "name": "tileId", "type": "string", "value": "scrub" }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        { "name": "tileId", "type": "string", "value": "stoneBlocker" },
+        { "name": "blocksMovement", "type": "bool", "value": true }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        { "name": "tileId", "type": "string", "value": "scrubBlocker" },
+        { "name": "blocksMovement", "type": "bool", "value": true }
+      ]
+    }
+  ],
+  "tilewidth": 64,
+  "type": "tileset",
+  "version": "1.10"
+}

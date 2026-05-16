@@ -1,4 +1,4 @@
-import type { BuildingId, ResourceSiteResourceId } from "../game/types";
+import type { BuildingId, EnemyUnitCounts, ResourceSiteLoot } from "../game/types";
 
 export type VillagePlotDefinition = {
   id: string;
@@ -17,12 +17,12 @@ export type VillageResourceSiteDefinition = {
   y: number;
   width: number;
   height: number;
-  resourceId: ResourceSiteResourceId;
-  captureMinTroops: number;
-  captureBaseDeathRisk: number;
-  maxWorkers: number;
-  yieldPerWorker: number;
+  palisadeType: VillageResourceSitePalisadeType;
+  loot: ResourceSiteLoot;
+  defenderArmy: EnemyUnitCounts;
 };
+
+export type VillageResourceSitePalisadeType = "wood" | "stone" | "scrap";
 
 export const villagePlotRulesById: Record<string, VillagePlotRule> = {
   "plot-main": {

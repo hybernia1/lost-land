@@ -4,7 +4,6 @@ import type { BuildingId, GameState, ResourceBag, ResourceId } from "../../../ga
 import type { TranslationPack } from "../../../i18n/types";
 import {
   getAcademyBuildTimeMultiplier,
-  getAcademyExpeditionDeathRiskMultiplier,
   getAcademyProductionBonus,
 } from "../../../systems/academy";
 import {
@@ -24,7 +23,6 @@ import {
   getMarketTradeLimit,
   getMarketTradeSlots,
 } from "../../../systems/market";
-import { getBarracksTrainingRatePerGameHour } from "../../../systems/survivors";
 import type { CostLinePart, EffectLine } from "../core/types";
 import { formatPercentBonus, formatRate } from "./formatters";
 
@@ -113,20 +111,6 @@ export function getNextLevelEffects(
     });
   }
 
-  if (buildingId === "barracks") {
-    const currentRate = getBarracksTrainingRatePerGameHour(currentLevel);
-    const nextRate = getBarracksTrainingRatePerGameHour(currentLevel + 1);
-    const rateDelta = nextRate - currentRate;
-
-    if (rateDelta > 0) {
-      effects.push({
-        iconId: "troop",
-        value: `+${formatRate(rateDelta)}/h`,
-        tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(rateDelta)}/h`,
-      });
-    }
-  }
-
   if (buildingId === "academy") {
     const currentBonus = getAcademyProductionBonus(currentLevel);
     const nextBonus = getAcademyProductionBonus(currentLevel + 1);
@@ -135,16 +119,6 @@ export function getNextLevelEffects(
         iconId: "build",
         value: formatPercentBonus(nextBonus - currentBonus),
         tooltip: `${translations.ui.production}: ${formatPercentBonus(nextBonus - currentBonus)}`,
-      });
-    }
-
-    const currentRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel);
-    const nextRiskMultiplier = getAcademyExpeditionDeathRiskMultiplier(currentLevel + 1);
-    if (nextRiskMultiplier < currentRiskMultiplier) {
-      effects.push({
-        iconId: "expedition",
-        value: `-${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}%`,
-        tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate((currentRiskMultiplier - nextRiskMultiplier) * 100)}% risk`,
       });
     }
 
@@ -323,15 +297,6 @@ export function getCurrentBuildingEffects(
     });
   }
 
-  if (buildingId === "barracks") {
-    const trainingRate = getBarracksTrainingRatePerGameHour(level);
-    effects.push({
-      iconId: "troop",
-      value: `+${formatRate(trainingRate)}/h`,
-      tooltip: `${translations.ui.troopTraining ?? "Troop training"} +${formatRate(trainingRate)}/h`,
-    });
-  }
-
   if (buildingId === "academy") {
     const productionBonus = getAcademyProductionBonus(level);
     if (productionBonus > 0) {
@@ -339,15 +304,6 @@ export function getCurrentBuildingEffects(
         iconId: "build",
         value: formatPercentBonus(productionBonus),
         tooltip: `${translations.ui.production}: ${formatPercentBonus(productionBonus)}`,
-      });
-    }
-
-    const expeditionRiskReduction = (1 - getAcademyExpeditionDeathRiskMultiplier(level)) * 100;
-    if (expeditionRiskReduction > 0) {
-      effects.push({
-        iconId: "expedition",
-        value: `-${formatRate(expeditionRiskReduction)}%`,
-        tooltip: `${translations.ui.resourceSiteSendTroops ?? "Expeditions"}: -${formatRate(expeditionRiskReduction)}% risk`,
       });
     }
 

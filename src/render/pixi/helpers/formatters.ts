@@ -33,6 +33,18 @@ export function formatScoutingRemaining(seconds: number): string {
   return `${Math.max(1, Math.ceil(gameHours * 60))}m`;
 }
 
+export function formatRealTimeRemaining(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainderSeconds = totalSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${remainderSeconds}s`;
+  }
+
+  return `${minutes}m ${remainderSeconds.toString().padStart(2, "0")}s`;
+}
+
 export function getHourlyRateLabel(ratePerSecond: number): string {
   const hourlyRate = ratePerSecond * GAME_HOUR_REAL_SECONDS;
 

@@ -48,6 +48,7 @@ export function installGodMode(root: HTMLElement, game: Game): GodModeController
         <button data-dev-action="add-resources">+100 supplies</button>
         <button data-dev-action="add-workers">+5 workers</button>
         <button data-dev-action="finish-builds">Finish builds</button>
+        <button data-dev-action="demo-battle">Demo battle</button>
         <button data-dev-action="homeless-snow">Homeless snow</button>
       </div>
       <div class="god-mode-section">
@@ -90,6 +91,8 @@ export function installGodMode(root: HTMLElement, game: Game): GodModeController
       game.devAddWorkers(5);
     } else if (action === "finish-builds") {
       game.devFinishActiveBuilds();
+    } else if (action === "demo-battle") {
+      game.devStartDemoBattle();
     } else if (action === "set-environment" && button.dataset.condition) {
       game.devSetEnvironment(
         button.dataset.condition as EnvironmentConditionId,

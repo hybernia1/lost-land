@@ -18,6 +18,8 @@ import type {
   ObjectiveQuestId,
   ResourceBag,
   ResourceId,
+  UnitCounts,
+  UnitId,
 } from "../../../game/types";
 
 export type SceneLayout = {
@@ -116,12 +118,17 @@ export type PixiActionDetail = {
   building?: BuildingId;
   plot?: string;
   resourceSiteId?: string;
-  resourceSiteTroops?: number;
+  resourceSiteUnits?: UnitCounts;
+  battleUnitId?: string;
+  battleQ?: number;
+  battleR?: number;
   delta?: number;
   troopCount?: number;
+  unitId?: UnitId;
   questOption?: DecisionOptionId;
   objectiveQuestId?: ObjectiveQuestId;
   resourceId?: ResourceId;
+  inventoryAmount?: number;
   marketFromResource?: ResourceId;
   marketToResource?: ResourceId;
   marketAmount?: number;
@@ -129,13 +136,12 @@ export type PixiActionDetail = {
   continuousShifts?: boolean;
 };
 
-export type ConquestResultPreview = {
-  outcome: "victory" | "failed" | "overrun";
-  resourceId: "food" | "water" | "material" | "coal";
+export type RaidResultPreview = {
+  outcome: "victory" | "failed";
+  loot?: Partial<Record<ResourceId, number>>;
   sentTroops: number;
   returnedTroops: number;
   deaths: number;
-  requiredTroops?: number;
   resolvedAt: number;
 };
 
@@ -149,7 +155,7 @@ export type VillageInfoPanel =
   | "survivors"
   | "decisionArchive"
   | "weather"
-  | "oasisOverview"
+  | "heroInventory"
   | "questLog"
   | `objective:${ObjectiveQuestId}`;
 

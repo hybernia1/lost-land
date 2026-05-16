@@ -5,16 +5,19 @@ import { getTileAssetUrl, getTiledTilesetSource } from "./tiledAssets";
 import type {
   TerrainTileLayerDefinition,
   TerrainTilePlacement,
+  VillageHomeAreaDefinition,
   VillageLayoutDefinition,
   VillageMapObjectDefinition,
   VillageNpcSpawnDefinition,
   VillageObjectLayerDefinition,
 } from "./villageLayouts";
-import type { ResourceSiteResourceId } from "../game/types";
+import type { EnemyUnitCounts, EnemyUnitId, ResourceSiteLoot } from "../game/types";
+import { enemyUnitIds } from "./combatUnits";
 import {
   villagePlotRulesById,
   type VillagePlotDefinition,
   type VillageResourceSiteDefinition,
+  type VillageResourceSitePalisadeType,
 } from "./villagePlots";
 
 type TiledProperty = {
@@ -121,16 +124,6 @@ type TiledMap = {
   properties?: TiledProperty[];
 };
 
-const DEFAULT_RESOURCE_SITE_CAPTURE_MIN_TROOPS = 5;
-const DEFAULT_RESOURCE_SITE_CAPTURE_BASE_DEATH_RISK = 0.42;
-const DEFAULT_RESOURCE_SITE_MAX_WORKERS = 3;
-const DEFAULT_RESOURCE_SITE_YIELD_PER_WORKER: Record<ResourceSiteResourceId, number> = {
-  food: 0.08,
-  water: 0.075,
-  coal: 0.07,
-  material: 0.06,
-};
-
 type GidTileReference = {
   tileId: TerrainTileId;
   textureKey: TerrainTextureKey;
@@ -168,6 +161,8 @@ export function createVillageLayoutFromTiled(
   }
   const registry = createTilesetRegistry(id, map.tilesets, map.tileheight);
   const mapPixelBounds = getMapPixelBounds(map, orientation);
+  const tileLayers = getTileLayers(map, orientation, registry.gidToTile);
+  const homeArea = getHomeVillageArea(tileLayers, map.tilewidth, map.tileheight);
 
   return {
     id,
@@ -183,11 +178,12 @@ export function createVillageLayoutFromTiled(
     width: mapPixelBounds.width,
     height: mapPixelBounds.height,
     tileTextures: registry.tileTextures,
-    tileLayers: getTileLayers(map, orientation, registry.gidToTile),
+    tileLayers,
     objectLayers: getObjectLayers(map, orientation, registry),
     npcSpawns: getNpcSpawns(map, orientation),
+    homeArea,
     plots: getVillagePlots(map, orientation),
-    resourceSites: getResourceSites(map, orientation),
+    resourceSites: getResourceSites(map, orientation, homeArea),
   };
 }
 
@@ -752,6 +748,7 @@ function getPlotObjectId(object: TiledObject): string {
 function getResourceSites(
   map: TiledMap,
   orientation: "orthogonal" | "isometric",
+  homeArea: VillageHomeAreaDefinition,
 ): VillageResourceSiteDefinition[] {
   const layer = getNamedObjectLayer(map, "resourceSites");
 
@@ -771,56 +768,99 @@ function getResourceSites(
         throw new Error("Resource site object is missing a plotId property or name.");
       }
 
-      const resourceId = getResourceSiteResourceId(object.properties, id);
-      const captureMinTroops = Math.max(
-        1,
-        Math.floor(
-          getNumberProperty(object.properties, "siteCaptureMinTroops") ??
-          getNumberProperty(object.properties, "captureMinTroops") ??
-          DEFAULT_RESOURCE_SITE_CAPTURE_MIN_TROOPS,
-        ),
-      );
-      const captureBaseDeathRisk = Math.max(
-        0.05,
-        Math.min(
-          0.95,
-          getNumberProperty(object.properties, "siteCaptureBaseDeathRisk") ??
-            getNumberProperty(object.properties, "captureBaseDeathRisk") ??
-            DEFAULT_RESOURCE_SITE_CAPTURE_BASE_DEATH_RISK,
-        ),
-      );
-      const maxWorkers = Math.max(
-        1,
-        Math.min(
-          3,
-          Math.floor(
-            getNumberProperty(object.properties, "siteMaxWorkers") ??
-            getNumberProperty(object.properties, "maxWorkers") ??
-            DEFAULT_RESOURCE_SITE_MAX_WORKERS,
-          ),
-        ),
-      );
-      const yieldPerWorker = Math.max(
-        0.001,
-        getNumberProperty(object.properties, "siteYieldPerWorker") ??
-          getNumberProperty(object.properties, "yieldPerWorker") ??
-          DEFAULT_RESOURCE_SITE_YIELD_PER_WORKER[resourceId],
-      );
-
+      const loot = getResourceSiteLoot(object.properties, id);
+      const x = position.x + layerOffset.x;
+      const y = position.y + layerOffset.y;
+      const footprint = getResourceSiteFootprint(map, orientation, x, y, object.width ?? 0, object.height ?? 0);
       return {
         id,
-        x: position.x + layerOffset.x,
-        y: position.y + layerOffset.y,
-        width: object.width ?? 0,
-        height: object.height ?? 0,
-        resourceId,
-        captureMinTroops,
-        captureBaseDeathRisk,
-        maxWorkers,
-        yieldPerWorker,
+        x: footprint.x,
+        y: footprint.y,
+        width: footprint.width,
+        height: footprint.height,
+        palisadeType: getResourceSitePalisadeType(object.properties),
+        loot,
+        defenderArmy: getResourceSiteDefenderArmy(object.properties, id),
       };
     })
+    .filter((site) => !isRectCenterInsideArea(site, homeArea))
     .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
+}
+
+function getResourceSiteFootprint(
+  map: Pick<TiledMap, "tilewidth" | "tileheight">,
+  orientation: "orthogonal" | "isometric",
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Pick<VillageResourceSiteDefinition, "x" | "y" | "width" | "height"> {
+  const centerX = x + Math.max(1, width) / 2;
+  const centerY = y + Math.max(1, height) / 2;
+  const footprintWidth = map.tilewidth * 2;
+  const footprintHeight = map.tileheight * 2;
+
+  if (orientation === "isometric") {
+    return {
+      x: centerX - footprintWidth / 2,
+      y: centerY - footprintHeight / 2,
+      width: footprintWidth,
+      height: footprintHeight,
+    };
+  }
+
+  return {
+    x,
+    y,
+    width: footprintWidth,
+    height: footprintHeight,
+  };
+}
+
+function getResourceSitePalisadeType(
+  properties: TiledProperty[] | undefined,
+): VillageResourceSitePalisadeType {
+  const value = getStringProperty(properties, "palisadeType");
+
+  return value === "stone" || value === "scrap" ? value : "wood";
+}
+
+function getHomeVillageArea(
+  tileLayers: TerrainTileLayerDefinition[],
+  tileWidth: number,
+  tileHeight: number,
+): VillageHomeAreaDefinition {
+  const layer = tileLayers.find((candidate) => candidate.name === "palisade");
+
+  if (!layer || layer.tiles.length === 0) {
+    throw new Error("Tiled map is missing non-empty tile layer \"palisade\" for the home village area.");
+  }
+
+  const minX = Math.min(...layer.tiles.map((tile) => tile.x));
+  const minY = Math.min(...layer.tiles.map((tile) => tile.y));
+  const maxX = Math.max(...layer.tiles.map((tile) => tile.x + tileWidth));
+  const maxY = Math.max(...layer.tiles.map((tile) => tile.y + tileHeight));
+
+  return {
+    id: "home-village",
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+function isRectCenterInsideArea(
+  rect: Pick<VillageResourceSiteDefinition, "x" | "y" | "width" | "height">,
+  area: VillageHomeAreaDefinition,
+): boolean {
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
+
+  return centerX >= area.x &&
+    centerX <= area.x + area.width &&
+    centerY >= area.y &&
+    centerY <= area.y + area.height;
 }
 
 function getNpcSpawns(
@@ -1004,20 +1044,83 @@ function parseTiledColor(value: unknown): number | null {
   return Number.parseInt(rgbHex, 16);
 }
 
-function getResourceSiteResourceId(
+function getResourceSiteLoot(
   properties: TiledProperty[] | undefined,
   siteId: string,
-): ResourceSiteResourceId {
-  const value = getStringProperty(properties, "siteResourceId") ??
-    getStringProperty(properties, "resourceId");
+): ResourceSiteLoot {
+  const loot: ResourceSiteLoot = {};
 
-  if (value === "food" || value === "water" || value === "coal" || value === "material") {
-    return value;
+  for (const resourceId of ["food", "water", "material", "coal"] as const) {
+    const amount = getNumberProperty(properties, resourceId) ??
+      getNumberProperty(properties, `loot${capitalize(resourceId)}`);
+
+    if (amount !== null) {
+      loot[resourceId] = Math.max(0, Math.floor(amount));
+    }
   }
 
-  throw new Error(
-    `Resource site "${siteId}" has invalid or missing siteResourceId/resourceId property.`,
-  );
+  const totalLoot = Object.values(loot).reduce((total, amount) => total + Math.max(0, Math.floor(amount ?? 0)), 0);
+  if (totalLoot <= 0) {
+    throw new Error(
+      `Resource site "${siteId}" has no loot. Add numeric food/water/material/coal properties.`,
+    );
+  }
+
+  return loot;
+}
+
+function getResourceSiteDefenderArmy(
+  properties: TiledProperty[] | undefined,
+  siteId: string,
+): EnemyUnitCounts {
+  const army = createEmptyEnemyUnitCounts();
+  const defenderList = getStringProperty(properties, "defenders");
+
+  if (defenderList) {
+    for (const entry of defenderList.split(",")) {
+      const [rawUnitId, rawCount] = entry.split(":");
+      const unitId = rawUnitId?.trim();
+      const count = Number.parseInt(rawCount?.trim() ?? "", 10);
+
+      if (!isEnemyUnitId(unitId) || !Number.isFinite(count)) {
+        throw new Error(
+          `Resource site "${siteId}" has invalid defenders entry "${entry}". Use e.g. "rat:2,spider:1".`,
+        );
+      }
+
+      army[unitId] = Math.max(0, Math.floor(count));
+    }
+  }
+
+  for (const unitId of enemyUnitIds) {
+    const directCount = getNumberProperty(properties, unitId) ??
+      getNumberProperty(properties, `enemy${capitalize(unitId)}`);
+
+    if (directCount !== null) {
+      army[unitId] = Math.max(0, Math.floor(directCount));
+    }
+  }
+
+  const totalDefenders = enemyUnitIds.reduce((total, unitId) => total + army[unitId], 0);
+  if (totalDefenders <= 0) {
+    throw new Error(
+      `Resource site "${siteId}" has no defenders. Add a defenders property, e.g. "rat:2".`,
+    );
+  }
+
+  return army;
+}
+
+function createEmptyEnemyUnitCounts(): EnemyUnitCounts {
+  return Object.fromEntries(enemyUnitIds.map((unitId) => [unitId, 0])) as EnemyUnitCounts;
+}
+
+function isEnemyUnitId(value: string | undefined): value is EnemyUnitId {
+  return typeof value === "string" && enemyUnitIds.includes(value as EnemyUnitId);
+}
+
+function capitalize(value: string): string {
+  return value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 }
 
 function getNamedObjectLayer(

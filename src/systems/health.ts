@@ -1,9 +1,9 @@
 import type { BuildingId, GameState } from "../game/types";
+import { unitIds } from "./survivors";
 import { getEnvironmentDefinition, getEnvironmentIntensityIndex } from "../data/environment";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import { pushLocalizedLog } from "./log";
 import { getPopulation } from "./population";
-import { removeOneResourceSiteWorker } from "./resourceSites";
 
 const CLINIC_BASE_FOOD_PER_TREATMENT = 2;
 const CLINIC_BASE_WATER_PER_TREATMENT = 1;
@@ -230,10 +230,6 @@ function injureWorker(state: GameState): boolean {
     return true;
   }
 
-  if (removeOneResourceSiteWorker(state)) {
-    return true;
-  }
-
   const activeConstruction = Object.values(state.buildings).find(
     (building) => building.constructionWorkers > 0,
   );
@@ -261,10 +257,6 @@ export function killCampSurvivor(state: GameState): boolean {
     return true;
   }
 
-  if (removeOneResourceSiteWorker(state)) {
-    return true;
-  }
-
   const activeConstruction = Object.values(state.buildings).find(
     (building) => building.constructionWorkers > 0,
   );
@@ -274,8 +266,7 @@ export function killCampSurvivor(state: GameState): boolean {
     return true;
   }
 
-  if (state.survivors.troops > 0) {
-    state.survivors.troops -= 1;
+  if (removeOneAvailableTroop(state)) {
     return true;
   }
 
@@ -285,6 +276,17 @@ export function killCampSurvivor(state: GameState): boolean {
 
   state.health.injured -= 1;
   return true;
+}
+
+function removeOneAvailableTroop(state: GameState): boolean {
+  for (const unitId of unitIds) {
+    if (state.survivors.units[unitId] > 0) {
+      state.survivors.units[unitId] -= 1;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function stableRoll(seed: string): number {

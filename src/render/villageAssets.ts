@@ -5,6 +5,7 @@ import {
   type FrameObject,
 } from "pixi.js";
 import constructionSiteTextureUrl from "../assets/buildings/construction-site.png";
+import settlementPalisadeTextureUrl from "../assets/sites/settlement-palisade.png";
 import {
   mapBirdDefinitions,
   type MapBirdKindId,
@@ -14,12 +15,19 @@ import {
   type MapNpcKindId,
 } from "../data/mapNpcs";
 import {
+  settlementBattleMap,
+  type SettlementBattleTileId,
+} from "../data/settlementBattleMap";
+import type { VillageResourceSitePalisadeType } from "../data/villagePlots";
+import {
   buildingVisualDefinitions,
   type BuildingVisualDefinition,
 } from "../data/buildingVisuals";
 import type { TerrainTextureDefinition } from "../data/terrainTiles";
 import { villageLayoutDefinitions } from "../data/villageLayouts";
 import type { BuildingId } from "../game/types";
+import settlementPalisadeStoneTextureUrl from "../assets/sites/settlement-palisade-stone.png";
+import settlementPalisadeScrapTextureUrl from "../assets/sites/settlement-palisade-scrap.png";
 
 const terrainTextureCache = new Map<string, Texture>();
 const terrainAnimationCache = new Map<string, FrameObject[] | null>();
@@ -59,6 +67,9 @@ export class VillageAssets {
   private readonly mapBirdTextures = new Map<MapBirdKindId, MapBirdTextureSet>();
   private readonly mapNpcAtlases = new Map<string, Texture>();
   private readonly mapNpcTextures = new Map<MapNpcKindId, MapNpcTextureSet>();
+  private battleTileAtlas: Texture | null = null;
+  private readonly battleTileTextures = new Map<SettlementBattleTileId, Texture>();
+  private readonly settlementPalisadeTextures = new Map<VillageResourceSitePalisadeType, Texture>();
   private loadPromise: Promise<void> | null = null;
 
   load(): Promise<void> {
@@ -149,12 +160,24 @@ export class VillageAssets {
     return this.mapBirdTextures.get(kindId) ?? null;
   }
 
+  getSettlementBattleTileTexture(tileId: SettlementBattleTileId): Texture | null {
+    return this.battleTileTextures.get(tileId) ?? null;
+  }
+
+  getSettlementPalisadeTexture(type: VillageResourceSitePalisadeType): Texture | null {
+    return this.settlementPalisadeTextures.get(type) ??
+      this.settlementPalisadeTextures.get("wood") ??
+      null;
+  }
+
   private async loadTextures(): Promise<void> {
     await Promise.all([
       this.loadBuildingTextures(),
       this.loadTerrainAtlases(),
       this.loadMapBirdAtlases(),
       this.loadMapNpcAtlases(),
+      this.loadBattleTileAtlas(),
+      this.loadSettlementPalisadeTexture(),
     ]);
   }
 
@@ -246,6 +269,38 @@ export class VillageAssets {
         east: definition.frames.east.map((frameIndex) => this.createAtlasFrame(atlas, frameIndex, definition.frameWidth, definition.frameHeight)),
       });
     }
+  }
+
+  private async loadBattleTileAtlas(): Promise<void> {
+    const atlas = await Assets.load<Texture>(settlementBattleMap.tileset.atlasUrl);
+    atlas.source.scaleMode = "nearest";
+    this.battleTileAtlas = atlas;
+
+    for (const [tileId, definition] of Object.entries(settlementBattleMap.tileset.tiles) as Array<[SettlementBattleTileId, typeof settlementBattleMap.tileset.tiles[SettlementBattleTileId]]>) {
+      this.battleTileTextures.set(tileId, new Texture({
+        source: atlas.source,
+        frame: new Rectangle(
+          definition.frame.x,
+          definition.frame.y,
+          definition.frame.width,
+          definition.frame.height,
+        ),
+      }));
+    }
+  }
+
+  private async loadSettlementPalisadeTexture(): Promise<void> {
+    await Promise.all(
+      ([
+        ["wood", settlementPalisadeTextureUrl],
+        ["stone", settlementPalisadeStoneTextureUrl],
+        ["scrap", settlementPalisadeScrapTextureUrl],
+      ] as Array<[VillageResourceSitePalisadeType, string]>).map(async ([type, textureUrl]) => {
+        const texture = await Assets.load<Texture>(textureUrl);
+        texture.source.scaleMode = "nearest";
+        this.settlementPalisadeTextures.set(type, texture);
+      }),
+    );
   }
 
   private createAtlasFrame(
