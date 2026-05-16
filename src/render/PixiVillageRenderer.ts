@@ -426,7 +426,13 @@ export class PixiVillageRenderer {
     this.frontScreenModel = null;
     this.lastState = state;
     this.lastTranslations = translations;
+    const previousModalPlotId = this.activeModalPlotId;
     this.activeModalPlotId = modalPlotId ?? null;
+    if (this.activeModalPlotId !== previousModalPlotId) {
+      this.activeBuildingDetailTab = "overview";
+      this.buildingBonusScrollY = 0;
+      this.buildingBonusScrollBuildingId = null;
+    }
     const hasBlockingOverlay = Boolean(
       modalPlotId ||
       infoPanel ||

@@ -505,6 +505,21 @@ export function drawBuildingDetail(
         parent.y + sectionY + 52,
       );
     } else {
+      const tabContentY = sectionY + 52;
+      const tabContentHeight = Math.max(120, sectionHeight - 52);
+      if (hasControls) {
+        drawBuildingControlSection(
+          host,
+          content,
+          buildingId,
+          state,
+          translations,
+          controlX,
+          tabContentY,
+          controlWidth,
+          tabContentHeight,
+        );
+      }
       drawNextLevelSection(
         host,
         content,
@@ -515,10 +530,10 @@ export function drawBuildingDetail(
         requiredWorkers,
         state,
         translations,
-        sideMargin,
-        sectionY + 52,
-        bodyWidth,
-        Math.max(120, sectionHeight - 52),
+        hasControls ? nextLevelX : sideMargin,
+        tabContentY,
+        hasControls ? nextLevelWidth : bodyWidth,
+        tabContentHeight,
       );
     }
   } else {
