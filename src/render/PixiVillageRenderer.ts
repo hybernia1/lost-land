@@ -597,7 +597,7 @@ export class PixiVillageRenderer {
     const frame = resolveModalFrame(width, height, {
       maxWidth: 430,
       minHeight: 292,
-      preferredHeight: model.view === "settings" ? 342 : 300,
+      preferredHeight: model.view === "settings" ? 318 : 300,
       marginY: 56,
       topMin: 46,
     });
@@ -667,22 +667,14 @@ export class PixiVillageRenderer {
   ): void {
     const contentX = 28;
     const contentWidth = panelWidth - 56;
-    this.drawText(panel, translations.ui.language ?? "Language", contentX, headerBottom + 22, {
+    this.drawText(panel, translations.ui.language ?? "Language", contentX, headerBottom + 24, {
       fill: uiTheme.accentStrong,
-      fontSize: uiTextSize.bodyLarge,
+      fontSize: uiTextSize.sectionTitle,
       fontWeight: "900",
-    });
-    this.drawText(panel, translations.ui.languageText ?? "", contentX, headerBottom + 50, {
-      fill: uiTheme.textMuted,
-      fontSize: uiTextSize.body,
-      fontWeight: "700",
-      wordWrap: true,
-      wordWrapWidth: contentWidth,
-      lineHeight: 18,
     });
 
     const buttonWidth = Math.min(contentWidth, 230);
-    let buttonY = headerBottom + 90;
+    let buttonY = headerBottom + 64;
     for (const locale of model.locales) {
       const active = locale.id === model.activeLocale;
       this.createRectButton(panel, {
