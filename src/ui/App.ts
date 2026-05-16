@@ -31,6 +31,8 @@ type AmbientLoop = "day" | "night" | "rain";
 
 const AMBIENT_LOOP_VOLUME: Record<AmbientLoop, number> = gameConfig.audio.ambientLoopVolume;
 const AMBIENT_CROSSFADE_MS = gameConfig.audio.ambientCrossfadeMs;
+const KEYBOARD_CAMERA_STEP = 112;
+const KEYBOARD_CAMERA_FAST_STEP = 240;
 
 export class App {
   private villageRenderer: PixiVillageRenderer | null = null;
@@ -595,6 +597,11 @@ export class App {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    if (this.mode === "game") {
+      this.handleGameKeyDown(event);
+      return;
+    }
+
     if (this.mode !== "new-game") {
       return;
     }
@@ -623,6 +630,83 @@ export class App {
     }
     this.communityNameDraft += event.key;
     this.requestRender();
+  }
+
+  private handleGameKeyDown(event: KeyboardEvent): void {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    const direction = this.getArrowKeyDirection(event.key);
+    if (!direction) {
+      return;
+    }
+
+    if (this.isBuildingDetailModalOpen()) {
+      event.preventDefault();
+      if (direction.x === 0) {
+        return;
+      }
+
+      this.openAdjacentBuildingModal(direction.x < 0 ? -1 : 1);
+      return;
+    }
+
+    if (this.isAnyModalOpen()) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    const step = event.shiftKey ? KEYBOARD_CAMERA_FAST_STEP : KEYBOARD_CAMERA_STEP;
+    this.villageRenderer?.panCameraByViewportDelta(direction.x * step, direction.y * step);
+  }
+
+  private getArrowKeyDirection(key: string): { x: number; y: number } | null {
+    if (key === "ArrowLeft") {
+      return { x: -1, y: 0 };
+    }
+    if (key === "ArrowRight") {
+      return { x: 1, y: 0 };
+    }
+    if (key === "ArrowUp") {
+      return { x: 0, y: -1 };
+    }
+    if (key === "ArrowDown") {
+      return { x: 0, y: 1 };
+    }
+    return null;
+  }
+
+  private isBuildingDetailModalOpen(): boolean {
+    if (!this.state || this.villageInfoPanel || !this.villageModalPlotId) {
+      return false;
+    }
+
+    const plot = this.state.village.plots.find((candidate) => candidate.id === this.villageModalPlotId);
+    return Boolean(plot?.buildingId);
+  }
+
+  private openAdjacentBuildingModal(direction: -1 | 1): void {
+    if (!this.state || !this.villageModalPlotId) {
+      return;
+    }
+
+    const occupiedPlots = this.state.village.plots.filter((plot) => plot.buildingId !== null);
+    if (occupiedPlots.length <= 1) {
+      return;
+    }
+
+    const currentIndex = occupiedPlots.findIndex((plot) => plot.id === this.villageModalPlotId);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const nextIndex = (currentIndex + direction + occupiedPlots.length) % occupiedPlots.length;
+    this.villageModalPlotId = occupiedPlots[nextIndex].id;
+    this.villageInfoPanel = null;
+    this.requestRender();
+    this.playUiSound(this.tabSwitchAudio);
   }
 
   private startNewCommunity(): void {

@@ -820,6 +820,17 @@ export class PixiVillageRenderer {
     this.app = null;
   }
 
+  panCameraByViewportDelta(deltaX: number, deltaY: number): void {
+    if (this.cameraDragBlocked) {
+      return;
+    }
+
+    this.cameraTargetOffsetX -= deltaX;
+    this.cameraTargetOffsetY -= deltaY;
+    this.clampTargetCamera(this.host.clientWidth, this.host.clientHeight);
+    this.ambientEffects.updateAnimationLoop();
+  }
+
   private async initialize(): Promise<void> {
     const app = new Application();
     if (!cullerPluginRegistered) {
