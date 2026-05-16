@@ -815,19 +815,12 @@ function drawBuildingBonusRow(
     });
   }
 
-  if (unlocked && !current) {
+  if (unlocked) {
     const doneIcon = host.drawIcon(rowLayer, "done", width - 42, height / 2, 18);
-    host.bindTooltip(doneIcon, copy.unlocked);
+    host.bindTooltip(doneIcon, current ? copy.current : copy.unlocked);
   } else if (!unlocked) {
     const lockIcon = host.drawIcon(rowLayer, "lock", width - 42, height / 2, 18);
     host.bindTooltip(lockIcon, copy.locked);
-  } else {
-    host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
-      fill: statusFill,
-      fontSize: uiTextSize.caption,
-      fontWeight: "900",
-      align: "right",
-    });
   }
   if (effects.length === 0) {
     host.bindTooltip(rowLayer, `${copy.level} ${rowLevel}: ${copy.noBonus}`);
