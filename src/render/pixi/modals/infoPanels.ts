@@ -458,10 +458,10 @@ function drawSurvivorOverviewPanel(
   height: number,
 ): void {
   const { panel, panelWidth } = createInfoPanelShell(host, width, height, {
-    maxWidth: 308,
-    minHeight: 302,
-    preferredHeight: 302,
-    maxHeight: 302,
+    maxWidth: 420,
+    minHeight: 378,
+    preferredHeight: 378,
+    maxHeight: 420,
   });
 
   const housing = getHousingStatus(state);
@@ -504,9 +504,9 @@ function drawSurvivorOverviewPanel(
   rows.forEach((row, index) => {
     drawWorkforceRow(host, panel, {
       ...row,
-      x: 18,
-      y: headerBottom + 2 + index * 23,
-      width: panelWidth - 28,
+      x: 28,
+      y: headerBottom + 12 + index * 29,
+      width: panelWidth - 56,
     });
   });
 }
@@ -846,20 +846,20 @@ function drawWorkforceRow(
   row.y = options.y;
   parent.addChild(row);
 
-  host.drawIcon(row, options.iconId, 8, 9, 14);
-  host.drawText(row, options.label, 28, 1, {
+  host.drawIcon(row, options.iconId, 10, 12, 17);
+  host.drawText(row, options.label, 34, 2, {
     fill: uiTheme.textMuted,
-    fontSize: uiTextSize.caption,
+    fontSize: uiTextSize.body,
     fontWeight: "800",
   });
   const value = host.drawText(row, options.value, options.width, 1, {
     fill: options.missing ? uiTheme.negative : uiTheme.accentStrong,
-    fontSize: uiTextSize.body,
+    fontSize: uiTextSize.value,
     fontWeight: "900",
   });
   value.anchor.set(1, 0);
 
-  row.hitArea = new Rectangle(0, -2, options.width, 23);
+  row.hitArea = new Rectangle(0, -3, options.width, 29);
   host.bindTooltip(row, options.tooltip);
 }
 
