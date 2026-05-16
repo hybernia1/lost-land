@@ -66,9 +66,10 @@ export const cs: CsTranslationPack = {
     upgrade: "Vylepšit",
     survivors: "Přeživší",
     log: "Záznam",
-    logDayOne: "Den 1: táborové rádio chytá jen šum.",
+    logDayOne: "Den 1, rok 2143: starý svět už nikdo živý nepamatuje.",
+    logAgeOfCollapse: "Více než sto let po kolapsu přežívá historie hlavně v bájích a zvěstech.",
     logPerimeter:
-      "Kolem starého dopravního depa je vyznačen bezpečný perimetr.",
+      "Kolem mechem porostlých ruin je vyznačen palisádový perimetr.",
     logConstructionStarted: "Stavba budovy {building} zahájena.",
     logUpgradeStarted: "Vylepšení budovy {building} zahájeno.",
     logReachedLevel: "{building} dosáhla úrovně {level}.",
@@ -335,7 +336,7 @@ export const cs: CsTranslationPack = {
     },
     market: {
       name: "Tržiště",
-      description: "Umožňuje směňovat zásoby s jinými komunitami přes rádiové dohody.",
+      description: "Umožňuje směňovat zásoby s jinými komunitami přes běžce a domluvené signální trasy.",
     },
     watchtower: {
       name: "Strážní věž",

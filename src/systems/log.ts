@@ -36,6 +36,7 @@ export function getLocalizedUiText(
 export function getLocalizedInitialLogEntries(): LogEntry[] {
   return [
     { source: "ui", key: "logDayOne" },
+    { source: "ui", key: "logAgeOfCollapse" },
     { source: "ui", key: "logPerimeter" },
   ];
 }
