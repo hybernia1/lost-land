@@ -70,6 +70,7 @@ type VillageModalsHost = {
   ) => void;
   drawBuildingDetail: (
     parent: Container,
+    plotId: string,
     buildingId: BuildingId,
     level: number,
     upgradingRemaining: number,
@@ -175,6 +176,7 @@ export function drawVillageModal(
   const definition = buildingById[buildingId];
   host.drawBuildingDetail(
     panel,
+    selectedPlot.id,
     buildingId,
     building.level,
     building.upgradingRemaining,

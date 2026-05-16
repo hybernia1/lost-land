@@ -124,6 +124,8 @@ export const en: EnTranslationPack = {
     maxLevelReached: "Maximum level reached.",
     buildingDetailOverview: "Overview",
     buildingDetailBonuses: "Bonuses",
+    previousBuilding: "Previous building",
+    nextBuilding: "Next building",
     buildingBonusTitle: "Bonuses by level",
     buildingLevelCurrent: "Current",
     buildingLevelUnlocked: "Unlocked",

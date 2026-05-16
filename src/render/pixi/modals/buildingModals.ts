@@ -408,6 +408,7 @@ function drawBuildRow(
 export function drawBuildingDetail(
   host: BuildingModalsHost,
   parent: Container,
+  plotId: string,
   buildingId: BuildingId,
   level: number,
   upgradingRemaining: number,
@@ -438,7 +439,6 @@ export function drawBuildingDetail(
   const previewSlotY = 26;
   const previewSlotHeight = 112;
   const titleX = sideMargin + previewWidth + 20;
-  const titleWidth = modalWidth - titleX - sideMargin;
   const bodyWidth = modalWidth - sideMargin * 2;
   const metricGap = 8;
   const metrics = getBuildingDetailMetrics(buildingId, building, level, maxLevel, state, translations);
@@ -457,6 +457,8 @@ export function drawBuildingDetail(
   const controlX = sideMargin;
   const nextLevelX = hasControls ? controlX + controlWidth + columnGap : sideMargin;
   const activeDetailTab = hasDetailTabs ? host.getActiveBuildingDetailTab() : "overview";
+  const adjacentPlots = getAdjacentBuildingPlotIds(state, plotId);
+  const titleWidth = modalWidth - titleX - sideMargin - (adjacentPlots ? 170 : 0);
 
   const content = new Container();
   parent.addChild(content);
@@ -479,6 +481,10 @@ export function drawBuildingDetail(
     wordWrap: true,
     wordWrapWidth: titleWidth,
   });
+
+  if (adjacentPlots) {
+    drawBuildingModalNavigation(host, content, adjacentPlots.previous, adjacentPlots.next, translations, modalWidth);
+  }
 
   metrics.slice(0, metricCount).forEach((metric, index) => {
     drawMetricCard(host, content, metric, sideMargin + index * (metricWidth + metricGap), metricY, metricWidth, 74);
@@ -593,6 +599,63 @@ export function drawBuildingDetail(
     disabled,
     disabledTooltip,
   );
+}
+
+function getAdjacentBuildingPlotIds(
+  state: GameState,
+  currentPlotId: string,
+): { previous: string; next: string } | null {
+  const occupiedPlots = state.village.plots.filter((plot) => plot.buildingId !== null);
+  if (occupiedPlots.length <= 1) {
+    return null;
+  }
+
+  const currentIndex = occupiedPlots.findIndex((plot) => plot.id === currentPlotId);
+  if (currentIndex < 0) {
+    return null;
+  }
+
+  return {
+    previous: occupiedPlots[(currentIndex - 1 + occupiedPlots.length) % occupiedPlots.length].id,
+    next: occupiedPlots[(currentIndex + 1) % occupiedPlots.length].id,
+  };
+}
+
+function drawBuildingModalNavigation(
+  host: BuildingModalsHost,
+  parent: Container,
+  previousPlotId: string,
+  nextPlotId: string,
+  translations: TranslationPack,
+  modalWidth: number,
+): void {
+  const buttonSize = 38;
+  const gap = 8;
+  const y = 18;
+  const rightEdge = modalWidth - 106;
+  const previousX = rightEdge - buttonSize * 2 - gap;
+  const nextX = rightEdge - buttonSize;
+
+  host.createRectButton(parent, {
+    iconId: "arrow-left",
+    x: previousX,
+    y,
+    width: buttonSize,
+    height: buttonSize,
+    detail: { action: "open-village-plot", plot: previousPlotId },
+    tooltip: translations.ui.previousBuilding,
+    tone: "secondary",
+  });
+  host.createRectButton(parent, {
+    iconId: "arrow-right",
+    x: nextX,
+    y,
+    width: buttonSize,
+    height: buttonSize,
+    detail: { action: "open-village-plot", plot: nextPlotId },
+    tooltip: translations.ui.nextBuilding,
+    tone: "secondary",
+  });
 }
 
 function hasBuildingControlSection(buildingId: BuildingId): boolean {

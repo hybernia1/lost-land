@@ -1724,6 +1724,7 @@ export class PixiVillageRenderer {
       ),
       drawBuildingDetail: (
         parent: Container,
+        plotId: string,
         buildingId: BuildingId,
         level: number,
         upgradingRemaining: number,
@@ -1735,6 +1736,7 @@ export class PixiVillageRenderer {
       ) => drawBuildingDetailModal(
         this.buildingModalsHost(),
         parent,
+        plotId,
         buildingId,
         level,
         upgradingRemaining,

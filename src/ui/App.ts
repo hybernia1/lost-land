@@ -484,6 +484,19 @@ export class App {
       return;
     }
 
+    if (action === "open-village-plot" && plot && this.state) {
+      const targetPlot = this.state.village.plots.find((candidate) => candidate.id === plot);
+      if (!targetPlot || targetPlot.buildingId === null) {
+        return;
+      }
+
+      this.villageModalPlotId = targetPlot.id;
+      this.villageInfoPanel = null;
+      this.requestRender();
+      this.playUiSound(this.tabSwitchAudio);
+      return;
+    }
+
     if (action === "build" && building && plot) {
       if (this.game.buildAtPlot(plot, building)) {
         this.villageModalPlotId = null;

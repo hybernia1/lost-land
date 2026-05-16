@@ -125,6 +125,8 @@ export const cs: CsTranslationPack = {
     maxLevelReached: "Dosažena maximální úroveň.",
     buildingDetailOverview: "Přehled",
     buildingDetailBonuses: "Bonusy",
+    previousBuilding: "Předchozí budova",
+    nextBuilding: "Další budova",
     buildingBonusTitle: "Bonusy po úrovních",
     buildingLevelCurrent: "Aktuální",
     buildingLevelUnlocked: "Odemčeno",
