@@ -80,7 +80,7 @@ export const uiTheme = {
 };
 
 export const VILLAGE_BUILDING_RENDER_SCALE = 2;
-export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "defense", "support"];
+export const buildCategoryOrder: BuildingCategory[] = ["resource", "housing", "support"];
 
 export const HUD_DESIGN_SCALE = 1;
 export const HUD_CHROME_ALPHA = 1;

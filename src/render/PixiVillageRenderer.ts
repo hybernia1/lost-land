@@ -1297,7 +1297,6 @@ export class PixiVillageRenderer {
             : undefined,
           action: { action: "open-survivor-overview" },
         },
-        { iconId: "shield", label: `${Math.round(this.getDefenseScore(state))}`, tooltip: t?.ui.defenseTooltip },
         {
           iconId: "morale",
           label: `${Math.floor(state.resources.morale)}%`,
@@ -3373,11 +3372,6 @@ export class PixiVillageRenderer {
 
   private getPlotBounds(plot: Pick<VillagePlotDefinition, "x" | "y" | "width" | "height">): Bounds {
     return mapRectToSceneBounds(defaultVillageLayout, this.layout, plot);
-  }
-
-  private getDefenseScore(state: GameState): number {
-    return state.survivors.troops * 4 +
-      state.buildings.watchtower.level * 12;
   }
 
   private getTroopHousingCapacity(state: GameState): number {

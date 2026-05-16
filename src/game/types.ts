@@ -22,7 +22,6 @@ export type BuildingId =
 export type BuildingCategory =
   | "resource"
   | "housing"
-  | "defense"
   | "support";
 
 export type ResourceBag = Partial<Record<ResourceId, number>>;
@@ -49,7 +48,6 @@ export type BuildingDefinition = {
   alwaysConsumes?: ResourceBag;
   storageBonus?: ResourceBag;
   housing?: number;
-  defense?: number;
   requiredMainBuildingLevel?: number;
   requiredMainBuildingLevelByUpgradeLevel?: number[];
 };

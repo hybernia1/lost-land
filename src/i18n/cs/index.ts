@@ -35,7 +35,6 @@ export const cs: CsTranslationPack = {
     home: "Domů",
     homeVillage: "Domovská vesnice",
     totalLevels: "úrovní celkem",
-    defense: "Obrana",
     morale: "Morálka",
     moraleBreakdown: "Aktuální vlivy na morálku za herní hodinu",
     moraleNetChange: "Čistá změna",
@@ -106,7 +105,6 @@ export const cs: CsTranslationPack = {
     availableBuilds: "Dostupné stavby",
     buildingCategoryResource: "Suroviny",
     buildingCategoryHousing: "Ubytování",
-    buildingCategoryDefense: "Obrana",
     buildingCategorySupport: "Zázemí",
     settlement: "Osada",
     day: "Den",
@@ -183,7 +181,6 @@ export const cs: CsTranslationPack = {
     daylightDawn: "Svítání",
     populationTooltip:
       "Celkový počet přeživších napříč dostupnými lidmi, pracovníky v budovách, stavebními četami, vojáky a zraněnými.",
-    defenseTooltip: "Ochrana tabora z vojaku, vezi a pozdejsich obrannych systemu.",
     buildingQueue: "Stavební fronta",
     queueEmpty: "Žádná aktivní stavba.",
     queueFull: "Stavební fronta je plná.",
@@ -219,7 +216,7 @@ export const cs: CsTranslationPack = {
     conquestDefeatTitle: "Dobývání oázy selhalo",
     conquestDefeatSummary: "Dobývání oázy ({resource}) selhalo.",
     conquestDefeatBodyFailed: "Z útoku se nikdo nevrátil.",
-    conquestDefeatBodyOverrun: "Útočná skupina byla na obranu oázy příliš slabá.",
+    conquestDefeatBodyOverrun: "Útočná skupina byla na odpor v oáze příliš slabá.",
     conquestDefeatRequirement: "Požadované minimum: {required}",
     gameOverKicker: "Tábor padl",
     gameOverTitle: "Komunita {community} padla.",
@@ -332,11 +329,11 @@ export const cs: CsTranslationPack = {
     },
     watchtower: {
       name: "Strážní věž",
-      description: "Zlepšuje kontrolu perimetru proti potulným hordám.",
+      description: "Drží hlídku nad perimetrem a včasnými varovnými trasami.",
     },
     barracks: {
       name: "Kasárny",
-      description: "Cvičí pracovníky na vojáky pro budoucí venkovní mise a obranu tábora.",
+      description: "Cvičí pracovníky na vojáky pro budoucí venkovní mise.",
     },
     academy: {
       name: "Akademie",

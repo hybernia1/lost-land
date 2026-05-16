@@ -285,9 +285,6 @@ function getBuildCategoryLabel(category: BuildingCategory, translations: Transla
   if (category === "housing") {
     return translations.ui.buildingCategoryHousing;
   }
-  if (category === "defense") {
-    return translations.ui.buildingCategoryDefense;
-  }
   return translations.ui.buildingCategorySupport;
 }
 

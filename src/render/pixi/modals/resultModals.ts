@@ -282,7 +282,7 @@ export function drawConquestResultModal(
       ? translations.ui.conquestVictoryBodyWithLosses ?? "The oasis is ours, but the fight cost lives."
       : translations.ui.conquestVictoryBodyNoLosses ?? "The team secured the oasis without losses.")
     : (isOverrun
-      ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis defenses."
+      ? translations.ui.conquestDefeatBodyOverrun ?? "The assault force was too small against the oasis resistance."
       : translations.ui.conquestDefeatBodyFailed ?? "No one returned from the assault.");
   const summaryHeight = host.measureWrappedTextHeight(summary, uiTextSize.resultTitle, "900", panelWidth - 120);
   const bodyHeight = host.measureWrappedTextHeight(body, uiTextSize.body, "800", panelWidth - 56);

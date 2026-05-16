@@ -254,7 +254,6 @@ export type BuildingEffectsContext = {
     populationLabel: string;
     treatmentLabel: string;
     housingCapacityLabel: string;
-    defenseLabel: string;
     productionLabel: string;
     unlocksTroopTrainingLabel: string;
     marketTradeLimitLabel: string;

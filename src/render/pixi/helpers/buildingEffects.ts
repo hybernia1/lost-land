@@ -230,14 +230,6 @@ export function getNextLevelEffects(
     }
   }
 
-  if (definition.defense) {
-    effects.push({
-      iconId: "shield",
-      value: `+${definition.defense}`,
-      tooltip: `${translations.ui.defense} +${definition.defense}`,
-    });
-  }
-
   for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
     const typedResourceId = resourceId as ResourceId;
     effects.push({
@@ -389,14 +381,6 @@ export function getCurrentBuildingEffects(
         tooltip: `${translations.ui.marketTrades ?? "Trades"} ${getMarketTradeSlots(level)}`,
       });
     }
-  }
-
-  if (definition.defense) {
-    effects.push({
-      iconId: "shield",
-      value: `+${definition.defense * level}`,
-      tooltip: `${translations.ui.defense} +${definition.defense * level}`,
-    });
   }
 
   for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {

@@ -834,13 +834,6 @@ export function recalculateCapacities(state: GameState): void {
   }
 }
 
-export function getDefenseScore(state: GameState): number {
-  return buildingDefinitions.reduce((score, definition) => {
-    const building = state.buildings[definition.id];
-    return score + (definition.defense ?? 0) * building.level;
-  }, state.survivors.troops * 6);
-}
-
 function applyRate(
   delta: ResourceBag,
   bag: ResourceBag | undefined,
