@@ -1,4 +1,4 @@
-﻿# Tile Atlases
+# Tile Atlases
 
 Map tiles are grouped by Tiled layer purpose. Older top-down atlases use a
 128x128 grid. Isometric tiles can use their own map grid sizes.
@@ -40,7 +40,7 @@ without baking in a background.
 - no spacing between frames (`spacing=0`)
 - atlas size `1024x512`
 - source image copied from `C:\Users\nikol\Desktop\path water.png`
-- restyled from the matching `roads.png` shape/lighting reference into a no-outline water palette while preserving the atlas grid and tile positions
+- restyled from the former matching dirt-road shape/lighting reference into a no-outline water palette while preserving the atlas grid and tile positions
 - 2026-05-14 palette pass shifted the water from bright cyan to a quieter blue-green while preserving the exact alpha mask, frame grid, and atlas size
 
 `nature-blocks.png` is an isometric block-style terrain atlas:
@@ -51,49 +51,12 @@ without baking in a background.
 - atlas size `640x512`
 - source images copied from `C:\Users\nikol\Desktop\iso grass\*.png`, then normalized into fixed `128x128` cells while preserving proportions
 
-`roads.png` is a freeform isometric dirt-road atlas:
-- 16 frames (`4x4` grid)
-- frame size `256x128`
-- atlas layout `4 columns x 4 rows`
-- no spacing between frames (`spacing=0`)
-- atlas size `1024x512`
-- source image copied from `C:\Users\nikol\Desktop\path dirt2.png`
-- restyled to a warmer no-outline dirt palette while preserving the atlas grid and tile positions
-- 2026-05-14 palette pass warmed the road pixels from cold stone gray to muted dirt brown while preserving the exact alpha mask, frame grid, and atlas size
-
-`fence.png` is a freeform isometric fence/wall atlas:
-- 9 frames (`3x3` grid)
+`dungeon.png` is a canonical isometric dungeon decor atlas from Kenney's Isometric Miniature Dungeon pack:
+- 288 half-size frames from the `Isometric/*.png` source set
 - frame size `128x256`
-- atlas layout `3 columns x 3 rows`
+- atlas layout `16 columns x 18 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `384x768`
-- source images copied from `C:\Users\nikol\Desktop\fence\*.png`
-- source frames were normalized from `256x512` to half-size `128x256` while preserving tile proportions
-- 2026-05-14 palette pass darkened the atlas from bright beige masonry toward muted timber/earth tones so the palisade reads as fortified perimeter while preserving the exact alpha mask, frame grid, and atlas size
-- 2026-05-16 cleanup compacted the atlas to the nine tiles currently used by the home palisade (`doorClosed_N`, straight walls, and wall corners)
-
-`floor.png` is an isometric terrain floor atlas:
-- 20 frames (`5x4` grid)
-- frame size `128x128`
-- atlas layout `5 columns x 4 rows`
-- no spacing between frames (`spacing=0`)
-- atlas size `640x512`
-- source image calibrated from `C:\Users\nikol\Desktop\bulindgs\floor.png`
-- source frames were detected from the irregular magenta-background sheet, cleaned to alpha, and normalized into terrain-sized cells
-
-`ground-decor.png` is a subtle isometric floor overlay atlas:
-- 12 frames (`4x3` grid)
-- frame size `128x128`
-- atlas layout `4 columns x 3 rows`
-- no spacing between frames (`spacing=0`)
-- atlas size `512x384`
-- locally generated with Pillow for village floor wear: stains, dirt, cracks, wet marks, and small debris overlays
-
-`items.png` is a small village item/decor atlas:
-- 8 frames (`4x2` grid)
-- frame size `64x96`
-- atlas layout `4 columns x 2 rows`
-- no spacing between frames (`spacing=0`)
-- atlas size `256x192`
-- locally generated with Pillow for scale/detail props: barrels, crates, sacks, well/pump, scrap pile, workbench, lamp post, and wood pile
-
+- atlas size `2048x4608`
+- source: https://kenney.nl/assets/isometric-miniature-dungeon
+- license: Creative Commons CC0; see `LICENSE-kenney-isometric-miniature-dungeon-cc0.txt`
+- tile order is grouped by asset, then direction: `asset_N`, `asset_E`, `asset_S`, `asset_W`; this keeps all angle variants adjacent in Tiled
