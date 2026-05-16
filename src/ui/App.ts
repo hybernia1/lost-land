@@ -14,7 +14,7 @@ import type {
   PixiActionDetail,
   VillageInfoPanel,
 } from "../render/PixiVillageRenderer";
-import { deleteSavedGame, listSavedGames } from "../systems/save";
+import { deleteSavedGame, listSavedGames, type SaveSummary } from "../systems/save";
 import { getPopulation } from "../systems/population";
 import type { GodModeController } from "../dev/godMode";
 import modalOpenSoundUrl from "../assets/audio/modal-open.ogg";
@@ -72,6 +72,8 @@ export class App {
   private godMode: GodModeController | null = null;
   private communityNameDraft = "";
   private pendingDeleteSaveId: string | null = null;
+  private frontKeyboardIndex = 0;
+  private gameMenuKeyboardIndex = 0;
 
   constructor(
     private readonly root: HTMLDivElement,
@@ -153,11 +155,8 @@ export class App {
       return;
     }
 
-    if (!this.communityNameDraft.trim()) {
-      this.communityNameDraft = this.t().ui.defaultCommunityName;
-    }
-
     const saves = listSavedGames();
+    const keyboardActions = this.getFrontKeyboardActions(saves);
     const frontMode = this.mode === "game" ? "menu" : this.mode;
     const model: FrontScreenModel = {
       mode: frontMode,
@@ -174,6 +173,7 @@ export class App {
         version: save.version,
       })),
       pendingDeleteSaveId: this.pendingDeleteSaveId,
+      keyboardSelectedAction: this.getSelectedKeyboardAction(keyboardActions, this.frontKeyboardIndex),
     };
 
     this.villageRenderer.renderFrontScreen(model);
@@ -206,6 +206,10 @@ export class App {
           view: this.gameMenuView,
           locales: this.getLocaleOptions(),
           activeLocale: this.locale,
+          keyboardSelectedAction: this.getSelectedKeyboardAction(
+            this.getGameMenuKeyboardActions(),
+            this.gameMenuKeyboardIndex,
+          ),
         }
         : null,
     );
@@ -616,27 +620,58 @@ export class App {
       return;
     }
 
+    this.handleFrontKeyDown(event);
+  }
+
+  private handleFrontKeyDown(event: KeyboardEvent): void {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    const direction = this.getArrowKeyDirection(event.key);
+    if (direction) {
+      event.preventDefault();
+      this.moveFrontKeyboardSelection(direction.x + direction.y);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const selectedAction = this.getSelectedKeyboardAction(
+        this.getFrontKeyboardActions(listSavedGames()),
+        this.frontKeyboardIndex,
+      );
+      if (selectedAction?.action) {
+        this.handleAppModeAction(selectedAction.action, selectedAction.value);
+      } else if (this.mode === "new-game") {
+        this.startNewCommunity();
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (this.pendingDeleteSaveId) {
+        this.pendingDeleteSaveId = null;
+      } else if (this.mode !== "menu") {
+        this.mode = "menu";
+        this.frontKeyboardIndex = 0;
+      }
+      this.requestRender();
+      return;
+    }
+
     if (this.mode !== "new-game") {
       return;
     }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      this.startNewCommunity();
-      return;
-    }
+
     if (event.key === "Backspace") {
       event.preventDefault();
       this.communityNameDraft = this.communityNameDraft.slice(0, -1);
       this.requestRender();
       return;
     }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      this.mode = "menu";
-      this.requestRender();
-      return;
-    }
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+    if (event.key.length !== 1) {
       return;
     }
     if (this.communityNameDraft.length >= 32) {
@@ -644,6 +679,18 @@ export class App {
     }
     this.communityNameDraft += event.key;
     this.requestRender();
+  }
+
+  private moveFrontKeyboardSelection(delta: number): void {
+    const actions = this.getFrontKeyboardActions(listSavedGames());
+    if (actions.length === 0) {
+      this.frontKeyboardIndex = 0;
+      return;
+    }
+
+    this.frontKeyboardIndex = this.wrapKeyboardIndex(this.frontKeyboardIndex + delta, actions.length);
+    this.requestRender();
+    this.playUiSound(this.tabSwitchAudio);
   }
 
   private handleGameKeyDown(event: KeyboardEvent): void {
@@ -654,6 +701,10 @@ export class App {
     if (event.key === "Escape") {
       event.preventDefault();
       this.handleGameEscape();
+      return;
+    }
+
+    if (this.gameMenuView && this.handleGameMenuKeyDown(event)) {
       return;
     }
 
@@ -680,6 +731,44 @@ export class App {
     event.preventDefault();
     const step = event.shiftKey ? KEYBOARD_CAMERA_FAST_STEP : KEYBOARD_CAMERA_STEP;
     this.villageRenderer?.panCameraByViewportDelta(direction.x * step, direction.y * step);
+  }
+
+  private handleGameMenuKeyDown(event: KeyboardEvent): boolean {
+    const direction = this.getArrowKeyDirection(event.key);
+    if (direction) {
+      event.preventDefault();
+      const actions = this.getGameMenuKeyboardActions();
+      if (actions.length > 0) {
+        this.gameMenuKeyboardIndex = this.wrapKeyboardIndex(
+          this.gameMenuKeyboardIndex + direction.x + direction.y,
+          actions.length,
+        );
+        this.requestRender();
+        this.playUiSound(this.tabSwitchAudio);
+      }
+      return true;
+    }
+
+    if (event.key !== "Enter") {
+      return false;
+    }
+
+    event.preventDefault();
+    const selectedAction = this.getSelectedKeyboardAction(
+      this.getGameMenuKeyboardActions(),
+      this.gameMenuKeyboardIndex,
+    );
+    if (!selectedAction?.action) {
+      return true;
+    }
+
+    if (selectedAction.action.startsWith("game-menu-")) {
+      this.handleGameMenuAction(selectedAction.action);
+      return true;
+    }
+
+    this.handleAppModeAction(selectedAction.action, selectedAction.value);
+    return true;
   }
 
   private getArrowKeyDirection(key: string): { x: number; y: number } | null {
@@ -787,6 +876,7 @@ export class App {
 
     const wasModalOpen = this.isAnyModalOpen();
     this.gameMenuView = "main";
+    this.gameMenuKeyboardIndex = 0;
     this.requestRender();
     this.playModalTransitionSound(wasModalOpen);
   }
@@ -810,6 +900,7 @@ export class App {
 
     if (action === "game-menu-settings") {
       this.gameMenuView = "settings";
+      this.gameMenuKeyboardIndex = 0;
       this.requestRender();
       this.playUiSound(this.tabSwitchAudio);
       return;
@@ -817,6 +908,7 @@ export class App {
 
     if (action === "game-menu-back") {
       this.gameMenuView = "main";
+      this.gameMenuKeyboardIndex = 0;
       this.requestRender();
       this.playUiSound(this.tabSwitchAudio);
       return;
@@ -843,6 +935,7 @@ export class App {
     this.conquestResultPreview = null;
     this.gameOverPreview = null;
     this.gameMenuView = null;
+    this.gameMenuKeyboardIndex = 0;
     this.lastActiveDecisionId = this.state?.quests.activeDecision?.id ?? null;
     this.game.start();
     this.updateAmbientLoop();
@@ -861,6 +954,8 @@ export class App {
     const wasModalOpen = this.isAnyModalOpen();
     this.mode = "menu";
     this.pendingDeleteSaveId = null;
+    this.frontKeyboardIndex = 0;
+    this.gameMenuKeyboardIndex = 0;
     this.villageModalPlotId = null;
     this.villageInfoPanel = null;
     this.resolvedDecisionPreview = null;
@@ -895,6 +990,92 @@ export class App {
 
   private getLocaleOptions(): Array<{ id: string; label: string }> {
     return Object.values(packs).map((pack) => ({ id: pack.locale, label: pack.label }));
+  }
+
+  private getFrontKeyboardActions(saves: SaveSummary[]): PixiActionDetail[] {
+    if (this.pendingDeleteSaveId) {
+      return [
+        { action: "cancel-delete-save", value: this.pendingDeleteSaveId },
+        { action: "confirm-delete-save", value: this.pendingDeleteSaveId },
+      ];
+    }
+
+    if (this.mode === "menu") {
+      return [
+        { action: "new-game" },
+        ...(saves.some((save) => save.loadable) ? [{ action: "continue" }] : []),
+        { action: "settings" },
+      ];
+    }
+
+    if (this.mode === "new-game") {
+      return [
+        { action: "start-new-community" },
+        { action: "community-name-backspace" },
+        { action: "community-name-clear" },
+        { action: "back-menu" },
+      ];
+    }
+
+    if (this.mode === "settings") {
+      return [
+        ...this.getLocaleOptions().map((locale): PixiActionDetail => ({
+          action: "select-locale",
+          value: locale.id,
+        })),
+        { action: "back-menu" },
+      ];
+    }
+
+    if (this.mode === "load-game") {
+      return [
+        { action: "back-menu" },
+        ...saves.flatMap((save): PixiActionDetail[] => [
+          ...(save.loadable ? [{ action: "load-save", value: save.id }] : []),
+          { action: "delete-save", value: save.id },
+        ]),
+      ];
+    }
+
+    return [];
+  }
+
+  private getGameMenuKeyboardActions(): PixiActionDetail[] {
+    if (this.gameMenuView === "settings") {
+      return [
+        ...this.getLocaleOptions().map((locale): PixiActionDetail => ({
+          action: "select-locale",
+          value: locale.id,
+        })),
+        { action: "game-menu-back" },
+      ];
+    }
+
+    if (this.gameMenuView === "main") {
+      return [
+        { action: "game-menu-continue" },
+        { action: "game-menu-settings" },
+        { action: "game-menu-quit" },
+      ];
+    }
+
+    return [];
+  }
+
+  private getSelectedKeyboardAction(actions: PixiActionDetail[], index: number): PixiActionDetail | null {
+    if (actions.length === 0) {
+      return null;
+    }
+
+    return actions[this.wrapKeyboardIndex(index, actions.length)] ?? null;
+  }
+
+  private wrapKeyboardIndex(index: number, length: number): number {
+    if (length <= 0) {
+      return 0;
+    }
+
+    return ((index % length) + length) % length;
   }
 
   private playModalTransitionSound(previousOpen: boolean): void {
@@ -1314,6 +1495,7 @@ export class App {
 
     if (action === "new-game") {
       this.mode = "new-game";
+      this.frontKeyboardIndex = 0;
       if (!this.communityNameDraft.trim()) {
         this.communityNameDraft = this.t().ui.defaultCommunityName;
       }
@@ -1323,18 +1505,21 @@ export class App {
 
     if (action === "continue") {
       this.mode = "load-game";
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
 
     if (action === "settings") {
       this.mode = "settings";
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
 
     if (action === "back-menu") {
       this.mode = "menu";
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
@@ -1376,12 +1561,14 @@ export class App {
 
     if (action === "delete-save" && value) {
       this.pendingDeleteSaveId = value;
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
 
     if (action === "cancel-delete-save") {
       this.pendingDeleteSaveId = null;
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
@@ -1389,6 +1576,7 @@ export class App {
     if (action === "confirm-delete-save" && value) {
       deleteSavedGame(value);
       this.pendingDeleteSaveId = null;
+      this.frontKeyboardIndex = 0;
       this.requestRender();
       return true;
     }
