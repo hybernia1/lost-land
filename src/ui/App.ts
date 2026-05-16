@@ -747,7 +747,7 @@ export class App {
     const wasModalOpen = this.isAnyModalOpen();
 
     if (this.gameMenuView) {
-      this.closeGameMenu(true);
+      this.closeGameMenu();
       return true;
     }
 
@@ -787,30 +787,24 @@ export class App {
 
     const wasModalOpen = this.isAnyModalOpen();
     this.gameMenuView = "main";
-    if (!this.state.paused) {
-      this.game.setPaused(true);
-    }
     this.requestRender();
     this.playModalTransitionSound(wasModalOpen);
   }
 
-  private closeGameMenu(resumeGame: boolean): void {
+  private closeGameMenu(): void {
     if (!this.gameMenuView) {
       return;
     }
 
     const wasModalOpen = this.isAnyModalOpen();
     this.gameMenuView = null;
-    if (resumeGame && this.state?.paused) {
-      this.game.setPaused(false);
-    }
     this.requestRender();
     this.playModalTransitionSound(wasModalOpen);
   }
 
   private handleGameMenuAction(action: string): void {
     if (action === "game-menu-continue") {
-      this.closeGameMenu(true);
+      this.closeGameMenu();
       return;
     }
 

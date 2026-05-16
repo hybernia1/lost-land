@@ -31,7 +31,6 @@ export const en: EnTranslationPack = {
     pause: "Pause",
     resume: "Resume",
     gameMenu: "Game menu",
-    gamePaused: "Game paused",
     quit: "Quit",
     speedNormal: "1x",
     speedFast: "24x",

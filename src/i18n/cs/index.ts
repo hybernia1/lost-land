@@ -31,7 +31,6 @@ export const cs: CsTranslationPack = {
     pause: "Pauza",
     resume: "Pokračovat",
     gameMenu: "Herní menu",
-    gamePaused: "Hra pozastavena",
     quit: "Odejít",
     speedNormal: "1x",
     speedFast: "24x",

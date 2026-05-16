@@ -103,15 +103,9 @@ export function drawQuestDecisionModal(
     const definition = decisionQuestById[activeDecision.definitionId];
     const copy = translations.quests.decisions[definition.id];
     const bodyHeight = host.measureWrappedTextHeight(copy?.body ?? "", uiTextSize.bodyLarge, "700", panelInnerWidth);
-    const consequencesHeight = host.measureWrappedTextHeight(
-      translations.quests.ui.hiddenConsequences,
-      12,
-      "900",
-      panelInnerWidth,
-    );
     const optionCount = definition.options.length;
     const buttonsHeight = optionCount * 34 + Math.max(0, optionCount - 1) * 8;
-    const firstButtonY = 86 + bodyHeight + 12 + consequencesHeight + 16;
+    const firstButtonY = 86 + bodyHeight + 16;
     panelHeight = Math.ceil(firstButtonY + buttonsHeight + 24);
   } else if (resolvedDecisionPreview) {
     const resultDefinition = decisionQuestById[resolvedDecisionPreview.definitionId];
@@ -149,7 +143,6 @@ export function drawQuestDecisionModal(
     const copy = translations.quests.decisions[definition.id];
     const headerBottom = host.drawOverlayHeader(panel, resolvedPanelWidth, translations, {
       iconId: "people",
-      kicker: translations.quests.ui.decisionRequired,
       title: copy?.title ?? definition.id,
     });
     const bodyLabel = host.drawText(panel, copy?.body ?? "", 28, headerBottom + 2, {
@@ -159,19 +152,11 @@ export function drawQuestDecisionModal(
       wordWrap: true,
       wordWrapWidth: resolvedPanelWidth - 56,
     });
-    const consequencesY = bodyLabel.y + bodyLabel.height + 12;
-    const consequencesLabel = host.drawText(panel, translations.quests.ui.hiddenConsequences, 28, consequencesY, {
-      fill: uiTheme.warning,
-      fontSize: uiTextSize.small,
-      fontWeight: "900",
-      wordWrap: true,
-      wordWrapWidth: resolvedPanelWidth - 56,
-    });
 
     const buttonWidth = resolvedPanelWidth - 56;
     const buttonBlockHeight = definition.options.length * 34 + Math.max(0, definition.options.length - 1) * 8;
     const buttonStartY = Math.min(
-      consequencesLabel.y + consequencesLabel.height + 16,
+      bodyLabel.y + bodyLabel.height + 16,
       resolvedPanelHeight - buttonBlockHeight - 24,
     );
     definition.options.forEach((option, index) => {

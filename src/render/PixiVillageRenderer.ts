@@ -609,7 +609,6 @@ export class PixiVillageRenderer {
     const headerBottom = this.drawOverlayHeader(panel, frame.width, translations, {
       iconId: "pause",
       title: translations.ui.gameMenu ?? "Game menu",
-      subtitle: translations.ui.gamePaused ?? "Game paused",
       closeAction: { action: "game-menu-continue" },
     });
 
