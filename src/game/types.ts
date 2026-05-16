@@ -200,6 +200,7 @@ export type ObjectiveQuestId =
   | "buildHydroponics";
 
 export type DecisionQuestId =
+  | "foundingBriefing"
   | "survivorsAtGate"
   | "rationDispute"
   | "radioCall"

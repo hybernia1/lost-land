@@ -36,6 +36,7 @@ export function createInitialState(
       },
     ]),
   ) as Record<BuildingId, BuildingState>;
+  const initialQuestState = createInitialQuestState();
 
   const state: GameState = {
     saveVersion: SAVE_VERSION,
@@ -43,7 +44,7 @@ export function createInitialState(
     communityName,
     startedAt: new Date().toISOString(),
     elapsedSeconds: 0,
-    paused: false,
+    paused: initialQuestState.activeDecision !== null,
     speed: 1,
     workMode: "day",
     resources: {
@@ -61,7 +62,7 @@ export function createInitialState(
       },
       barracksTrainingQueue: [],
     },
-    quests: createInitialQuestState(),
+    quests: initialQuestState,
     resourceSites: createInitialResourceSites(),
     activeBattle: null,
     market: {

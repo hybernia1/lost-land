@@ -92,7 +92,7 @@ const buildingDefinitionInputs: BuildingDefinitionInput[] = [
     id: "market",
     category: "support",
     name: "Marketplace",
-    description: "Trades stored supplies with distant communities over radio deals.",
+    description: "Trades stored supplies with distant communities through messenger routes.",
     maxLevel: 5,
     buildSeconds: 42,
     baseConstructionWorkers: 3,

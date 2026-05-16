@@ -39,6 +39,7 @@ const SCARCITY_THEFT_RESOURCE_IDS: ResourceId[] = ["food", "water", "material"];
 const SCARCITY_THEFT_THRESHOLD = 0.22;
 const SCARCITY_THEFT_BASE_CHANCE = 0.18;
 const SCARCITY_THEFT_PRESSURE_CHANCE = 0.42;
+const OPENING_DECISION_ID: DecisionQuestId = "foundingBriefing";
 
 export type DecisionProfileKind =
   | "noData"
@@ -78,7 +79,12 @@ export function createInitialQuestState(): QuestState {
       completedAt: null,
       rewardClaimedAt: null,
     })),
-    activeDecision: null,
+    activeDecision: {
+      id: "decision-opening-briefing",
+      definitionId: OPENING_DECISION_ID,
+      startedAt: 0,
+      wasPaused: false,
+    },
     resolvedDecisionCount: 0,
     resolvedSuddenCount: 0,
     nextDecisionAt: FIRST_DECISION_DELAY_SECONDS,

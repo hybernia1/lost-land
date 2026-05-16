@@ -66,8 +66,9 @@ export const en: EnTranslationPack = {
     upgrade: "Upgrade",
     survivors: "Survivors",
     log: "Log",
-    logDayOne: "Day 1: the camp radio catches only static.",
-    logPerimeter: "A safe perimeter is marked around the old transit depot.",
+    logDayOne: "Day 1, year 2143: no living witness remembers the old world.",
+    logAgeOfCollapse: "A century after the collapse, history survives mostly as rumor and myth.",
+    logPerimeter: "A palisade perimeter is marked around moss-covered relic structures.",
     logConstructionStarted: "{building} construction started.",
     logUpgradeStarted: "{building} upgrade started.",
     logReachedLevel: "{building} reached level {level}.",
@@ -299,7 +300,7 @@ export const en: EnTranslationPack = {
     food: "Consumed every tick by survivors. Produced by hydroponics and later outside missions.",
     water: "Consumed every tick by survivors. Produced by water systems and found in safe locations.",
     material: "Main construction resource for buildings, upgrades and perimeter work.",
-    coal: "Burnable fuel stock. Coal is mined by staffed coal mines and consumed by heated or powered buildings.",
+    coal: "Burnable fuel stock. Coal is mined by staffed coal mines and consumed by heated or technical buildings.",
     morale: "Overall community stability. Low morale makes survival events harsher and lowers production.",
   },
   buildings: {
@@ -333,7 +334,7 @@ export const en: EnTranslationPack = {
     },
     market: {
       name: "Marketplace",
-      description: "Trades stored supplies with other communities through radio deals.",
+      description: "Trades stored supplies with other communities through scouts and relay contacts.",
     },
     watchtower: {
       name: "Watchtower",
