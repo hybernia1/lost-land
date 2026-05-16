@@ -726,7 +726,7 @@ function drawBuildingBonusRow(
   const fill = current ? uiTheme.rowActive : uiTheme.row;
   const borderColor = current ? uiTheme.borderStrong : uiTheme.border;
   const effects = getCurrentBuildingEffects(buildingId, rowLevel, translations);
-  const status = current ? copy.current : unlocked ? copy.unlocked : copy.locked;
+  const status = current ? copy.current : copy.locked;
   const statusFill = current ? uiTheme.accentStrong : unlocked ? uiTheme.positive : uiTheme.textSoft;
 
   const rowLayer = new Container();
@@ -758,12 +758,17 @@ function drawBuildingBonusRow(
     });
   }
 
-  host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
-    fill: statusFill,
-    fontSize: uiTextSize.caption,
-    fontWeight: "900",
-    align: "right",
-  });
+  if (unlocked && !current) {
+    const doneIcon = host.drawIcon(rowLayer, "done", width - 42, height / 2, 18);
+    host.bindTooltip(doneIcon, copy.unlocked);
+  } else {
+    host.drawText(rowLayer, status, width - 92, height / 2 - 7, {
+      fill: statusFill,
+      fontSize: uiTextSize.caption,
+      fontWeight: "900",
+      align: "right",
+    });
+  }
   if (effects.length > 0) {
     host.bindTooltip(rowLayer, effects.map((effect) => effect.tooltip).join("\n"));
   } else {
