@@ -92,6 +92,12 @@ type BuildingModalsHost = {
   setActiveBuildCategory: (value: BuildingCategory) => void;
   getActiveBuildingDetailTab: () => BuildingDetailTab;
   setActiveBuildingDetailTab: (value: BuildingDetailTab) => void;
+  getBuildingBonusScrollBuildingId: () => BuildingId | null;
+  setBuildingBonusScrollBuildingId: (value: BuildingId | null) => void;
+  getBuildingBonusScrollY: () => number;
+  setBuildingBonusScrollY: (value: number) => void;
+  setBuildingBonusScrollMax: (value: number) => void;
+  setBuildingBonusScrollArea: (value: Bounds | null) => void;
 
   getMarketFromResource: () => MarketResourceId;
   setMarketFromResource: (value: MarketResourceId) => void;
@@ -495,6 +501,8 @@ export function drawBuildingDetail(
         sectionY + 52,
         bodyWidth,
         Math.max(120, sectionHeight - 52),
+        parent.x + sideMargin,
+        parent.y + sectionY + 52,
       );
     } else {
       drawNextLevelSection(
@@ -622,21 +630,67 @@ function drawBuildingBonusOverviewSection(
   y: number,
   width: number,
   height: number,
+  absoluteX: number,
+  absoluteY: number,
 ): void {
   drawDetailPanel(parent, x, y, width, height);
   const copy = getBuildingBonusCopy(translations);
   drawSectionTitle(host, parent, copy.title, x + 22, y + 24);
 
+  if (host.getBuildingBonusScrollBuildingId() !== buildingId) {
+    host.setBuildingBonusScrollBuildingId(buildingId);
+    host.setBuildingBonusScrollY(0);
+  }
+
   const rows = Array.from({ length: maxLevel }, (_, index) => index + 1);
   const rowGap = 8;
-  const rowHeight = Math.max(34, Math.min(46, (height - 72 - rowGap * Math.max(0, rows.length - 1)) / rows.length));
-  const rowWidth = width - 44;
-  let rowY = y + 64;
+  const rowHeight = 42;
+  const listX = x + 22;
+  const listY = y + 64;
+  const viewportHeight = Math.max(48, height - 82);
+  const contentHeight = rows.length * rowHeight + rowGap * Math.max(0, rows.length - 1);
+  const maxScroll = Math.max(0, contentHeight - viewportHeight);
+  const needsScroll = maxScroll > 1;
+  const scrollbarGutter = needsScroll ? 18 : 0;
+  const rowWidth = width - 44 - scrollbarGutter;
+  const scrollY = Math.max(0, Math.min(maxScroll, host.getBuildingBonusScrollY()));
+  host.setBuildingBonusScrollY(scrollY);
+  host.setBuildingBonusScrollMax(maxScroll);
+  host.setBuildingBonusScrollArea({
+    x: absoluteX + 22,
+    y: absoluteY + 60,
+    width: width - 44,
+    height: viewportHeight + 8,
+  });
+
+  const listContent = new Container();
+  listContent.x = listX;
+  listContent.y = listY - scrollY;
+  parent.addChild(listContent);
+
+  const listMask = new Graphics();
+  listMask.eventMode = "none";
+  listMask.rect(listX - 4, listY - 4, width - 36, viewportHeight + 8).fill({ color: 0xffffff, alpha: 1 });
+  parent.addChild(listMask);
+  listContent.mask = listMask;
 
   rows.forEach((rowLevel) => {
-    drawBuildingBonusRow(host, parent, buildingId, rowLevel, level, translations, x + 22, rowY, rowWidth, rowHeight, copy);
-    rowY += rowHeight + rowGap;
+    const rowY = (rowLevel - 1) * (rowHeight + rowGap);
+    drawBuildingBonusRow(host, listContent, buildingId, rowLevel, level, translations, 0, rowY, rowWidth, rowHeight, copy);
   });
+
+  if (needsScroll) {
+    drawBuildChoicesScrollbar(
+      parent,
+      x + width - 34,
+      listY,
+      8,
+      viewportHeight,
+      scrollY,
+      maxScroll,
+      contentHeight,
+    );
+  }
 }
 
 function drawBuildingBonusRow(

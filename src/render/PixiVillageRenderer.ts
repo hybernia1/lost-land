@@ -276,6 +276,10 @@ export class PixiVillageRenderer {
   private buildChoicesScrollMax = 0;
   private buildChoicesScrollY = 0;
   private buildChoicesScrollPlotId: string | null = null;
+  private buildingBonusScrollArea: Bounds | null = null;
+  private buildingBonusScrollMax = 0;
+  private buildingBonusScrollY = 0;
+  private buildingBonusScrollBuildingId: BuildingId | null = null;
   private logScrollArea: Bounds | null = null;
   private logScrollMax = 0;
   private logScrollY = 0;
@@ -458,6 +462,8 @@ export class PixiVillageRenderer {
     this.clearContainerChildren(this.hudLayer);
     this.buildChoicesScrollArea = null;
     this.buildChoicesScrollMax = 0;
+    this.buildingBonusScrollArea = null;
+    this.buildingBonusScrollMax = 0;
     this.logScrollArea = null;
     this.logScrollMax = 0;
     this.resourceBreakdownScrollArea = null;
@@ -662,6 +668,12 @@ export class PixiVillageRenderer {
         buildChoicesScrollY: this.buildChoicesScrollY,
         setBuildChoicesScrollY: (value: number) => {
           this.buildChoicesScrollY = value;
+        },
+        buildingBonusScrollArea: this.buildingBonusScrollArea,
+        buildingBonusScrollMax: this.buildingBonusScrollMax,
+        buildingBonusScrollY: this.buildingBonusScrollY,
+        setBuildingBonusScrollY: (value: number) => {
+          this.buildingBonusScrollY = value;
         },
         resourceBreakdownScrollArea: this.resourceBreakdownScrollArea,
         resourceBreakdownScrollMax: this.resourceBreakdownScrollMax,
@@ -1832,6 +1844,20 @@ export class PixiVillageRenderer {
       getActiveBuildingDetailTab: () => this.activeBuildingDetailTab,
       setActiveBuildingDetailTab: (value: "overview" | "bonuses") => {
         this.activeBuildingDetailTab = value;
+      },
+      getBuildingBonusScrollBuildingId: () => this.buildingBonusScrollBuildingId,
+      setBuildingBonusScrollBuildingId: (value: BuildingId | null) => {
+        this.buildingBonusScrollBuildingId = value;
+      },
+      getBuildingBonusScrollY: () => this.buildingBonusScrollY,
+      setBuildingBonusScrollY: (value: number) => {
+        this.buildingBonusScrollY = value;
+      },
+      setBuildingBonusScrollMax: (value: number) => {
+        this.buildingBonusScrollMax = value;
+      },
+      setBuildingBonusScrollArea: (value: Bounds | null) => {
+        this.buildingBonusScrollArea = value;
       },
 
       getMarketFromResource: () => this.marketFromResource,
@@ -3080,6 +3106,7 @@ export class PixiVillageRenderer {
     }
 
     this.scaleBounds(this.buildChoicesScrollArea, scale);
+    this.scaleBounds(this.buildingBonusScrollArea, scale);
     this.scaleBounds(this.logScrollArea, scale);
     this.scaleBounds(this.resourceBreakdownScrollArea, scale);
     this.scaleBounds(this.decisionHistoryScrollArea, scale);
