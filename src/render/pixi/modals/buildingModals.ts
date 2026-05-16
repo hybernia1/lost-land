@@ -4,7 +4,6 @@ import { buildingVisualDefinitions } from "../../../data/buildingVisuals";
 import { GAME_HOUR_REAL_SECONDS } from "../../../game/time";
 import type { BuildingCategory, BuildingId, GameState, MarketResourceId, ResourceBag, ResourceId } from "../../../game/types";
 import type { TranslationPack } from "../../../i18n/types";
-import { getAcademyProductionBonus } from "../../../systems/academy";
 import {
   getBuildingBuildSeconds,
   getBuildingWorkerLimit,
@@ -12,7 +11,6 @@ import {
   getConstructionWorkerRequirement,
   getGlobalProductionMultiplier,
   getMainBuildingLevelRequirement,
-  getMainBuildingProductionBonus,
   getUpgradeCost,
   getWorkshopCoalRate,
   getWorkshopMaterialRate,
@@ -29,7 +27,6 @@ import {
   marketResourceIds,
 } from "../../../systems/market";
 import { canAfford } from "../../../systems/resources";
-import { getBarracksTrainingRatePerGameHour } from "../../../systems/survivors";
 import { buildCategoryOrder, UI_PANEL_RADIUS, uiTextSize, uiTheme } from "../core/constants";
 import type {
   Bounds,
@@ -445,7 +442,7 @@ export function drawBuildingDetail(
   const bodyWidth = modalWidth - sideMargin * 2;
   const metricGap = 8;
   const metrics = getBuildingDetailMetrics(buildingId, building, level, maxLevel, state, translations);
-  const metricCount = Math.max(1, Math.min(4, metrics.length));
+  const metricCount = Math.max(1, Math.min(7, metrics.length));
   const metricWidth = (bodyWidth - metricGap * (metricCount - 1)) / metricCount;
   const metricY = contentTop + 120;
   const footerHeight = 54;
@@ -483,7 +480,7 @@ export function drawBuildingDetail(
     wordWrapWidth: titleWidth,
   });
 
-  metrics.slice(0, 4).forEach((metric, index) => {
+  metrics.slice(0, metricCount).forEach((metric, index) => {
     drawMetricCard(host, content, metric, sideMargin + index * (metricWidth + metricGap), metricY, metricWidth, 74);
   });
 
@@ -828,8 +825,6 @@ function getBuildingDetailMetrics(
   state: GameState,
   translations: TranslationPack,
 ): BuildingMetric[] {
-  const definition = buildingById[buildingId];
-  const defense = (definition.defense ?? 0) * level;
   const metrics: BuildingMetric[] = [
     {
       iconId: "build",
@@ -851,18 +846,8 @@ function getBuildingDetailMetrics(
     });
   }
 
-  if (defense > 0) {
-    metrics.push({
-      iconId: "shield",
-      label: translations.ui.defense,
-      value: `${Math.round(defense)}`,
-      fill: uiTheme.text,
-      tooltip: `${translations.ui.defense}: ${Math.round(defense)}`,
-    });
-  }
-
-  pushUniqueBuildingMetric(metrics, getBuildingProductionMetric(buildingId, building, level, state, translations));
-  pushUniqueBuildingMetric(metrics, getBuildingCoalMetric(buildingId, building, level, state, translations));
+  getBuildingCurrentEffectMetrics(buildingId, building, level, state, translations)
+    .forEach((metric) => pushUniqueBuildingMetric(metrics, metric));
 
   return metrics;
 }
@@ -879,144 +864,104 @@ function pushUniqueBuildingMetric(metrics: BuildingMetric[], metric: BuildingMet
   }
 }
 
-function getBuildingProductionMetric(
+function getBuildingCurrentEffectMetrics(
   buildingId: BuildingId,
   building: GameState["buildings"][BuildingId],
   level: number,
   state: GameState,
   translations: TranslationPack,
-): BuildingMetric | null {
+): BuildingMetric[] {
   const definition = buildingById[buildingId];
   const productionMultiplier = getGlobalProductionMultiplier(state);
 
-  if (buildingId === "mainBuilding") {
-    const bonus = getMainBuildingProductionBonus(level);
-    return bonus > 0 ? {
-      iconId: "build",
-      label: translations.ui.production,
-      value: formatPercentBonus(bonus),
-      fill: uiTheme.accentStrong,
-      tooltip: `${translations.ui.production}: ${formatPercentBonus(bonus)}`,
-    } : null;
-  }
   if (buildingId === "coalMine") {
     const rate = getCoalMineCoalRate(level, building.workers) * productionMultiplier;
-    return {
-      iconId: "coal",
-      label: translations.ui.production,
-      value: getHourlyRateLabel(rate),
-      fill: getRateColor(rate),
-      tooltip: `${translations.resources.coal}: ${getHourlyRateLabel(rate)}`,
-    };
+    return [getResourceRateMetric("coal", rate, translations)];
   }
+
   if (buildingId === "workshop") {
-    const rate = getWorkshopMaterialRate(level, building.workers) * productionMultiplier;
-    return {
-      iconId: "material",
-      label: translations.ui.production,
-      value: getHourlyRateLabel(rate),
-      fill: getRateColor(rate),
-      tooltip: `${translations.resources.material}: ${getHourlyRateLabel(rate)}`,
-    };
-  }
-  if (buildingId === "market") {
-    const tradeLimit = getMarketTradeLimit(level);
-    return {
-      iconId: "material",
-      label: translations.ui.marketTradeLimit ?? translations.ui.stock,
-      value: `${tradeLimit}`,
-      fill: tradeLimit > 0 ? uiTheme.accentStrong : uiTheme.textMuted,
-      tooltip: `${translations.ui.marketTradeLimit ?? "Trade limit"}: ${tradeLimit}`,
-    };
-  }
-  if (buildingId === "barracks") {
-    const trainingRate = getBarracksTrainingRatePerGameHour(level);
-    return {
-      iconId: "scout",
-      label: translations.ui.troopTraining ?? translations.roles.troops,
-      value: `+${formatRate(trainingRate)}/h`,
-      fill: getRateColor(trainingRate / GAME_HOUR_REAL_SECONDS),
-      tooltip: `${translations.ui.troopTraining ?? "Troop training"}: +${formatRate(trainingRate)}/h`,
-    };
-  }
-  if (buildingId === "academy") {
-    const productionBonus = getAcademyProductionBonus(level);
-    return productionBonus > 0 ? {
-      iconId: "build",
-      label: translations.ui.production,
-      value: formatPercentBonus(productionBonus),
-      fill: uiTheme.accentStrong,
-      tooltip: `${translations.ui.production}: ${formatPercentBonus(productionBonus)}`,
-    } : null;
+    const materialRate = getWorkshopMaterialRate(level, building.workers) * productionMultiplier;
+    const coalRate = -getWorkshopCoalRate(level, building.workers);
+    return [
+      getResourceRateMetric("material", materialRate, translations),
+      getResourceRateMetric("coal", coalRate, translations),
+    ];
   }
 
-  const produced = Object.entries(definition.produces ?? {}).find(([, amount]) => (amount ?? 0) > 0);
-  if (produced) {
-    const [resourceId, amount] = produced;
-    const typedResourceId = resourceId as ResourceId;
-    const rate = (amount ?? 0) * level * (typedResourceId === "morale" ? 1 : productionMultiplier);
-    return {
-      iconId: typedResourceId,
-      label: translations.ui.production,
-      value: getHourlyRateLabel(rate),
-      fill: getRateColor(rate),
-      tooltip: `${translations.resources[typedResourceId]}: ${getHourlyRateLabel(rate)}`,
-    };
-  }
+  const effectMetrics = getCurrentBuildingEffects(buildingId, level, translations)
+    .filter((effect) => !isDefinitionResourceRateEffect(effect, definition))
+    .map((effect) => ({
+      iconId: effect.iconId,
+      label: effect.tooltip,
+      value: effect.value,
+      fill: effect.negative ? uiTheme.negative : uiTheme.accentStrong,
+      tooltip: effect.tooltip,
+    }));
+  const resourceMetrics = getDefinitionResourceRateMetrics(definition, level, productionMultiplier, translations);
 
-  if (definition.housing) {
-    const capacity = definition.housing * level;
-    return {
-      iconId: "home",
-      label: translations.ui.housingCapacity,
-      value: `+${capacity}`,
-      fill: capacity > 0 ? uiTheme.accentStrong : uiTheme.textMuted,
-      tooltip: `${translations.ui.housingCapacity}: ${capacity}`,
-    };
-  }
-
-  const storage = Object.entries(definition.storageBonus ?? {}).find(([, amount]) => (amount ?? 0) > 0);
-  if (storage) {
-    const [resourceId, amount] = storage;
-    const typedResourceId = resourceId as ResourceId;
-    const capacity = Math.round((amount ?? 0) * level);
-    return {
-      iconId: typedResourceId,
-      label: translations.ui.stock,
-      value: `+${capacity}`,
-      fill: capacity > 0 ? uiTheme.accentStrong : uiTheme.textMuted,
-      tooltip: `${translations.resources[typedResourceId]} ${translations.ui.stock}: +${capacity}`,
-    };
-  }
-
-  return null;
+  return [...effectMetrics, ...resourceMetrics];
 }
 
-function getBuildingCoalMetric(
-  buildingId: BuildingId,
-  building: GameState["buildings"][BuildingId],
+function getDefinitionResourceRateMetrics(
+  definition: typeof buildingById[BuildingId],
   level: number,
-  state: GameState,
+  productionMultiplier: number,
   translations: TranslationPack,
-): BuildingMetric | null {
-  const definition = buildingById[buildingId];
-  const consumption = ((definition.consumes?.coal ?? 0) + (definition.alwaysConsumes?.coal ?? 0)) * level;
-  const production = buildingId === "coalMine"
-    ? getCoalMineCoalRate(level, building.workers) * getGlobalProductionMultiplier(state)
-    : 0;
-  const staffedConsumption = buildingId === "workshop" ? getWorkshopCoalRate(level, building.workers) : consumption;
-  const netRate = production - staffedConsumption;
+): BuildingMetric[] {
+  const metrics: BuildingMetric[] = [];
 
-  if (netRate === 0 && production === 0 && staffedConsumption === 0) {
-    return null;
+  for (const [resourceId, amount] of Object.entries(definition.produces ?? {})) {
+    if ((amount ?? 0) <= 0) {
+      continue;
+    }
+    const typedResourceId = resourceId as ResourceId;
+    const multiplier = typedResourceId === "morale" ? 1 : productionMultiplier;
+    metrics.push(getResourceRateMetric(typedResourceId, (amount ?? 0) * level * multiplier, translations));
   }
 
+  for (const [resourceId, amount] of Object.entries(definition.consumes ?? {})) {
+    if ((amount ?? 0) <= 0) {
+      continue;
+    }
+    metrics.push(getResourceRateMetric(resourceId as ResourceId, -(amount ?? 0) * level, translations));
+  }
+
+  for (const [resourceId, amount] of Object.entries(definition.alwaysConsumes ?? {})) {
+    if ((amount ?? 0) <= 0) {
+      continue;
+    }
+    metrics.push(getResourceRateMetric(resourceId as ResourceId, -(amount ?? 0) * level, translations));
+  }
+
+  return metrics;
+}
+
+function isDefinitionResourceRateEffect(
+  effect: EffectLine,
+  definition: typeof buildingById[BuildingId],
+): boolean {
+  if (!effect.value.includes("/h")) {
+    return false;
+  }
+
+  return Boolean(
+    definition.produces?.[effect.iconId as ResourceId] ||
+      definition.consumes?.[effect.iconId as ResourceId] ||
+      definition.alwaysConsumes?.[effect.iconId as ResourceId],
+  );
+}
+
+function getResourceRateMetric(
+  resourceId: ResourceId,
+  ratePerSecond: number,
+  translations: TranslationPack,
+): BuildingMetric {
   return {
-    iconId: "coal",
-    label: translations.resources.coal,
-    value: getHourlyRateLabel(netRate),
-    fill: getRateColor(netRate),
-    tooltip: `${translations.resources.coal}: ${getHourlyRateLabel(netRate)}`,
+    iconId: resourceId,
+    label: translations.resources[resourceId],
+    value: getHourlyRateLabel(ratePerSecond),
+    fill: getRateColor(ratePerSecond),
+    tooltip: `${translations.resources[resourceId]}: ${getHourlyRateLabel(ratePerSecond)}`,
   };
 }
 
