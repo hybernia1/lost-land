@@ -11,7 +11,7 @@
   "layers": [
     {
       "compression": "gzip",
-      "data": "H4sIACmqCGoC/+3UsQ0AIAhFQRawYWec2wlsMKHxilvgv0BGRAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHC1G+ymN3qjN3qjN/O9S+/v7rv09s/RG73RG73RG70BAAAAAAAAAAB4tmwAAAAAAAAAAAAAAAAAAAAAAAAADDuwYf7UQPAAAA==",
+      "data": "H4sIAIaxCGoC/+3UMQ0AMAhFQQx0QRz176QKutCEpTecgf8CGREJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADA1W6wm97ojd7ojd7M9y69v7vv0ts/R2/0Rm/0Rm/0BgAAAAAAAAAA4NmyAQAAAAAAAAAAAAAAAAAAAAAAADDsAEgP0dtA8AAA",
       "encoding": "base64",
       "height": 124,
       "id": 1,
@@ -25,7 +25,7 @@
     },
     {
       "compression": "gzip",
-      "data": "H4sIACmqCGoC/+3asQrCMBRA0fxKdXFQ0t3Fye/qp7elESUiaMEhL+csDwSX1Ns0akoAAAAAAADAHqcy84d5tEQQ1tL3pHfoq3edQ/zOx2rqHuIaLQHoG2jOUGb+cnqe79fh5Vw3lEnc/d7e73NAzP3+st3Pb1ZE34C+6eIMN6X0/jvdOp3p4vWdXVPsCc15/J/iXN2n6+9jneHQt2tGfL/+Vpef7/MMqG86vC/Ur6FvQN+gb0DfgL4BfQP6BvSN6w36BvQN6Btop++7ZYKw9A36BvQN6Bv4v6slAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIDdZuQ267FA8AAA",
+      "data": "H4sIAIaxCGoC/+3asQrCMBRA0fxKdXFQ0t3Fye/qp7elESUiaMEhL+csDwSX1Ns0akoAAAAAAADAHqcy84d5tEQQ1tL3pHfoq3edQ/zOx2rqHuIaLQHoG2jOUGb+cnqe79fh5Vw3lEnc/d7e73NAzP3+st3Pb1ZE34C+6eIMN6X0/jvdOp3p4vWdXVPsCc15/J/iXN2n6+9jneHQt2tGfL/+Vpef7/MMqG86vC/Ur6FvQN+gb0DfgL4BfQP6BvSN6w36BvQN6Btop++7ZYKw9A36BvQN6Bv4v6slAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIDdZuQ267FA8AAA",
       "encoding": "base64",
       "height": 124,
       "id": 12,
@@ -39,7 +39,7 @@
     },
     {
       "compression": "gzip",
-      "data": "H4sIACmqCGoC/+3WOQ6AMAwEwPy/hXCE461QuEIcvZmRrMhKt5GtlAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADcqZd+EElK48f9JKK05rP6s5ooUnt731U8afd6tcPTWx7+bS32O7lnvDPf6W1Re5zFbP9WL4JUOhEQdhEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDvHQVOrZdA8AAA",
+      "data": "H4sIAIaxCGoC/+3WOQ6AMAwEwDwWwhGO/3dQuEIcvZmRrMhKt5GtlAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADcqZd+EElK48f9JKK05rP6s5ooUnt731U8afd6tcPTWx7+bS32O7lnvDPf6W1Re5zFbP9WL4JUOhEQdhEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDvHYV7TDhA8AAA",
       "encoding": "base64",
       "height": 124,
       "id": 15,
@@ -53,7 +53,7 @@
     },
     {
       "compression": "gzip",
-      "data": "H4sIACmqCGoC/+3RsQ2AIBRFUQbUCVBXANy/kNIQGkwsIOckryGh+TcEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgxFlXBnc527TShz+3s+mN3uiN3uiN3uiN3uiN3nrrrbfeejOpWJebbZ239w5nW8ruBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDPHhaVVDtA8AAA",
+      "data": "H4sIAIaxCGoC/+3RMQ6AIBBFQW4nCMr9byMNDTEmW2Jmkt8Qqn0pAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEffYGVh3sq3l4P/qZHqjN3qjN3qjN3qjN3qjt9566633z7Sxsux4eZu7nAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+PAA1/F8SEDwAAA=",
       "encoding": "base64",
       "height": 124,
       "id": 14,
@@ -2606,7 +2606,7 @@
       "name": "villageDecor",
       "objects": [
         {
-          "gid": 160,
+          "gid": 113,
           "height": 96,
           "id": 1101,
           "name": "crates-main",
@@ -2619,7 +2619,7 @@
           "y": 3855.33333333333
         },
         {
-          "gid": 165,
+          "gid": 118,
           "height": 96,
           "id": 1103,
           "name": "lamp-main",
@@ -2632,7 +2632,7 @@
           "y": 3987.63636363636
         },
         {
-          "gid": 163,
+          "gid": 116,
           "height": 96,
           "id": 1107,
           "name": "scrap-southwest",
@@ -2645,7 +2645,7 @@
           "y": 3902
         },
         {
-          "gid": 160,
+          "gid": 113,
           "height": 96,
           "id": 1109,
           "name": "crates-east",
@@ -3743,15 +3743,15 @@
       "source": "tilesets/fence.tsj"
     },
     {
-      "firstgid": 127,
+      "firstgid": 80,
       "source": "tilesets/floor.tsj"
     },
     {
-      "firstgid": 147,
+      "firstgid": 100,
       "source": "tilesets/ground-decor.tsj"
     },
     {
-      "firstgid": 159,
+      "firstgid": 112,
       "source": "tilesets/items.tsj"
     }
   ],

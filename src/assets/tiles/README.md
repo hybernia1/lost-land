@@ -62,14 +62,15 @@ without baking in a background.
 - 2026-05-14 palette pass warmed the road pixels from cold stone gray to muted dirt brown while preserving the exact alpha mask, frame grid, and atlas size
 
 `fence.png` is a freeform isometric fence/wall atlas:
-- 56 frames (`8x7` grid)
+- 9 frames (`3x3` grid)
 - frame size `128x256`
-- atlas layout `8 columns x 7 rows`
+- atlas layout `3 columns x 3 rows`
 - no spacing between frames (`spacing=0`)
-- atlas size `1024x1792`
+- atlas size `384x768`
 - source images copied from `C:\Users\nikol\Desktop\fence\*.png`
 - source frames were normalized from `256x512` to half-size `128x256` while preserving tile proportions
 - 2026-05-14 palette pass darkened the atlas from bright beige masonry toward muted timber/earth tones so the palisade reads as fortified perimeter while preserving the exact alpha mask, frame grid, and atlas size
+- 2026-05-16 cleanup compacted the atlas to the nine tiles currently used by the home palisade (`doorClosed_N`, straight walls, and wall corners)
 
 `floor.png` is an isometric terrain floor atlas:
 - 20 frames (`5x4` grid)
