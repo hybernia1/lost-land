@@ -10,6 +10,7 @@ import type {
   FrontScreenModel,
   FrontScreenSaveEntry,
   GameOverPreview,
+  GameMenuView,
   PixiActionDetail,
   VillageInfoPanel,
 } from "../render/PixiVillageRenderer";
@@ -45,6 +46,7 @@ export class App {
   private resolvedDecisionPreview: DecisionHistoryEntry | null = null;
   private conquestResultPreview: ConquestResultPreview | null = null;
   private gameOverPreview: GameOverPreview | null = null;
+  private gameMenuView: GameMenuView | null = null;
   private topLogSignature = "";
   private lastActiveDecisionId: string | null = null;
   private hasReceivedInitialState = false;
@@ -162,7 +164,7 @@ export class App {
       translations: this.t(),
       canContinue: saves.some((save) => save.loadable),
       communityNameDraft: this.communityNameDraft,
-      locales: Object.values(packs).map((pack) => ({ id: pack.locale, label: pack.label })),
+      locales: this.getLocaleOptions(),
       activeLocale: this.locale,
       saves: saves.map((save): FrontScreenSaveEntry => ({
         id: save.id,
@@ -199,6 +201,13 @@ export class App {
       this.resolvedDecisionPreview,
       this.conquestResultPreview,
       this.gameOverPreview,
+      this.gameMenuView
+        ? {
+          view: this.gameMenuView,
+          locales: this.getLocaleOptions(),
+          activeLocale: this.locale,
+        }
+        : null,
     );
 
     this.updateShellMode();
@@ -321,6 +330,11 @@ export class App {
     }
 
     if (this.gameOverPreview && action !== "home") {
+      return;
+    }
+
+    if (action?.startsWith("game-menu-")) {
+      this.handleGameMenuAction(action);
       return;
     }
 
@@ -637,6 +651,12 @@ export class App {
       return;
     }
 
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.handleGameEscape();
+      return;
+    }
+
     const direction = this.getArrowKeyDirection(event.key);
     if (!direction) {
       return;
@@ -709,6 +729,110 @@ export class App {
     this.playUiSound(this.tabSwitchAudio);
   }
 
+  private handleGameEscape(): void {
+    this.hideTooltip();
+
+    if (this.closeTopClosableModalWithEsc()) {
+      return;
+    }
+
+    if (this.isAnyModalOpen()) {
+      return;
+    }
+
+    this.openGameMenu();
+  }
+
+  private closeTopClosableModalWithEsc(): boolean {
+    const wasModalOpen = this.isAnyModalOpen();
+
+    if (this.gameMenuView) {
+      this.closeGameMenu(true);
+      return true;
+    }
+
+    if (this.gameOverPreview || this.state?.quests.activeDecision) {
+      return false;
+    }
+
+    if (this.conquestResultPreview) {
+      this.conquestResultPreview = null;
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return true;
+    }
+
+    if (this.resolvedDecisionPreview && !this.state?.quests.activeDecision) {
+      this.resolvedDecisionPreview = null;
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return true;
+    }
+
+    if (this.villageModalPlotId || this.villageInfoPanel) {
+      this.villageModalPlotId = null;
+      this.villageInfoPanel = null;
+      this.requestRender();
+      this.playModalTransitionSound(wasModalOpen);
+      return true;
+    }
+
+    return false;
+  }
+
+  private openGameMenu(): void {
+    if (!this.state) {
+      return;
+    }
+
+    const wasModalOpen = this.isAnyModalOpen();
+    this.gameMenuView = "main";
+    if (!this.state.paused) {
+      this.game.setPaused(true);
+    }
+    this.requestRender();
+    this.playModalTransitionSound(wasModalOpen);
+  }
+
+  private closeGameMenu(resumeGame: boolean): void {
+    if (!this.gameMenuView) {
+      return;
+    }
+
+    const wasModalOpen = this.isAnyModalOpen();
+    this.gameMenuView = null;
+    if (resumeGame && this.state?.paused) {
+      this.game.setPaused(false);
+    }
+    this.requestRender();
+    this.playModalTransitionSound(wasModalOpen);
+  }
+
+  private handleGameMenuAction(action: string): void {
+    if (action === "game-menu-continue") {
+      this.closeGameMenu(true);
+      return;
+    }
+
+    if (action === "game-menu-settings") {
+      this.gameMenuView = "settings";
+      this.requestRender();
+      this.playUiSound(this.tabSwitchAudio);
+      return;
+    }
+
+    if (action === "game-menu-back") {
+      this.gameMenuView = "main";
+      this.requestRender();
+      this.playUiSound(this.tabSwitchAudio);
+      return;
+    }
+
+    if (action === "game-menu-quit") {
+      this.returnHome();
+    }
+  }
+
   private startNewCommunity(): void {
     const communityName = this.communityNameDraft.trim() || this.t().ui.defaultCommunityName;
 
@@ -724,6 +848,7 @@ export class App {
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
     this.gameOverPreview = null;
+    this.gameMenuView = null;
     this.lastActiveDecisionId = this.state?.quests.activeDecision?.id ?? null;
     this.game.start();
     this.updateAmbientLoop();
@@ -747,6 +872,7 @@ export class App {
     this.resolvedDecisionPreview = null;
     this.conquestResultPreview = null;
     this.gameOverPreview = null;
+    this.gameMenuView = null;
     this.lastActiveDecisionId = null;
     this.godMode?.destroy();
     this.godMode = null;
@@ -767,8 +893,14 @@ export class App {
       this.villageInfoPanel ||
       this.resolvedDecisionPreview ||
       this.conquestResultPreview ||
-      this.gameOverPreview,
+      this.gameOverPreview ||
+      this.gameMenuView ||
+      this.state?.quests.activeDecision,
     );
+  }
+
+  private getLocaleOptions(): Array<{ id: string; label: string }> {
+    return Object.values(packs).map((pack) => ({ id: pack.locale, label: pack.label }));
   }
 
   private playModalTransitionSound(previousOpen: boolean): void {

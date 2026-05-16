@@ -149,7 +149,7 @@ import { SettlementNpcController } from "./pixi/scene/settlementNpcs";
 import { AmbientEffectsController } from "./pixi/ambient/ambientEffects";
 import { drawInfoPanel } from "./pixi/modals/infoPanels";
 import { drawVillageModal } from "./pixi/modals/villageModals";
-import { drawModalHeaderPlane } from "./pixi/modals/modalLayout";
+import { createModalPanel, drawModalHeaderPlane, resolveModalFrame } from "./pixi/modals/modalLayout";
 import {
   drawBuildChoices as drawBuildChoicesModal,
   drawBuildingDetail as drawBuildingDetailModal,
@@ -218,6 +218,14 @@ export type FrontScreenModel = {
   activeLocale: string;
   saves: FrontScreenSaveEntry[];
   pendingDeleteSaveId: string | null;
+};
+
+export type GameMenuView = "main" | "settings";
+
+export type GameMenuModel = {
+  view: GameMenuView;
+  locales: FrontScreenLocaleOption[];
+  activeLocale: string;
 };
 
 const STATIC_WORLD_CACHE_MAX_TEXTURE_SIZE = 4096;
@@ -422,6 +430,7 @@ export class PixiVillageRenderer {
     resolvedDecisionPreview?: DecisionHistoryEntry | null,
     conquestResultPreview?: ConquestResultPreview | null,
     gameOverPreview?: GameOverPreview | null,
+    gameMenu?: GameMenuModel | null,
   ): void {
     this.frontScreenModel = null;
     this.lastState = state;
@@ -439,7 +448,8 @@ export class PixiVillageRenderer {
       state.quests.activeDecision ||
       resolvedDecisionPreview ||
       conquestResultPreview ||
-      gameOverPreview,
+      gameOverPreview ||
+      gameMenu,
     );
     this.cameraDragBlocked = hasBlockingOverlay;
     if (hasBlockingOverlay && !this.hadBlockingOverlayOpen) {
@@ -560,12 +570,140 @@ export class PixiVillageRenderer {
       hudHeight,
       gameOverPreview ?? null,
     );
+    this.drawGameMenuModal(translations, hudWidth, hudHeight, gameMenu ?? null);
     this.ambientEffects.syncState(state);
     this.ambientEffects.refreshOverlays(performance.now(), true);
     this.ambientEffects.updateAnimationLoop();
     this.applyHudPixelScale(this.hudLayer, hudRenderScale);
     this.scaleHudInteractionBounds(hudRenderScale);
     this.app.render();
+  }
+
+  private drawGameMenuModal(
+    translations: TranslationPack | undefined,
+    width: number,
+    height: number,
+    model: GameMenuModel | null,
+  ): void {
+    if (!translations || !model) {
+      return;
+    }
+
+    const overlay = new Container();
+    this.hudLayer.addChild(overlay);
+    this.drawModalBackdrop(overlay, width, height, { action: "game-menu-continue" });
+    const frame = resolveModalFrame(width, height, {
+      maxWidth: 430,
+      minHeight: 292,
+      preferredHeight: model.view === "settings" ? 318 : 300,
+      marginY: 56,
+      topMin: 46,
+    });
+    const panel = createModalPanel(
+      overlay,
+      (parent, x, y, panelWidth, panelHeight, fillAlpha, cornerRadius) =>
+        this.drawPanel(parent, x, y, panelWidth, panelHeight, fillAlpha, cornerRadius),
+      frame,
+    );
+    drawModalHeaderPlane(panel, frame.width, 92);
+    const headerBottom = this.drawOverlayHeader(panel, frame.width, translations, {
+      iconId: "pause",
+      title: translations.ui.gameMenu ?? "Game menu",
+      subtitle: translations.ui.gamePaused ?? "Game paused",
+      closeAction: { action: "game-menu-continue" },
+    });
+
+    if (model.view === "settings") {
+      this.drawGameMenuSettings(panel, translations, model, frame.width, headerBottom);
+      return;
+    }
+
+    const buttonWidth = frame.width - 56;
+    const buttonX = 28;
+    let buttonY = headerBottom + 22;
+    this.createRectButton(panel, {
+      label: translations.ui.continue ?? "Continue",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 42,
+      detail: { action: "game-menu-continue" },
+      tone: "primary",
+    });
+
+    buttonY += 52;
+    this.createRectButton(panel, {
+      label: translations.ui.settings ?? "Settings",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 42,
+      detail: { action: "game-menu-settings" },
+      tone: "toolbar",
+    });
+
+    buttonY += 52;
+    this.createRectButton(panel, {
+      label: translations.ui.quit ?? "Quit",
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: 42,
+      detail: { action: "game-menu-quit" },
+      tone: "secondary",
+    });
+  }
+
+  private drawGameMenuSettings(
+    panel: Container,
+    translations: TranslationPack,
+    model: GameMenuModel,
+    panelWidth: number,
+    headerBottom: number,
+  ): void {
+    const contentX = 28;
+    const contentWidth = panelWidth - 56;
+    this.drawText(panel, translations.ui.language ?? "Language", contentX, headerBottom + 22, {
+      fill: uiTheme.accentStrong,
+      fontSize: uiTextSize.bodyLarge,
+      fontWeight: "900",
+    });
+    this.drawText(panel, translations.ui.languageText ?? "", contentX, headerBottom + 50, {
+      fill: uiTheme.textMuted,
+      fontSize: uiTextSize.body,
+      fontWeight: "700",
+      wordWrap: true,
+      wordWrapWidth: contentWidth,
+      lineHeight: 18,
+    });
+
+    let buttonX = contentX;
+    const buttonY = headerBottom + 102;
+    for (const locale of model.locales) {
+      const active = locale.id === model.activeLocale;
+      const widthHint = Math.max(110, Math.min(176, locale.label.length * 12 + 42));
+      this.createRectButton(panel, {
+        label: locale.label,
+        x: buttonX,
+        y: buttonY,
+        width: widthHint,
+        height: 38,
+        detail: { action: "select-locale", value: locale.id },
+        active,
+        tone: active ? "primary" : "toolbar",
+      });
+      buttonX += widthHint + 10;
+    }
+
+    this.createRectButton(panel, {
+      label: translations.ui.back ?? "Back",
+      x: contentX,
+      y: buttonY + 58,
+      width: 132,
+      height: 38,
+      detail: { action: "game-menu-back" },
+      tone: "secondary",
+    });
   }
 
   renderFrontScreen(model: FrontScreenModel): void {
