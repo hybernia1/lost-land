@@ -769,9 +769,7 @@ function drawBuildingBonusRow(
       align: "right",
     });
   }
-  if (effects.length > 0) {
-    host.bindTooltip(rowLayer, effects.map((effect) => effect.tooltip).join("\n"));
-  } else {
+  if (effects.length === 0) {
     host.bindTooltip(rowLayer, `${copy.level} ${rowLevel}: ${copy.noBonus}`);
   }
 }
@@ -1430,7 +1428,26 @@ function drawEffects(host: BuildingModalsHost, parent: Container, effects: Effec
   let offsetX = 0;
   let offsetY = 0;
   let maxOffsetX = 0;
-  for (const effect of effects.slice(0, 4)) {
+  const visibleEffects = effects.slice(0, 4);
+  const orderedEffects = [
+    ...visibleEffects.filter((effect) => !effect.negative),
+    ...visibleEffects.filter((effect) => effect.negative),
+  ];
+  const hasPositive = visibleEffects.some((effect) => !effect.negative);
+  const hasNegative = visibleEffects.some((effect) => effect.negative);
+  let separatorDrawn = false;
+
+  for (const effect of orderedEffects) {
+    if (hasPositive && hasNegative && effect.negative && !separatorDrawn) {
+      if (offsetX > 0 && offsetX + 14 > maxWidth) {
+        offsetX = 0;
+        offsetY += BUILDING_INFO_TOKEN_HEIGHT;
+      }
+      drawEffectSeparator(parent, x + offsetX + 4, y + offsetY + 4);
+      offsetX += 14;
+      separatorDrawn = true;
+    }
+
     const token = drawInfoToken(host, parent, {
       iconId: effect.iconId,
       text: effect.value,
@@ -1451,6 +1468,12 @@ function drawEffects(host: BuildingModalsHost, parent: Container, effects: Effec
     maxOffsetX = Math.max(maxOffsetX, offsetX);
   }
   return maxOffsetX;
+}
+
+function drawEffectSeparator(parent: Container, x: number, y: number): void {
+  const separator = new Graphics();
+  separator.rect(x, y, 1, 18).fill({ color: uiTheme.borderStrong, alpha: 0.5 });
+  parent.addChild(separator);
 }
 
 function drawCostLine(
