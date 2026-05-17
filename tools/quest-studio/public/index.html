@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quest Studio</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Quest Studio</h1>
+    <div class="topbar-actions">
+      <button id="reloadBtn" type="button">Reload</button>
+      <button id="addBtn" type="button">Add Quest</button>
+      <button id="saveAllBtn" type="button" class="primary">Save All</button>
+    </div>
+  </header>
+
+  <section class="gitbar">
+    <div class="git-status-line">
+      <strong>Git:</strong>
+      <span id="gitStatusText">Loading git status...</span>
+    </div>
+    <div class="git-actions">
+      <input id="commitMessageInput" type="text" placeholder="Commit message for quest changes" />
+      <button id="refreshGitBtn" type="button">Refresh Git</button>
+      <button id="commitPushBtn" type="button" class="primary">Commit + Push</button>
+    </div>
+  </section>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-title">Quests</div>
+      <div class="sidebar-controls">
+        <input id="questSearchInput" type="search" placeholder="Search quest id or title..." />
+        <select id="questKindFilter">
+          <option value="all">All types</option>
+          <option value="decisions">Decisions</option>
+          <option value="objectives">Objectives</option>
+          <option value="sudden">Sudden</option>
+        </select>
+      </div>
+      <div id="questList" class="quest-list"></div>
+    </aside>
+
+    <section class="editor">
+      <div id="emptyState" class="empty-state">Select a quest to edit.</div>
+
+      <div id="editorPanel" class="editor-panel hidden">
+        <div class="editor-header">
+          <div>
+            <div id="questBadge" class="badge"></div>
+            <h2 id="questTitle"></h2>
+          </div>
+          <div class="editor-actions">
+            <button id="duplicateBtn" type="button">Duplicate</button>
+            <button id="renameBtn" type="button">Rename ID</button>
+            <button id="deleteBtn" type="button" class="danger">Delete</button>
+            <button id="copyEnToCsBtn" type="button">Copy EN -> CS</button>
+            <button id="localeCheckBtn" type="button">Locale Check</button>
+            <button id="syncOptionsBtn" type="button" class="hidden">Sync Option Keys</button>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Definition JSON</span>
+          <textarea id="definitionInput" rows="16"></textarea>
+        </label>
+
+        <div class="locale-grid">
+          <label class="field">
+            <span>English Locale JSON</span>
+            <textarea id="enInput" rows="14"></textarea>
+          </label>
+
+          <label class="field">
+            <span>Czech Locale JSON</span>
+            <textarea id="csInput" rows="14"></textarea>
+          </label>
+        </div>
+
+        <div class="preview-card">
+          <div class="preview-title">Preview</div>
+          <pre id="previewOutput" class="preview-output">Preview is empty.</pre>
+        </div>
+
+        <button id="applyBtn" type="button">Apply Changes To In-Memory Model</button>
+      </div>
+    </section>
+  </main>
+
+  <footer id="status" class="status">Loading...</footer>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
