@@ -7,3 +7,4 @@ release/
 .codex-vite.err
 .codex-dev.*.log
 tmp/
+tools/quest-studio/.quest-studio*.log

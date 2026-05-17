@@ -7,7 +7,6 @@ export type QuestTranslationPack = {
   objectives: Record<string, {
     title: string;
     description: string;
-    reward: string;
   }>;
   decisions: Record<string, {
     title: string;

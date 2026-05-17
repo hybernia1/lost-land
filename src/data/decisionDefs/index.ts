@@ -3,11 +3,12 @@ import { communityDecisionQuestDefinitions } from "./community";
 import { infrastructureDecisionQuestDefinitions } from "./infrastructure";
 import { openingDecisionQuestDefinitions } from "./opening";
 import type {
+  DecisionQuestDraftDefinition,
   DecisionQuestDefinition,
   DecisionQuestOptionDefinition,
 } from "./types";
 
-function assertUniqueDecisionIds(definitions: readonly DecisionQuestDefinition[]): void {
+function assertUniqueDecisionIds(definitions: readonly DecisionQuestDraftDefinition[]): void {
   const seenDecisionIds = new Set<string>();
 
   for (const definition of definitions) {
@@ -30,13 +31,20 @@ function assertUniqueDecisionIds(definitions: readonly DecisionQuestDefinition[]
   }
 }
 
-export const decisionQuestDefinitions: DecisionQuestDefinition[] = [
+const decisionQuestDraftDefinitions: DecisionQuestDraftDefinition[] = [
   ...openingDecisionQuestDefinitions,
   ...communityDecisionQuestDefinitions,
   ...infrastructureDecisionQuestDefinitions,
 ];
 
-assertUniqueDecisionIds(decisionQuestDefinitions);
+assertUniqueDecisionIds(decisionQuestDraftDefinitions);
+
+export const decisionQuestDefinitions: DecisionQuestDefinition[] = decisionQuestDraftDefinitions.map(
+  (definition) => ({
+    ...definition,
+    kind: "decision",
+  }),
+);
 
 export const decisionQuestById = Object.fromEntries(
   decisionQuestDefinitions.map((quest) => [quest.id, quest]),

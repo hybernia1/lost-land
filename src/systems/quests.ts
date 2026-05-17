@@ -1,6 +1,8 @@
+import { buildingDefinitions } from "../data/buildings";
 import {
   decisionQuestById,
   decisionQuestDefinitions,
+  type DecisionQuestDefinition,
   type DecisionQuestOptionDefinition,
 } from "../data/decisions";
 import {
@@ -9,22 +11,26 @@ import {
   suddenQuestById,
   suddenQuestDefinitions,
   type ObjectiveQuestDefinition,
+  type ObjectiveQuestTarget,
+  type ObjectiveQuestTrigger,
   type SuddenQuestDefinition,
 } from "../data/quests";
 import { GAME_HOUR_REAL_SECONDS } from "../game/time";
 import type {
+  BuildingId,
   DecisionOptionId,
   DecisionProfileAxisId,
   DecisionQuestId,
   DecisionHistoryEntry,
   GameState,
   ObjectiveQuestId,
+  QuestState,
   ResourceBag,
   ResourceId,
-  QuestState,
   SuddenQuestId,
 } from "../game/types";
 import { pushLogEntry } from "./log";
+import { getPopulation } from "./population";
 import { addResources, addRewardResources, canAfford } from "./resources";
 
 const FIRST_DECISION_DELAY_SECONDS = GAME_HOUR_REAL_SECONDS * 4;
@@ -40,6 +46,10 @@ const SCARCITY_THEFT_THRESHOLD = 0.22;
 const SCARCITY_THEFT_BASE_CHANCE = 0.18;
 const SCARCITY_THEFT_PRESSURE_CHANCE = 0.42;
 const OPENING_DECISION_ID: DecisionQuestId = "foundingBriefing";
+
+const objectiveChainStageIndex = createObjectiveChainStageIndex();
+
+type ObjectiveTriggerEvent = ObjectiveQuestTrigger | "tick";
 
 export type DecisionProfileKind =
   | "noData"
@@ -92,12 +102,14 @@ export function createInitialQuestState(): QuestState {
     decisionHistory: [],
     recentDecisionIds: [],
     recentSuddenIds: [],
+    triggerSnapshot: createEmptyTriggerSnapshot(),
   };
 }
 
 export function normalizeQuestState(state: GameState): void {
+  const source = state.quests;
   const existingObjectives = new Map(
-    state.quests?.objectives?.map((quest) => [
+    source?.objectives?.map((quest) => [
       quest.definitionId,
       {
         completedAt: quest.completedAt ?? null,
@@ -112,41 +124,45 @@ export function normalizeQuestState(state: GameState): void {
       completedAt: existingObjectives.get(definition.id)?.completedAt ?? null,
       rewardClaimedAt: existingObjectives.get(definition.id)?.rewardClaimedAt ?? null,
     })),
-    activeDecision: normalizeActiveDecision(state.quests?.activeDecision ?? null),
-    resolvedDecisionCount: Math.max(0, Math.floor(state.quests?.resolvedDecisionCount ?? 0)),
-    resolvedSuddenCount: Math.max(0, Math.floor(state.quests?.resolvedSuddenCount ?? 0)),
+    activeDecision: normalizeActiveDecision(source?.activeDecision ?? null),
+    resolvedDecisionCount: Math.max(0, Math.floor(source?.resolvedDecisionCount ?? 0)),
+    resolvedSuddenCount: Math.max(0, Math.floor(source?.resolvedSuddenCount ?? 0)),
     nextDecisionAt: Math.max(
       FIRST_DECISION_DELAY_SECONDS,
-      state.quests?.nextDecisionAt ?? FIRST_DECISION_DELAY_SECONDS,
+      source?.nextDecisionAt ?? FIRST_DECISION_DELAY_SECONDS,
     ),
-    resolvedDecisionIds: (state.quests?.resolvedDecisionIds ?? [])
+    resolvedDecisionIds: (source?.resolvedDecisionIds ?? [])
       .filter((id): id is DecisionQuestId => id in decisionQuestById),
-    decisionHistory: normalizeDecisionHistory(state.quests?.decisionHistory ?? []),
-    recentDecisionIds: (state.quests?.recentDecisionIds ?? [])
+    decisionHistory: normalizeDecisionHistory(source?.decisionHistory ?? []),
+    recentDecisionIds: (source?.recentDecisionIds ?? [])
       .filter((id): id is DecisionQuestId => id in decisionQuestById)
       .slice(0, RECENT_DECISION_MEMORY),
-    recentSuddenIds: (state.quests?.recentSuddenIds ?? [])
+    recentSuddenIds: (source?.recentSuddenIds ?? [])
       .filter((id): id is SuddenQuestId => id in suddenQuestById)
       .slice(0, RECENT_SUDDEN_MEMORY),
+    triggerSnapshot: createEmptyTriggerSnapshot(),
   };
 
   for (const objective of state.quests.objectives) {
     if (objective.completedAt === null) {
       objective.rewardClaimedAt = null;
+      continue;
     }
 
     if (
-      objective.completedAt !== null &&
       objective.rewardClaimedAt !== null &&
       objective.rewardClaimedAt < objective.completedAt
     ) {
       objective.rewardClaimedAt = objective.completedAt;
     }
   }
+
+  syncQuestTriggerSnapshot(state);
 }
 
 export function tickQuests(state: GameState): void {
-  completeObjectiveQuests(state);
+  const objectiveEvents = collectObjectiveTriggerEvents(state);
+  resolveObjectiveQuests(state, objectiveEvents);
   maybeStartDecisionQuest(state);
 }
 
@@ -163,11 +179,7 @@ export function resolveDecisionQuest(
   const definition = decisionQuestById[activeDecision.definitionId];
   const option = definition.options.find((candidate) => candidate.id === optionId);
 
-  if (!option) {
-    return false;
-  }
-
-  if (!canAffordDecisionOption(state, option)) {
+  if (!option || !canAffordDecisionOption(state, option)) {
     return false;
   }
 
@@ -199,6 +211,10 @@ export function resolveDecisionQuest(
     definition.id,
     ...state.quests.recentDecisionIds.filter((id) => id !== definition.id),
   ].slice(0, RECENT_DECISION_MEMORY);
+
+  const objectiveEvents = collectObjectiveTriggerEvents(state);
+  resolveObjectiveQuests(state, objectiveEvents);
+
   scheduleNextDecision(state);
   state.paused = activeDecision.wasPaused;
   pushLogEntry(state, {
@@ -213,20 +229,15 @@ export function isObjectiveQuestComplete(
   state: GameState,
   definition: ObjectiveQuestDefinition,
 ): boolean {
-  return state.buildings[definition.buildingId].level >= definition.requiredLevel;
+  const progress = getObjectiveQuestProgress(state, definition);
+  return progress.current >= progress.required;
 }
 
 export function getObjectiveQuestProgress(
   state: GameState,
   definition: ObjectiveQuestDefinition,
 ): { current: number; required: number } {
-  return {
-    current: Math.min(
-      definition.requiredLevel,
-      state.buildings[definition.buildingId].level,
-    ),
-    required: definition.requiredLevel,
-  };
+  return getObjectiveTargetProgress(state, definition.target);
 }
 
 export function getActiveObjectiveQuests(state: GameState) {
@@ -235,10 +246,8 @@ export function getActiveObjectiveQuests(state: GameState) {
       return false;
     }
 
-    return areObjectivePrerequisitesComplete(
-      state,
-      objectiveQuestById[quest.definitionId],
-    );
+    const definition = objectiveQuestById[quest.definitionId];
+    return isObjectiveUnlocked(state, definition);
   });
 }
 
@@ -321,99 +330,27 @@ export function getDecisionOptionCost(option: DecisionQuestOptionDefinition): Re
   return cost;
 }
 
-function normalizeDecisionHistory(history: DecisionHistoryEntry[]): DecisionHistoryEntry[] {
-  if (!Array.isArray(history)) {
-    return [];
-  }
-
-  return history.filter((entry): entry is DecisionHistoryEntry => {
-    if (!entry || !(entry.definitionId in decisionQuestById)) {
-      return false;
-    }
-
-    const definition = decisionQuestById[entry.definitionId];
-    return definition.options.some((option) => option.id === entry.optionId);
-  }).map((entry) => ({
-    definitionId: entry.definitionId,
-    optionId: entry.optionId,
-    resolvedAt: Math.max(0, Math.floor(entry.resolvedAt ?? 0)),
-  }));
-}
-
-function createEmptyDecisionProfileScores(): Record<DecisionProfileAxisId, number> {
-  return {
-    communityMarket: 0,
-    authorityAutonomy: 0,
-  };
-}
-
-function getDecisionHistoryOption(entry: DecisionHistoryEntry): DecisionQuestOptionDefinition | null {
-  return decisionQuestById[entry.definitionId]?.options.find(
-    (option) => option.id === entry.optionId,
-  ) ?? null;
-}
-
-function completeObjectiveQuests(state: GameState): void {
-  for (const quest of state.quests.objectives) {
-    if (quest.completedAt !== null) {
-      continue;
-    }
-
-    const definition = objectiveQuestById[quest.definitionId];
-
-    if (
-      !areObjectivePrerequisitesComplete(state, definition) ||
-      !isObjectiveQuestComplete(state, definition)
-    ) {
-      continue;
-    }
-
-    quest.completedAt = state.elapsedSeconds;
-    quest.rewardClaimedAt = null;
-    pushLogEntry(state, {
-      source: "questUi",
-      key: "logObjectiveCompleted",
-      params: { questId: definition.id },
-    });
-  }
-}
-
 export function canClaimObjectiveReward(
   state: GameState,
   objectiveQuestId: ObjectiveQuestId,
 ): boolean {
-  const objectiveState = state.quests.objectives.find(
-    (objective) => objective.definitionId === objectiveQuestId,
-  );
-  const definition = objectiveQuestById[objectiveQuestId];
-  if (!objectiveState || !definition) {
+  const objectiveState = getObjectiveState(state, objectiveQuestId);
+
+  if (!objectiveState) {
     return false;
   }
 
-  if (objectiveState.completedAt === null || objectiveState.rewardClaimedAt !== null) {
-    return false;
-  }
-
-  return true;
+  return objectiveState.completedAt !== null && objectiveState.rewardClaimedAt === null;
 }
 
 export function claimObjectiveQuestReward(
   state: GameState,
   objectiveQuestId: ObjectiveQuestId,
 ): boolean {
-  const objectiveState = state.quests.objectives.find(
-    (objective) => objective.definitionId === objectiveQuestId,
-  );
+  const objectiveState = getObjectiveState(state, objectiveQuestId);
   const definition = objectiveQuestById[objectiveQuestId];
-  if (!objectiveState || !definition) {
-    return false;
-  }
 
-  if (
-    objectiveState.completedAt === null ||
-    objectiveState.rewardClaimedAt !== null ||
-    !canClaimObjectiveReward(state, objectiveQuestId)
-  ) {
+  if (!objectiveState || !definition || !canClaimObjectiveReward(state, objectiveQuestId)) {
     return false;
   }
 
@@ -428,14 +365,133 @@ export function claimObjectiveQuestReward(
   return true;
 }
 
-function areObjectivePrerequisitesComplete(
+function getObjectiveTargetProgress(
+  state: GameState,
+  target: ObjectiveQuestTarget,
+): { current: number; required: number } {
+  if (target.type === "buildingLevel") {
+    const currentLevel = state.buildings[target.buildingId]?.level ?? 0;
+    return {
+      current: Math.min(target.requiredLevel, currentLevel),
+      required: target.requiredLevel,
+    };
+  }
+
+  if (target.type === "populationAtLeast") {
+    const population = getPopulation(state);
+    return {
+      current: Math.min(target.requiredPopulation, population),
+      required: target.requiredPopulation,
+    };
+  }
+
+  if (target.type === "resourceSitesLootedAtLeast") {
+    const lootedCount = getLootedResourceSiteCount(state);
+    return {
+      current: Math.min(target.requiredCount, lootedCount),
+      required: target.requiredCount,
+    };
+  }
+
+  if (target.type === "resolvedDecisionsAtLeast") {
+    return {
+      current: Math.min(target.requiredCount, state.quests.resolvedDecisionCount),
+      required: target.requiredCount,
+    };
+  }
+
+  return {
+    current: Math.min(target.requiredCount, state.quests.resolvedSuddenCount),
+    required: target.requiredCount,
+  };
+}
+
+function completeObjectiveQuest(
+  state: GameState,
+  objectiveQuestId: ObjectiveQuestId,
+): void {
+  const objectiveState = getObjectiveState(state, objectiveQuestId);
+  const definition = objectiveQuestById[objectiveQuestId];
+
+  if (!objectiveState || !definition || objectiveState.completedAt !== null) {
+    return;
+  }
+
+  objectiveState.completedAt = state.elapsedSeconds;
+  objectiveState.rewardClaimedAt = null;
+  pushLogEntry(state, {
+    source: "questUi",
+    key: "logObjectiveCompleted",
+    params: { questId: definition.id },
+  });
+}
+
+function resolveObjectiveQuests(
+  state: GameState,
+  triggerEvents: ReadonlySet<ObjectiveTriggerEvent>,
+): void {
+  for (const quest of state.quests.objectives) {
+    if (quest.completedAt !== null) {
+      continue;
+    }
+
+    const definition = objectiveQuestById[quest.definitionId];
+
+    if (
+      !triggerEvents.has(definition.trigger) ||
+      !isObjectiveUnlocked(state, definition) ||
+      !isObjectiveQuestComplete(state, definition)
+    ) {
+      continue;
+    }
+
+    completeObjectiveQuest(state, quest.definitionId);
+  }
+}
+
+function isObjectiveUnlocked(
   state: GameState,
   definition: ObjectiveQuestDefinition,
 ): boolean {
-  return (definition.prerequisiteIds ?? []).every((prerequisiteId) =>
+  return areObjectiveRequirementsComplete(state, definition) &&
+    isChainStageUnlocked(state, definition);
+}
+
+function areObjectiveRequirementsComplete(
+  state: GameState,
+  definition: ObjectiveQuestDefinition,
+): boolean {
+  return (definition.requires ?? []).every((requiredId) =>
     state.quests.objectives.some(
-      (quest) => quest.definitionId === prerequisiteId && quest.completedAt !== null,
+      (quest) => quest.definitionId === requiredId && quest.completedAt !== null,
     ),
+  );
+}
+
+function isChainStageUnlocked(
+  state: GameState,
+  definition: ObjectiveQuestDefinition,
+): boolean {
+  if (definition.kind !== "chain") {
+    return true;
+  }
+
+  if (definition.chain.stage <= 1) {
+    return true;
+  }
+
+  const previousStageDefinition = objectiveChainStageIndex
+    .get(definition.chain.id)
+    ?.get(definition.chain.stage - 1);
+
+  if (!previousStageDefinition) {
+    return false;
+  }
+
+  return state.quests.objectives.some(
+    (quest) =>
+      quest.definitionId === previousStageDefinition.id &&
+      quest.completedAt !== null,
   );
 }
 
@@ -446,10 +502,7 @@ function maybeStartDecisionQuest(state: GameState): void {
 
   const theftResourceId = pickScarcityTheftResource(state);
 
-  if (
-    theftResourceId &&
-    Math.random() < getScarcityTheftChance(state, theftResourceId)
-  ) {
+  if (theftResourceId && Math.random() < getScarcityTheftChance(state, theftResourceId)) {
     applyScarcityTheft(state, theftResourceId);
     return;
   }
@@ -497,6 +550,10 @@ function applySuddenQuest(state: GameState, definition: SuddenQuestDefinition): 
     definition.id,
     ...state.quests.recentSuddenIds.filter((id) => id !== definition.id),
   ].slice(0, RECENT_SUDDEN_MEMORY);
+
+  const objectiveEvents = collectObjectiveTriggerEvents(state);
+  resolveObjectiveQuests(state, objectiveEvents);
+
   scheduleNextDecision(state);
   pushLogEntry(state, {
     source: "questSuddenResult",
@@ -517,9 +574,12 @@ function applyScarcityTheft(state: GameState, resourceId: ResourceId): void {
     return;
   }
 
-  const losses: ResourceBag = { [resourceId]: -loss };
-  addResources(state.resources, losses, state.capacities);
+  addResources(state.resources, { [resourceId]: -loss }, state.capacities);
   state.quests.resolvedSuddenCount += 1;
+
+  const objectiveEvents = collectObjectiveTriggerEvents(state);
+  resolveObjectiveQuests(state, objectiveEvents);
+
   scheduleNextDecision(state);
   pushLogEntry(state, {
     source: "questSuddenResult",
@@ -528,22 +588,21 @@ function applyScarcityTheft(state: GameState, resourceId: ResourceId): void {
   });
 }
 
-function pickDecisionQuest(state: GameState) {
+function pickDecisionQuest(state: GameState): DecisionQuestDefinition | null {
   const candidates = decisionQuestDefinitions.filter(
     (definition) =>
       state.elapsedSeconds >= definition.minElapsedSeconds &&
       !state.quests.resolvedDecisionIds.includes(definition.id),
   );
-  const pool = candidates;
 
-  if (pool.length === 0) {
+  if (candidates.length === 0) {
     return null;
   }
 
-  const totalWeight = pool.reduce((total, definition) => total + definition.weight, 0);
+  const totalWeight = candidates.reduce((total, definition) => total + definition.weight, 0);
   let roll = Math.random() * totalWeight;
 
-  for (const definition of pool) {
+  for (const definition of candidates) {
     roll -= definition.weight;
 
     if (roll <= 0) {
@@ -551,7 +610,7 @@ function pickDecisionQuest(state: GameState) {
     }
   }
 
-  return pool[pool.length - 1];
+  return candidates[candidates.length - 1];
 }
 
 function pickScarcityTheftResource(state: GameState): ResourceId | null {
@@ -559,13 +618,9 @@ function pickScarcityTheftResource(state: GameState): ResourceId | null {
     .map((resourceId) => {
       const capacity = Math.max(1, state.capacities[resourceId]);
       const ratio = state.resources[resourceId] / capacity;
-
       return { resourceId, ratio };
     })
-    .filter((candidate) =>
-      candidate.ratio > 0 &&
-      candidate.ratio < SCARCITY_THEFT_THRESHOLD
-    )
+    .filter((candidate) => candidate.ratio > 0 && candidate.ratio < SCARCITY_THEFT_THRESHOLD)
     .sort((left, right) => left.ratio - right.ratio);
 
   return candidates[0]?.resourceId ?? null;
@@ -579,7 +634,7 @@ function getScarcityTheftChance(state: GameState, resourceId: ResourceId): numbe
   return SCARCITY_THEFT_BASE_CHANCE + pressure * SCARCITY_THEFT_PRESSURE_CHANCE;
 }
 
-function pickSuddenQuest(state: GameState) {
+function pickSuddenQuest(state: GameState): SuddenQuestDefinition {
   const candidates = suddenQuestDefinitions.filter(
     (definition) =>
       state.elapsedSeconds >= definition.minElapsedSeconds &&
@@ -620,4 +675,131 @@ function normalizeActiveDecision(
     startedAt: Math.max(0, activeDecision.startedAt),
     wasPaused: Boolean(activeDecision.wasPaused),
   };
+}
+
+function normalizeDecisionHistory(history: DecisionHistoryEntry[]): DecisionHistoryEntry[] {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  return history
+    .filter((entry): entry is DecisionHistoryEntry => {
+      if (!entry || !(entry.definitionId in decisionQuestById)) {
+        return false;
+      }
+
+      const definition = decisionQuestById[entry.definitionId];
+      return definition.options.some((option) => option.id === entry.optionId);
+    })
+    .map((entry) => ({
+      definitionId: entry.definitionId,
+      optionId: entry.optionId,
+      resolvedAt: Math.max(0, Math.floor(entry.resolvedAt ?? 0)),
+    }));
+}
+
+function createEmptyDecisionProfileScores(): Record<DecisionProfileAxisId, number> {
+  return {
+    communityMarket: 0,
+    authorityAutonomy: 0,
+  };
+}
+
+function getDecisionHistoryOption(entry: DecisionHistoryEntry): DecisionQuestOptionDefinition | null {
+  return decisionQuestById[entry.definitionId]?.options.find(
+    (option) => option.id === entry.optionId,
+  ) ?? null;
+}
+
+function createObjectiveChainStageIndex(): Map<string, Map<number, ObjectiveQuestDefinition>> {
+  const chainMap = new Map<string, Map<number, ObjectiveQuestDefinition>>();
+
+  for (const definition of objectiveQuestDefinitions) {
+    if (definition.kind !== "chain") {
+      continue;
+    }
+
+    if (!chainMap.has(definition.chain.id)) {
+      chainMap.set(definition.chain.id, new Map());
+    }
+
+    chainMap.get(definition.chain.id)?.set(definition.chain.stage, definition);
+  }
+
+  return chainMap;
+}
+
+function createEmptyTriggerSnapshot(): QuestState["triggerSnapshot"] {
+  return {
+    buildingLevels: Object.fromEntries(
+      buildingDefinitions.map((definition) => [definition.id, 0]),
+    ) as Record<BuildingId, number>,
+    population: 0,
+    lootedSiteCount: 0,
+    resolvedDecisionCount: 0,
+    resolvedSuddenCount: 0,
+  };
+}
+
+function createQuestTriggerSnapshot(state: GameState): QuestState["triggerSnapshot"] {
+  return {
+    buildingLevels: Object.fromEntries(
+      buildingDefinitions.map((definition) => [definition.id, Math.max(0, state.buildings[definition.id]?.level ?? 0)]),
+    ) as Record<BuildingId, number>,
+    population: getPopulation(state),
+    lootedSiteCount: getLootedResourceSiteCount(state),
+    resolvedDecisionCount: state.quests.resolvedDecisionCount,
+    resolvedSuddenCount: state.quests.resolvedSuddenCount,
+  };
+}
+
+function syncQuestTriggerSnapshot(state: GameState): void {
+  state.quests.triggerSnapshot = createQuestTriggerSnapshot(state);
+}
+
+function collectObjectiveTriggerEvents(
+  state: GameState,
+): Set<ObjectiveTriggerEvent> {
+  const events = new Set<ObjectiveTriggerEvent>(["tick"]);
+  const previous = state.quests.triggerSnapshot;
+  const next = createQuestTriggerSnapshot(state);
+
+  const buildingLevelChanged = Object.keys(next.buildingLevels).some((buildingId) =>
+    next.buildingLevels[buildingId as BuildingId] !==
+      previous.buildingLevels[buildingId as BuildingId],
+  );
+
+  if (buildingLevelChanged) {
+    events.add("buildingLevelChanged");
+  }
+
+  if (next.population !== previous.population) {
+    events.add("populationChanged");
+  }
+
+  if (next.lootedSiteCount !== previous.lootedSiteCount) {
+    events.add("resourceSitesLootedChanged");
+  }
+
+  if (next.resolvedDecisionCount !== previous.resolvedDecisionCount) {
+    events.add("decisionResolved");
+  }
+
+  if (next.resolvedSuddenCount !== previous.resolvedSuddenCount) {
+    events.add("randomEventResolved");
+  }
+
+  state.quests.triggerSnapshot = next;
+  return events;
+}
+
+function getLootedResourceSiteCount(state: GameState): number {
+  return state.resourceSites.reduce((total, site) => total + (site.looted ? 1 : 0), 0);
+}
+
+function getObjectiveState(
+  state: GameState,
+  objectiveQuestId: ObjectiveQuestId,
+): QuestState["objectives"][number] | null {
+  return state.quests.objectives.find((quest) => quest.definitionId === objectiveQuestId) ?? null;
 }

@@ -195,21 +195,33 @@ export type BattleState = {
 export type ObjectiveQuestId =
   | "buildStorage"
   | "buildCoalMine"
-  | "buildDormitory"
   | "buildWaterStill"
-  | "buildHydroponics";
+  | "buildHydroponics"
+  | "buildDormitory"
+  | "upgradeStorageLevel2"
+  | "upgradeStorageLevel3"
+  | "upgradeCoalMineLevel2"
+  | "upgradeCoalMineLevel3"
+  | "upgradeHydroponicsLevel2"
+  | "upgradeHydroponicsLevel3"
+  | "reachPopulationChain06"
+  | "reachPopulationChain10"
+  | "reachPopulationChain14"
+  | "lootSettlementChain01"
+  | "lootSettlementChain02"
+  | "lootSettlementChain05";
 
 export type DecisionQuestId =
   | "foundingBriefing"
   | "survivorsAtGate"
   | "rationDispute"
-  | "radioCall"
   | "bittenStranger"
-  | "traderAtDusk"
   | "nightScreams"
   | "waterTheft"
-  | "coalMineSpareParts"
   | "provenTheft"
+  | "radioCall"
+  | "traderAtDusk"
+  | "coalMineSpareParts"
   | "collapsedUnderpass"
   | "brokenWaterFilter";
 
@@ -241,6 +253,14 @@ export type DecisionHistoryEntry = {
   resolvedAt: number;
 };
 
+export type QuestTriggerSnapshot = {
+  buildingLevels: Record<BuildingId, number>;
+  population: number;
+  lootedSiteCount: number;
+  resolvedDecisionCount: number;
+  resolvedSuddenCount: number;
+};
+
 export type QuestState = {
   objectives: ObjectiveQuestState[];
   activeDecision: ActiveDecisionQuestState | null;
@@ -251,6 +271,7 @@ export type QuestState = {
   decisionHistory: DecisionHistoryEntry[];
   recentDecisionIds: DecisionQuestId[];
   recentSuddenIds: SuddenQuestId[];
+  triggerSnapshot: QuestTriggerSnapshot;
 };
 
 export type LogEntrySource = "ui" | "questUi" | "questDecisionResult" | "questSuddenResult";
