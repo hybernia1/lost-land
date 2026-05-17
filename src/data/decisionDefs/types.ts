@@ -14,9 +14,13 @@ export type DecisionQuestOptionDefinition = {
   profileScores?: Partial<Record<DecisionProfileAxisId, number>>;
 };
 
-export type DecisionQuestDefinition = {
+export type DecisionQuestDraftDefinition = {
   id: DecisionQuestId;
   minElapsedSeconds: number;
   weight: number;
   options: DecisionQuestOptionDefinition[];
+};
+
+export type DecisionQuestDefinition = DecisionQuestDraftDefinition & {
+  kind: "decision";
 };

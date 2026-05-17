@@ -1,7 +1,12 @@
 import type { ObjectiveQuestId, SuddenQuestId } from "../../game/types";
 import { tutorialObjectiveQuestDefinitions } from "./objectives/tutorialChain";
 import { resourcePressureSuddenQuestDefinitions } from "./sudden/resourcePressure";
-import type { ObjectiveQuestDefinition, SuddenQuestDefinition } from "./types";
+import type {
+  ObjectiveQuestDefinition,
+  ObjectiveQuestTarget,
+  ObjectiveQuestTrigger,
+  SuddenQuestDefinition,
+} from "./types";
 
 function assertUniqueIds<T extends { id: string }>(
   definitions: readonly T[],
@@ -37,4 +42,9 @@ export const suddenQuestById = Object.fromEntries(
   suddenQuestDefinitions.map((quest) => [quest.id, quest]),
 ) as Record<SuddenQuestId, SuddenQuestDefinition>;
 
-export type { ObjectiveQuestDefinition, SuddenQuestDefinition };
+export type {
+  ObjectiveQuestDefinition,
+  ObjectiveQuestTarget,
+  ObjectiveQuestTrigger,
+  SuddenQuestDefinition,
+};

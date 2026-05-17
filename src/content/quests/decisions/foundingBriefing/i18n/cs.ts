@@ -1,6 +1,6 @@
 export const decisionLocaleCs = {
   "title": "Rada u žhavého ohniště",
-  "body": "Rok 2143. Od globálního kolapsu uplynulo přes sto let a nikdo živý už starý svět nepamatuje. Stroje zarostly mechem, spisy se rozpadly a pravda přežila hlavně jako báje. Voda se musí čistit, zvěř je nepoživatelná a za palisádou se pohybují zmutované existence. Starší čekají, jakým směrem osadu povedeš.",
+  "body": "Rok 2146. Od globálního kolapsu uplynulo přes sto let a nikdo živý už starý svět nepamatuje. Stroje zarostly mechem, spisy se rozpadly a pravda přežila hlavně jako báje. Voda se musí čistit, zvěř je nepoživatelná a za palisádou se pohybují zmutované existence. Starší čekají, jakým směrem osadu povedeš.",
   "options": {
     "fortify": "Zesílit bránu a připravit strážní ohně",
     "scoutRumors": "Vyslat běžce ověřit pověsti v okolí",
