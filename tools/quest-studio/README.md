@@ -38,6 +38,5 @@ Then open:
 - For decision quests, "Sync Decision Option Keys" aligns locale option/result keys to current `definition.options` ids.
 - Bulk editing for selected quest: duplicate, rename ID, delete.
 - Locale helpers: copy missing CS fields from EN and quick locale issue check.
-- Preview panel shows a compact decision/objective/sudden text preview from current JSON inputs.
 - Template library for `Add Quest` (prompt-based template key selection).
 - "Commit + Push" saves current model, runs `git add -A`, commits with the provided message, and pushes to `origin/<current-branch>`.

@@ -147,7 +147,6 @@ const el = {
   definitionInput: document.getElementById("definitionInput"),
   enInput: document.getElementById("enInput"),
   csInput: document.getElementById("csInput"),
-  previewOutput: document.getElementById("previewOutput"),
   applyBtn: document.getElementById("applyBtn"),
   saveAllBtn: document.getElementById("saveAllBtn"),
   reloadBtn: document.getElementById("reloadBtn"),
@@ -606,54 +605,6 @@ function runLocaleCheck() {
   setStatus(`Locale issues (${issues.length}): ${preview}${suffix}`);
 }
 
-function buildPreview(kind, definition, enLocale, csLocale) {
-  if (kind === "decisions") {
-    const lines = [];
-    lines.push(`[Decision] ${definition.id}`);
-    lines.push(`weight=${definition.weight} minElapsedSeconds=${definition.minElapsedSeconds}`);
-    lines.push("");
-    lines.push(`EN title: ${enLocale.title ?? ""}`);
-    lines.push(`EN body: ${enLocale.body ?? ""}`);
-    lines.push("EN options/results:");
-    (definition.options ?? []).forEach((option) => {
-      lines.push(`- ${option.id}: ${enLocale.options?.[option.id] ?? ""}`);
-      lines.push(`  result: ${enLocale.results?.[option.id] ?? ""}`);
-    });
-    lines.push("");
-    lines.push(`CS title: ${csLocale.title ?? ""}`);
-    lines.push(`CS body: ${csLocale.body ?? ""}`);
-    return lines.join("\n");
-  }
-
-  if (kind === "objectives") {
-    return [
-      `[Objective] ${definition.id}`,
-      `building=${definition.buildingId} requiredLevel=${definition.requiredLevel}`,
-      `reward=${JSON.stringify(definition.reward ?? {})}`,
-      "",
-      `EN title: ${enLocale.title ?? ""}`,
-      `EN description: ${enLocale.description ?? ""}`,
-      `EN reward text: ${enLocale.reward ?? ""}`,
-      "",
-      `CS title: ${csLocale.title ?? ""}`,
-      `CS description: ${csLocale.description ?? ""}`,
-      `CS reward text: ${csLocale.reward ?? ""}`,
-    ].join("\n");
-  }
-
-  return [
-    `[Sudden] ${definition.id}`,
-    `weight=${definition.weight} minElapsedSeconds=${definition.minElapsedSeconds}`,
-    `resourceLossPercent=${JSON.stringify(definition.resourceLossPercent ?? {})}`,
-    "",
-    `EN title: ${enLocale.title ?? ""}`,
-    `EN result: ${enLocale.result ?? ""}`,
-    "",
-    `CS title: ${csLocale.title ?? ""}`,
-    `CS result: ${csLocale.result ?? ""}`,
-  ].join("\n");
-}
-
 function renderEditor() {
   const entry = selectedEntry();
 
@@ -674,24 +625,6 @@ function renderEditor() {
   el.csInput.value = JSON.stringify(entry.i18n.cs, null, 2);
 
   el.syncOptionsBtn.classList.toggle("hidden", info.kind !== "decisions");
-  renderPreviewFromInputs();
-}
-
-function renderPreviewFromInputs() {
-  const info = selectedKindAndId();
-  if (!info) {
-    el.previewOutput.textContent = "Preview is empty.";
-    return;
-  }
-
-  try {
-    const definition = parseJsonInput(el.definitionInput.value, "Definition JSON");
-    const en = parseJsonInput(el.enInput.value, "English locale JSON");
-    const cs = parseJsonInput(el.csInput.value, "Czech locale JSON");
-    el.previewOutput.textContent = buildPreview(info.kind, definition, en, cs);
-  } catch (error) {
-    el.previewOutput.textContent = `Preview unavailable: ${error.message}`;
-  }
 }
 
 async function saveModelToDisk() {
@@ -925,12 +858,6 @@ el.questKindFilter.addEventListener("change", () => {
   state.listKindFilter = el.questKindFilter.value || "all";
   resetListWindow();
   renderQuestList();
-});
-
-[el.definitionInput, el.enInput, el.csInput].forEach((input) => {
-  input.addEventListener("input", () => {
-    renderPreviewFromInputs();
-  });
 });
 
 loadModel()

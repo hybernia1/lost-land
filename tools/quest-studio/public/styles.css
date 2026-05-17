@@ -249,29 +249,6 @@ textarea {
   gap: 12px;
 }
 
-.preview-card {
-  border: 1px solid #d8e0ee;
-  border-radius: 8px;
-  padding: 10px;
-  background: #f8fbff;
-  margin-bottom: 12px;
-}
-
-.preview-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: #21407a;
-  margin-bottom: 6px;
-}
-
-.preview-output {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .status {
   border-top: 1px solid #d8e0ee;
   background: #fff;
