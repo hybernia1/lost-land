@@ -67,13 +67,16 @@ const QUEST_TEMPLATES = {
       build: (id) => ({
         definition: {
           id,
-          buildingId: "storage",
-          requiredLevel: 1,
+          target: {
+            type: "buildingLevel",
+            buildingId: "storage",
+            requiredLevel: 1,
+          },
           reward: { material: 12 },
         },
         i18n: {
-          en: { title: "", description: "", reward: "" },
-          cs: { title: "", description: "", reward: "" },
+          en: { title: "", description: "" },
+          cs: { title: "", description: "" },
         },
       }),
     },
@@ -82,13 +85,50 @@ const QUEST_TEMPLATES = {
       build: (id) => ({
         definition: {
           id,
-          buildingId: "workshop",
-          requiredLevel: 2,
+          target: {
+            type: "buildingLevel",
+            buildingId: "workshop",
+            requiredLevel: 2,
+          },
           reward: { material: 20, coal: 8 },
         },
         i18n: {
-          en: { title: "", description: "", reward: "" },
-          cs: { title: "", description: "", reward: "" },
+          en: { title: "", description: "" },
+          cs: { title: "", description: "" },
+        },
+      }),
+    },
+    populationMilestone: {
+      description: "reach target total population",
+      build: (id) => ({
+        definition: {
+          id,
+          target: {
+            type: "populationAtLeast",
+            requiredPopulation: 8,
+          },
+          reward: { food: 16, morale: 4 },
+        },
+        i18n: {
+          en: { title: "", description: "" },
+          cs: { title: "", description: "" },
+        },
+      }),
+    },
+    raidMilestone: {
+      description: "loot outside settlements (chain: 1,2,5...)",
+      build: (id) => ({
+        definition: {
+          id,
+          target: {
+            type: "resourceSitesLootedAtLeast",
+            requiredCount: 1,
+          },
+          reward: { material: 24, morale: 6 },
+        },
+        i18n: {
+          en: { title: "", description: "" },
+          cs: { title: "", description: "" },
         },
       }),
     },
@@ -230,6 +270,100 @@ function getFilteredEntries(kind) {
   return base.filter((entry) => getEntrySearchText(entry).includes(query));
 }
 
+function getObjectiveChainGroup(entry) {
+  if (entry?.chainGroup) {
+    return entry.chainGroup;
+  }
+
+  if (entry?.id?.startsWith("lootSettlementChain")) {
+    return "lootSettlementChain";
+  }
+
+  if (entry?.id?.startsWith("reachPopulationChain")) {
+    return "reachPopulationChain";
+  }
+
+  if (entry?.id?.startsWith("upgradeStorageLevel")) {
+    return "upgradeStorageChain";
+  }
+
+  if (entry?.id?.startsWith("upgradeCoalMineLevel")) {
+    return "upgradeCoalMineChain";
+  }
+
+  if (entry?.id?.startsWith("upgradeHydroponicsLevel")) {
+    return "upgradeHydroponicsChain";
+  }
+
+  return null;
+}
+
+function appendQuestButton(container, kind, entry) {
+  const key = `${kind}:${entry.id}`;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `quest-item${state.selectedKey === key ? " active" : ""}`;
+  button.textContent = entry.id;
+  button.onclick = () => {
+    state.selectedKey = key;
+    renderQuestList();
+    renderEditor();
+  };
+  container.appendChild(button);
+}
+
+function renderObjectiveListWithChains(container, allEntries, visibleLimit) {
+  const entries = allEntries.slice(0, visibleLimit);
+  const chainBuckets = new Map();
+  const singles = [];
+
+  entries.forEach((entry) => {
+    const chainGroup = getObjectiveChainGroup(entry);
+    if (!chainGroup) {
+      singles.push(entry);
+      return;
+    }
+
+    if (!chainBuckets.has(chainGroup)) {
+      chainBuckets.set(chainGroup, []);
+    }
+    chainBuckets.get(chainGroup).push(entry);
+  });
+
+  singles.forEach((entry) => appendQuestButton(container, "objectives", entry));
+
+  const orderedChains = [...chainBuckets.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  orderedChains.forEach(([chainGroup, chainEntries]) => {
+    chainEntries.sort((a, b) => a.id.localeCompare(b.id));
+    const details = document.createElement("details");
+    details.className = "quest-chain-accordion";
+    details.open = chainEntries.some((entry) => state.selectedKey === `objectives:${entry.id}`);
+
+    const summary = document.createElement("summary");
+    summary.className = "quest-chain-summary";
+    summary.textContent = `${chainGroup} (${chainEntries.length})`;
+    details.appendChild(summary);
+
+    const chainBody = document.createElement("div");
+    chainBody.className = "quest-chain-body";
+    chainEntries.forEach((entry) => appendQuestButton(chainBody, "objectives", entry));
+    details.appendChild(chainBody);
+    container.appendChild(details);
+  });
+
+  if (allEntries.length > visibleLimit) {
+    const moreButton = document.createElement("button");
+    moreButton.type = "button";
+    moreButton.className = "quest-show-more";
+    moreButton.textContent = `Show more (${allEntries.length - visibleLimit} remaining)`;
+    moreButton.onclick = () => {
+      state.listVisibleByKind.objectives = visibleLimit + LIST_PAGE_SIZE;
+      renderQuestList();
+    };
+    container.appendChild(moreButton);
+  }
+}
+
 function renderQuestList() {
   if (!state.model) {
     return;
@@ -264,19 +398,13 @@ function renderQuestList() {
       return;
     }
 
-    visibleEntries.forEach((entry) => {
-      const key = `${kind}:${entry.id}`;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `quest-item${state.selectedKey === key ? " active" : ""}`;
-      button.textContent = entry.id;
-      button.onclick = () => {
-        state.selectedKey = key;
-        renderQuestList();
-        renderEditor();
-      };
-      container.appendChild(button);
-    });
+    if (kind === "objectives") {
+      renderObjectiveListWithChains(container, allEntries, visibleLimit);
+      el.questList.appendChild(container);
+      return;
+    }
+
+    visibleEntries.forEach((entry) => appendQuestButton(container, kind, entry));
 
     if (allEntries.length > visibleEntries.length) {
       const moreButton = document.createElement("button");
@@ -316,6 +444,13 @@ function normalizeDecisionLocaleOptions(definition, locale) {
   locale.results = nextResults;
 }
 
+function normalizeObjectiveLocale(locale) {
+  return {
+    title: typeof locale?.title === "string" ? locale.title : "",
+    description: typeof locale?.description === "string" ? locale.description : "",
+  };
+}
+
 function applyCurrentEditor({ silent = false } = {}) {
   const entry = selectedEntry();
   if (!entry) {
@@ -334,6 +469,9 @@ function applyCurrentEditor({ silent = false } = {}) {
   if (entry.kind === "decision") {
     normalizeDecisionLocaleOptions(entry.definition, entry.i18n.en);
     normalizeDecisionLocaleOptions(entry.definition, entry.i18n.cs);
+  } else if (entry.kind === "objective") {
+    entry.i18n.en = normalizeObjectiveLocale(entry.i18n.en);
+    entry.i18n.cs = normalizeObjectiveLocale(entry.i18n.cs);
   }
 
   const { kind } = selectedKindAndId();
@@ -618,7 +756,10 @@ function renderEditor() {
   el.editorPanel.classList.remove("hidden");
 
   const info = selectedKindAndId();
-  el.questBadge.textContent = `${kindLabel(info.kind)} / group: ${entry.group}`;
+  const chainGroup = info.kind === "objectives" ? getObjectiveChainGroup(entry) : null;
+  el.questBadge.textContent = chainGroup
+    ? `${kindLabel(info.kind)} / group: ${entry.group} / chain: ${chainGroup}`
+    : `${kindLabel(info.kind)} / group: ${entry.group}`;
   el.questTitle.textContent = entry.id;
   el.definitionInput.value = JSON.stringify(entry.definition, null, 2);
   el.enInput.value = JSON.stringify(entry.i18n.en, null, 2);

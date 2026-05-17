@@ -44,6 +44,28 @@ const QUEST_DATA_PATHS = {
 const CONTENT_QUESTS_DIR = path.join(repoRoot, "src", "content", "quests");
 const I18N_QUESTS_DIR = path.join(repoRoot, "src", "i18n", "quests");
 const GAME_TYPES_PATH = path.join(repoRoot, "src", "game", "types.ts");
+const OBJECTIVE_CHAIN_BUNDLES = [
+  {
+    bundleId: "lootSettlementChain",
+    idPrefix: "lootSettlementChain",
+  },
+  {
+    bundleId: "reachPopulationChain",
+    idPrefix: "reachPopulationChain",
+  },
+  {
+    bundleId: "upgradeStorageChain",
+    idPrefix: "upgradeStorageLevel",
+  },
+  {
+    bundleId: "upgradeCoalMineChain",
+    idPrefix: "upgradeCoalMineLevel",
+  },
+  {
+    bundleId: "upgradeHydroponicsChain",
+    idPrefix: "upgradeHydroponicsLevel",
+  },
+];
 
 const META = {
   decisionGroups: Object.keys(QUEST_DATA_PATHS.decisions),
@@ -65,6 +87,7 @@ const META = {
     "clinic",
   ],
   decisionProfileAxes: ["communityMarket", "authorityAutonomy"],
+  objectiveChainGroups: OBJECTIVE_CHAIN_BUNDLES.map((bundle) => bundle.bundleId),
 };
 
 function ensureDir(dirPath) {
@@ -240,12 +263,129 @@ function getQuestLocaleExportName(kind, locale) {
   return `questUi${suffix}`;
 }
 
+function getObjectiveChainLocaleExportName(locale) {
+  return locale === "en" ? "objectiveChainLocaleEn" : "objectiveChainLocaleCs";
+}
+
+function getObjectiveChainBundleId(questId) {
+  return OBJECTIVE_CHAIN_BUNDLES.find((bundle) => questId.startsWith(bundle.idPrefix))?.bundleId ?? null;
+}
+
+function getObjectiveChainFilePath(bundleId, locale) {
+  return path.join(CONTENT_QUESTS_DIR, "objectives", bundleId, "i18n", `${locale}.ts`);
+}
+
+function normalizeObjectiveLocale(value) {
+  return {
+    title: typeof value?.title === "string" ? value.title : "",
+    description: typeof value?.description === "string" ? value.description : "",
+  };
+}
+
+function findObjectiveLocaleInAnyBundle(questId, locale) {
+  for (const bundle of OBJECTIVE_CHAIN_BUNDLES) {
+    const filePath = getObjectiveChainFilePath(bundle.bundleId, locale);
+    if (!existsSync(filePath)) {
+      continue;
+    }
+
+    const localesById = loadExportedValue(
+      filePath,
+      getObjectiveChainLocaleExportName(locale),
+    );
+    const localeValue = localesById?.[questId];
+    if (localeValue && typeof localeValue === "object") {
+      return localeValue;
+    }
+  }
+
+  return null;
+}
+
 function writeQuestLocale(kind, questId, locale, value) {
   const exportName = getQuestLocaleExportName(kind, locale);
   const filePath = path.join(CONTENT_QUESTS_DIR, kind, questId, "i18n", `${locale}.ts`);
   ensureDir(path.dirname(filePath));
   const body = `export const ${exportName} = ${toTsLiteral(value)} as const;\n`;
   writeFileSync(filePath, body, "utf8");
+}
+
+function loadObjectiveLocale(questId, locale) {
+  const bundleId = getObjectiveChainBundleId(questId);
+
+  if (!bundleId) {
+    const legacyPath = path.join(CONTENT_QUESTS_DIR, "objectives", questId, "i18n", `${locale}.ts`);
+    if (existsSync(legacyPath)) {
+      return normalizeObjectiveLocale(loadExportedValue(
+        legacyPath,
+        getQuestLocaleExportName("objectives", locale),
+      ));
+    }
+
+    const chainLocale = findObjectiveLocaleInAnyBundle(questId, locale);
+    if (chainLocale) {
+      return normalizeObjectiveLocale(chainLocale);
+    }
+
+    throw new Error(`Missing objective locale file for "${questId}" (${locale}).`);
+  }
+
+  const localesById = loadExportedValue(
+    getObjectiveChainFilePath(bundleId, locale),
+    getObjectiveChainLocaleExportName(locale),
+  );
+  const localeValue = localesById?.[questId];
+
+  if (!localeValue || typeof localeValue !== "object") {
+    const chainLocale = findObjectiveLocaleInAnyBundle(questId, locale);
+    if (chainLocale) {
+      return normalizeObjectiveLocale(chainLocale);
+    }
+
+    throw new Error(`Missing objective locale "${questId}" in bundle "${bundleId}" (${locale}).`);
+  }
+
+  return normalizeObjectiveLocale(localeValue);
+}
+
+function writeObjectiveLocales(objectiveEntries) {
+  const groupedByBundle = new Map();
+
+  for (const entry of objectiveEntries) {
+    const bundleId = getObjectiveChainBundleId(entry.id);
+    if (!bundleId) {
+      writeQuestLocale("objectives", entry.id, "en", entry.i18n.en);
+      writeQuestLocale("objectives", entry.id, "cs", entry.i18n.cs);
+      continue;
+    }
+
+    if (!groupedByBundle.has(bundleId)) {
+      groupedByBundle.set(bundleId, []);
+    }
+
+    groupedByBundle.get(bundleId).push(entry);
+  }
+
+  for (const [bundleId, entries] of groupedByBundle.entries()) {
+    const sorted = [...entries].sort((a, b) => a.id.localeCompare(b.id));
+    const enValue = Object.fromEntries(sorted.map((entry) => [entry.id, entry.i18n.en]));
+    const csValue = Object.fromEntries(sorted.map((entry) => [entry.id, entry.i18n.cs]));
+    const enPath = getObjectiveChainFilePath(bundleId, "en");
+    const csPath = getObjectiveChainFilePath(bundleId, "cs");
+
+    ensureDir(path.dirname(enPath));
+    ensureDir(path.dirname(csPath));
+    writeFileSync(
+      enPath,
+      `export const ${getObjectiveChainLocaleExportName("en")} = ${toTsLiteral(enValue)} as const;\n`,
+      "utf8",
+    );
+    writeFileSync(
+      csPath,
+      `export const ${getObjectiveChainLocaleExportName("cs")} = ${toTsLiteral(csValue)} as const;\n`,
+      "utf8",
+    );
+  }
 }
 
 function writeQuestUiLocale(locale, value) {
@@ -259,11 +399,24 @@ function writeQuestUiLocale(locale, value) {
 function formatI18nAggregator(locale, objectives, decisions, sudden) {
   const localeUpper = locale === "en" ? "En" : "Cs";
   const lines = [];
+  const importedObjectiveChainBundles = new Set();
 
   lines.push('import type { QuestTranslationPack } from "../types";');
   lines.push(`import { questUi${localeUpper} } from "../../content/quests/ui/i18n/${locale}";`);
 
   objectives.forEach((entry) => {
+    const bundleId = getObjectiveChainBundleId(entry.id);
+    if (bundleId) {
+      if (importedObjectiveChainBundles.has(bundleId)) {
+        return;
+      }
+      importedObjectiveChainBundles.add(bundleId);
+      lines.push(
+        `import { ${getObjectiveChainLocaleExportName(locale)} as objectiveChain_${bundleId}_${locale} } from "../../content/quests/objectives/${bundleId}/i18n/${locale}";`,
+      );
+      return;
+    }
+
     lines.push(
       `import { objectiveLocale${localeUpper} as objective_${entry.id}_${locale} } from "../../content/quests/objectives/${entry.id}/i18n/${locale}";`,
     );
@@ -286,6 +439,12 @@ function formatI18nAggregator(locale, objectives, decisions, sudden) {
   lines.push(`  ui: questUi${localeUpper},`);
   lines.push("  objectives: {");
   objectives.forEach((entry) => {
+    const bundleId = getObjectiveChainBundleId(entry.id);
+    if (bundleId) {
+      lines.push(`    ${entry.id}: objectiveChain_${bundleId}_${locale}.${entry.id},`);
+      return;
+    }
+
     lines.push(`    ${entry.id}: objective_${entry.id}_${locale},`);
   });
   lines.push("  },");
@@ -355,6 +514,12 @@ function validateModel(model) {
       optionIds.add(option.id);
     }
   }
+
+  for (const objective of objectives) {
+    objective.i18n = objective.i18n ?? {};
+    objective.i18n.en = normalizeObjectiveLocale(objective.i18n.en);
+    objective.i18n.cs = normalizeObjectiveLocale(objective.i18n.cs);
+  }
 }
 
 async function loadQuestStudioModel() {
@@ -389,20 +554,15 @@ async function loadQuestStudioModel() {
     const definitions = loadExportedValue(cfg.filePath, cfg.exportName);
 
     for (const definition of definitions) {
-      const en = loadExportedValue(
-        path.join(CONTENT_QUESTS_DIR, "objectives", definition.id, "i18n", "en.ts"),
-        "objectiveLocaleEn",
-      );
-      const cs = loadExportedValue(
-        path.join(CONTENT_QUESTS_DIR, "objectives", definition.id, "i18n", "cs.ts"),
-        "objectiveLocaleCs",
-      );
+      const en = loadObjectiveLocale(definition.id, "en");
+      const cs = loadObjectiveLocale(definition.id, "cs");
 
       objectiveEntries.push({
         id: definition.id,
         kind: "objective",
         group,
         definition,
+        chainGroup: getObjectiveChainBundleId(definition.id),
         i18n: { en, cs },
       });
     }
@@ -483,10 +643,7 @@ function saveQuestStudioModel(model) {
     writeQuestLocale("decisions", entry.id, "cs", entry.i18n.cs);
   }
 
-  for (const entry of objectives) {
-    writeQuestLocale("objectives", entry.id, "en", entry.i18n.en);
-    writeQuestLocale("objectives", entry.id, "cs", entry.i18n.cs);
-  }
+  writeObjectiveLocales(objectives);
 
   for (const entry of sudden) {
     writeQuestLocale("sudden", entry.id, "en", entry.i18n.en);
