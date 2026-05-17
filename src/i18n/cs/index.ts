@@ -1,4 +1,4 @@
-import { quests } from "./quests";
+import { questsCs as quests } from "../quests/cs";
 import type { CsTranslationPack } from "./types";
 
 export const cs: CsTranslationPack = {
